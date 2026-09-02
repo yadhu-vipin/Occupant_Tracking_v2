@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+reports/
+*.png
+reference_db.json
+test_db.json
+Building_B*/

@@ -1,0 +1,25 @@
+{
+    "profile": "local",
+    "description": "Local profile: 10 buildings on 127.0.0.1-10, port 9443",
+    "nodes": {
+        "B1":  {"host": "127.0.0.1",  "port": 9443},
+        "B2":  {"host": "127.0.0.2",  "port": 9443},
+        "B3":  {"host": "127.0.0.3",  "port": 9443},
+        "B4":  {"host": "127.0.0.4",  "port": 9443},
+        "B5":  {"host": "127.0.0.5",  "port": 9443},
+        "B6":  {"host": "127.0.0.6",  "port": 9443},
+        "B7":  {"host": "127.0.0.7",  "port": 9443},
+        "B8":  {"host": "127.0.0.8",  "port": 9443},
+        "B9":  {"host": "127.0.0.9",  "port": 9443},
+        "B10": {"host": "127.0.0.10", "port": 9443},
+        "registry": {"host": "127.0.0.11", "port": 9443}
+    },
+    "tls": {
+        "min_version": "TLSv1.3",
+        "ca_cert": "pki/ca.pem",
+        "verify_mode": "CERT_REQUIRED"
+    },
+    "gossip_interval_s": 30,
+    "nonce_window_s": 120,
+    "max_frame_bytes": 8388608
+}

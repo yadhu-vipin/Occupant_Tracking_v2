@@ -1,0 +1,25 @@
+{
+    "profile": "docker",
+    "description": "Docker profile: 11 containers on bridge network 172.28.0.0/24",
+    "nodes": {
+        "B1":  {"host": "172.28.0.11", "port": 9443},
+        "B2":  {"host": "172.28.0.12", "port": 9443},
+        "B3":  {"host": "172.28.0.13", "port": 9443},
+        "B4":  {"host": "172.28.0.14", "port": 9443},
+        "B5":  {"host": "172.28.0.15", "port": 9443},
+        "B6":  {"host": "172.28.0.16", "port": 9443},
+        "B7":  {"host": "172.28.0.17", "port": 9443},
+        "B8":  {"host": "172.28.0.18", "port": 9443},
+        "B9":  {"host": "172.28.0.19", "port": 9443},
+        "B10": {"host": "172.28.0.20", "port": 9443},
+        "registry": {"host": "172.28.0.21", "port": 9443}
+    },
+    "tls": {
+        "min_version": "TLSv1.3",
+        "ca_cert": "pki/ca.pem",
+        "verify_mode": "CERT_REQUIRED"
+    },
+    "gossip_interval_s": 30,
+    "nonce_window_s": 120,
+    "max_frame_bytes": 8388608
+}
