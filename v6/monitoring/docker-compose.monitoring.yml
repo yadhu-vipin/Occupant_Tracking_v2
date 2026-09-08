@@ -1,0 +1,54 @@
+# Docker Compose for DSTS Monitoring Stack
+# Spins up Prometheus + Grafana with dashboard pre-provisioned
+#
+# Usage:
+#   docker-compose -f docker-compose.monitoring.yml up -d
+#
+# Access:
+#   Prometheus: http://localhost:9091
+#   Grafana:    http://localhost:3000 (admin/admin)
+
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dsts-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: dsts-pushgateway
+    ports:
+      - "9092:9091"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dsts-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/dsts.json
+    volumes:
+      - ./grafana_dashboard.json:/var/lib/grafana/dashboards/dsts.json:ro
+      - ./grafana-provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:
