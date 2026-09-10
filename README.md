@@ -1,141 +1,161 @@
-# Distributed Spatial-Temporal Sensing (DSTS) & Building Routing Framework
+# Distributed Spatial-Temporal Sensing (DSTS) Framework
+### Multi-Building Occupant Tracking, Decentralized Routing & Zero-Trust Metadata Security
 
-[![Branch](https://img.shields.io/badge/branch-lane__B-blue)](https://github.com/YourRepo/Occupant_Tracking_v2/tree/lane_B)
-[![Tests](https://img.shields.io/badge/tests-33%2F33%20passed-brightgreen)](#-testing--verification)
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](requirements.txt)
-[![License](https://img.shields.io/badge/license-MIT-green)](#)
-
-DSTS is an edge-based, privacy-preserving multi-building occupant tracking and face recognition framework. It implements Bayesian spatial-temporal state estimation, decentralized LSH & Bloom filter routing for unknown visitors, zero-trust inter-node security (X25519, AES-128-GCM, Ed25519), and real-time Prometheus monitoring.
-
----
-
-## 📚 Complete Project Documentation
-
-- 📄 **[SYSTEM_BLUEPRINT.md](SYSTEM_BLUEPRINT.md)** — Architectural design blueprint, modular breakdown (Building Edge vs System-Wide), mathematical equations (Eq 1–6), data matrix, and security threat model.
-- 📄 **[FILE_CATALOG.md](FILE_CATALOG.md)** — Complete catalog of every file, detailing purpose, key classes/functions, input/output contracts, and major breakpoints.
-- 📄 **[SYSTEM_FLOW.md](SYSTEM_FLOW.md)** — Step-by-step dataflow & control flow trace from camera observation to cryptographic envelope packaging and Prometheus telemetry.
-- 📄 **[requirements.txt](requirements.txt)** — Explicit list of Python dependencies.
+[![Branch](https://img.shields.io/badge/branch-lane__B-blue.svg)](https://github.com/yadhu-vipin/Occupant_Tracking_v2/tree/lane_B)
+[![Build Status](https://img.shields.io/badge/tests-33%2F33%20passed-brightgreen.svg)](#-testing--verification)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](requirements.txt)
+[![Security Standard](https://img.shields.io/badge/crypto-X25519%20%7C%20AES--128--GCM%20%7C%20Ed25519-green.svg)](#-security--cryptographic-specification)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](#)
 
 ---
 
-## 🚀 Quick Start Guide
+## 📌 Executive Summary
 
-### 1. Installation
-Clone the repository and install dependencies:
-```bash
-git clone -b lane_B https://github.com/YourRepo/Occupant_Tracking_v2.git
-cd Occupant_Tracking_v2
-pip install -r requirements.txt
-```
+The **Distributed Spatial-Temporal Sensing (DSTS)** framework provides an edge-computed, privacy-preserving infrastructure for continuous multi-building occupant tracking, unknown visitor routing, and secure inter-building spatial handoffs.
 
-### 2. Run Main Demonstration Benchmark
-Run the end-to-end 40-event evaluation scenario ($B_1 \to z_T \to B_5$), compute recognition & routing metrics, execute security handoff checks, and generate performance report charts:
-```bash
-python run_demo.py
-```
-
-Generated report charts will be saved in `reports/`:
-- `reports/precision_recall_curve.png`
-- `reports/recognition_performance.png`
-- `reports/buildings_contacted.png`
-- `reports/routing_efficiency.png`
+Designed to eliminate centralized database bottlenecks and prevent privacy leakage, DSTS isolates biometric feature vectors at local building edges. When occupants transit between facility buildings, DSTS leverages **Locality-Sensitive Hashing (LSH)** and compressed **Bloom filter summaries** for decentralized routing, paired with an authenticated zero-trust cryptographic protocol (**X25519**, **HKDF-SHA256**, **AES-128-GCM**, and **Ed25519**) for inter-node metadata exchange.
 
 ---
 
-## 🧪 Testing & Verification
+## 🏛 Framework Architecture & Theoretical Foundations
 
-The repository contains 33 automated tests covering 100% of integration and security scenarios.
+### 1. Bayesian Spatial-Temporal State Transition (Equation 6)
+Each autonomous building node maintains a local state probability matrix $S_b(t)$ across zones $Z_b = \{z_1, \dots, z_8, z_T\}$. Upon receiving camera observation event $e_t = (z_k, y_t, t)$, the local spatial probability distribution updates via:
 
-### Run All Unit & Integration Tests
-```bash
-python tests/test_integration.py
-```
-*(19/19 E2E integration tests passing)*
+$$P(x_t = z_j \mid e_{1:t}) \propto P(y_t \mid x_t = z_j) \sum_{i} P(x_t = z_j \mid x_{t-1} = z_i) P(x_{t-1} = z_i \mid e_{1:t-1})$$
 
-### Run All Cryptographic Security Tests
-```bash
-python tests/test_security.py
-```
-*(14/14 security threat model tests passing)*
+Where:
+- $P(y_t \mid x_t = z_j)$ represents the camera likelihood model.
+- $P(x_t = z_j \mid x_{t-1} = z_i)$ represents the Markovian spatial transition kernel constrained by zone graph adjacency.
+
+### 2. High-Likelihood Condition (HLC) & Spatial Handoff
+An occupant presence is confirmed at a zone when:
+
+$$\text{HLC} = \text{True} \iff \max_{z} P(x_t = z \mid e_{1:t}) \ge \theta_{\text{HLC}} \quad (\theta_{\text{HLC}} = 0.80)$$
+
+When an occupant reaches transition zone $z_T$ in Building $A$ under HLC and subsequently leaves camera view, Building $A$ seals an encrypted handoff envelope for target Building $B$.
 
 ---
 
-## 🏗 System Architecture & Directory Structure
+## 📂 Repository Blueprint & Component Organization
+
+The system is partitioned into **Building-Specific Edge Layer** components and **System-Wide Infrastructure**:
 
 ```
 Occupant_Tracking_v2/
 ├── 🏢 BUILDING-SPECIFIC NODES (Edge Layer)
-│   ├── node/building_node.py       # Autonomous Building Node controller
-│   ├── dsts/bsts.py                # Building Spatial-Temporal Sensing (BSTS) Bayesian engine
-│   ├── dsts/state.py               # Local state matrix S_b(t) tracking
-│   ├── dsts/transition.py          # Spatial transition kernel (Eq 6)
-│   └── dsts/zones.py               # Zone layout definitions (z1..z8, z_T)
+│   ├── node/building_node.py       # Edge controller & visitor registry state management
+│   ├── dsts/bsts.py                # Building Spatial-Temporal Sensing (BSTS) engine
+│   ├── dsts/state.py               # Local state probability matrix S_b(t) maintainer
+│   ├── dsts/transition.py          # Spatial transition kernel implementation (Eq. 6)
+│   ├── dsts/zones.py               # Intra-building spatial zones (z1..z8, transition z_T)
+│   └── dsts/events.py              # RecognitionEvent & HLC event data definitions
 │
-├── 🌐 SYSTEM-WIDE / INTER-BUILDING INFRASTRUCTURE (Core & Routing)
-│   ├── identify/router.py          # Decentralized LSH & Bloom filter router
-│   ├── identify/bloom_summary.py   # Anonymized Bloom filter index per building
-│   ├── identify/lsh.py             # Locality-Sensitive Hashing for embeddings
-│   ├── identify/face_recognizer.py # Cosine similarity face matching engine
-│   ├── security/crypto.py          # X25519 DH, HKDF, AES-128-GCM, & Ed25519 signatures
-│   ├── security/metadata.py        # Transition metadata & encrypted envelope serialization
-│   ├── security/replay_guard.py    # Nonce cache, sliding timestamp window, anti-replay
-│   └── security/authorize.py       # Role-Based Access Control (RBAC) engine
+├── 🌐 SYSTEM-WIDE / INTER-BUILDING INFRASTRUCTURE
+│   ├── identify/router.py          # LSH & Bloom filter decentralized query router
+│   ├── identify/bloom_summary.py   # Anonymized Bloom filter summary generator
+│   ├── identify/lsh.py             # Locality-Sensitive Hashing vector indexer
+│   ├── identify/face_recognizer.py # Cosine similarity feature matching engine
+│   ├── security/crypto.py          # X25519, HKDF-SHA256, AES-128-GCM, & Ed25519 signatures
+│   ├── security/metadata.py        # TransitionMetadata & SecureMetadataEnvelope payloads
+│   ├── security/replay_guard.py    # Nonce cache, sliding timestamp window, & anti-replay
+│   └── security/authorize.py       # Role-Based Access Control (RBAC) authorization engine
 │
 ├── 📊 MONITORING & TELEMETRY
-│   ├── monitoring/monitoring.py    # Prometheus metrics collector & HTTP endpoint (Port 8000)
+│   ├── monitoring/monitoring.py    # Prometheus metrics server (HTTP Endpoint: Port 8000)
 │   ├── monitoring/prometheus.yml   # Prometheus scraper configuration
-│   ├── monitoring/grafana_dashboard.json # Grafana dashboard dashboard definition
-│   └── deploy/docker-compose.monitoring.yml # Docker Compose deployment stack
+│   ├── monitoring/grafana_dashboard.json # Grafana monitoring dashboard definition
+│   └── deploy/docker-compose.monitoring.yml # Docker Compose monitoring stack
 │
-├── 🧪 SIMULATION & REPORTING
+├── 🧪 SIMULATION, BENCHMARKS & REPORTING
 │   ├── sim/event_generator.py     # Deterministic occupant trajectory simulator
-│   ├── sim/scenario_b1_b5.py       # 40-event B1 -> z_T -> B5 evaluation scenario
+│   ├── sim/scenario_b1_b5.py       # 40-event evaluation scenario (B1 -> z_T -> B5)
 │   ├── sim/evaluation.py         # Precision/Recall & Routing Gain evaluator
-│   └── sim/report.py             # Chart visualization generator
+│   └── sim/report.py             # Performance chart visualization generator
 │
-├── 📜 DOCUMENTATION & CONFIGURATION
-│   ├── SYSTEM_BLUEPRINT.md         # Full system architectural blueprint
-│   ├── FILE_CATALOG.md             # File-by-file reference manual
-│   ├── SYSTEM_FLOW.md              # System dataflow & control flow guide
-│   ├── requirements.txt            # Dependency specs
-│   └── run_demo.py                 # Main CLI runner script
+├── 📖 DOCUMENTATION
+│   ├── SYSTEM_BLUEPRINT.md         # Comprehensive architectural specification
+│   ├── FILE_CATALOG.md             # Complete file-by-file reference manual
+│   ├── SYSTEM_FLOW.md              # End-to-end dataflow & control flow trace
+│   ├── requirements.txt            # Python dependency specification
+│   └── run_demo.py                 # Main CLI evaluation runner script
 ```
 
 ---
 
-## 🔒 Security Threat Coverage Matrix (Lane B)
+## 🔒 Security & Cryptographic Specification (Lane B)
 
-| Threat | Mitigation Mechanism | Implementation File | Status |
+The metadata security layer enforces a zero-trust architecture protecting against 8 core threat vectors:
+
+| Threat Vector | Mitigation Strategy | Cryptographic Primitive / File | Verification |
 | :--- | :--- | :--- | :--- |
-| **1. Man-in-the-Middle (MitM)** | Ephemeral X25519 DH + HKDF Session Keys | `security/crypto.py` | ✅ PASSED |
-| **2. Message Tampering** | AES-128-GCM Integrity Tag Validation | `security/crypto.py` | ✅ PASSED |
-| **3. Replay Attacks** | Nonce Cache & Timestamp Window ($300\text{s}$) | `security/replay_guard.py` | ✅ PASSED |
-| **4. Building Node Spoofing** | Ed25519 Digital Signature Verification | `security/crypto.py` | ✅ PASSED |
-| **5. Metadata Disclosure** | Encrypted Metadata Envelopes | `security/metadata.py` | ✅ PASSED |
-| **6. Message Duplication** | Unique 64-bit Hex Message Identifiers | `security/replay_guard.py` | ✅ PASSED |
-| **7. Unauthorized Access** | Role-Based Access Control (`BUILDING_NODE`) | `security/authorize.py` | ✅ PASSED |
-| **8. Privacy Leakage** | Bloom Filter Summaries & Metadata Only | `identify/bloom_summary.py` | ✅ PASSED |
+| **1. Man-in-the-Middle (MitM)** | Ephemeral key exchange & session key derivation | **X25519** + **HKDF-SHA256** (`crypto.py`) | ✅ Verified |
+| **2. Message Tampering** | Authenticated encryption with integrity tag | **AES-128-GCM** (`crypto.py`) | ✅ Verified |
+| **3. Replay Attacks** | Nonce tracking cache & 300s sliding window | `ReplayGuard` (`replay_guard.py`) | ✅ Verified |
+| **4. Building Node Spoofing** | Public-key digital signatures | **Ed25519** (`crypto.py`) | ✅ Verified |
+| **5. Metadata Disclosure** | Symmetric encryption of metadata payload | **AES-128-GCM** (`metadata.py`) | ✅ Verified |
+| **6. Message Duplication** | Unique 64-bit hexadecimal message identifiers | `ReplayGuard` (`replay_guard.py`) | ✅ Verified |
+| **7. Unauthorized Access** | Principal role verification (`BUILDING_NODE`) | `RBACEngine` (`authorize.py`) | ✅ Verified |
+| **8. Privacy Leakage** | Zero raw biometrics shared; Bloom filter exchange | `identify/bloom_summary.py` | ✅ Verified |
 
 ---
 
-## 📊 Key Performance Metrics
+## 📊 Benchmark Metrics & Quantitative Results
 
-Based on the 40-event $B_1 \to B_5$ evaluation scenario (`python run_demo.py`):
+Evaluated on the standardized 40-event multi-building scenario (`run_demo.py`):
 
-- **Recognition Accuracy**: **100.0%**
-- **Optimal Decision Threshold ($\theta_{\text{opt}}$)**: **0.990**
-- **LSH / Bloom Routing Rank-1 Accuracy**: **85.7%**
-- **Average Buildings Contacted**: **1.2** (vs. **9.0** for broadcast)
-- **Communication Efficiency Gain**: **86.2%**
+| Evaluation Category | Metric | Result | Benchmark Target |
+| :--- | :--- | :--- | :--- |
+| **Recognition** | Recognition Accuracy | **100.0%** | $\ge 95.0\%$ |
+| **Recognition** | Optimal Threshold ($\theta_{\text{opt}}$) | **0.990** | $0.80 - 0.99$ |
+| **Routing** | LSH / Bloom Rank-1 Accuracy | **85.7%** | $\ge 80.0\%$ |
+| **Routing Efficiency** | Avg. Contacted Buildings | **1.2** / 10 | vs. 9.0 Broadcast |
+| **Routing Efficiency** | Communication Efficiency Gain | **86.2%** | $\ge 80.0\%$ |
+| **Security** | Threat Verification Checks | **14 / 14 Passed** | 100% |
 
 ---
 
-## 🔀 Branch Merge Readiness Checklist (`lane_B` -> `main`)
+## ⚡ Quick Start & Execution Guide
 
-- [x] Repository cleaned up; flat top-level structure with zero redundant nested `v6/` folders.
-- [x] Dependencies listed cleanly in `requirements.txt`.
-- [x] Modular blueprint documented in `SYSTEM_BLUEPRINT.md`.
-- [x] Detailed file-by-file documentation created in `FILE_CATALOG.md`.
-- [x] Step-by-step dataflow documented in `SYSTEM_FLOW.md`.
-- [x] 100% test pass rate across 33 integration and security tests.
-- [x] `python run_demo.py` runs without errors out-of-the-box.
+### 1. Environment Setup
+Install dependencies listed in [`requirements.txt`](requirements.txt):
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Execute Demonstration Benchmark
+Run the end-to-end multi-building simulation, calculate recognition & routing metrics, execute security handoff validation, and export visual report charts:
+```bash
+python run_demo.py
+```
+*(Generated report PNG files will be saved in `reports/`)*
+
+### 3. Run Automated Test Suites
+Validate integration and security threat models:
+```bash
+# Run End-to-End Integration Tests (19 tests)
+python tests/test_integration.py
+
+# Run Security & Cryptography Tests (14 tests)
+python tests/test_security.py
+```
+
+---
+
+## 📑 Core Documentation Index
+
+Detailed architectural specs and control flow documentation are maintained in dedicated Markdown manuals:
+
+- 📘 **[SYSTEM_BLUEPRINT.md](SYSTEM_BLUEPRINT.md)** — Comprehensive architectural blueprint, edge vs system-wide breakdown, mathematical framework, and data matrix.
+- 📘 **[FILE_CATALOG.md](FILE_CATALOG.md)** — File catalog detailing intro, responsibilities, input/output contracts, key classes, and major execution breakpoints.
+- 📘 **[SYSTEM_FLOW.md](SYSTEM_FLOW.md)** — Detailed step-by-step trace of dataflow and control flow through the system.
+
+---
+
+## 🔀 Branch Merge Status (`lane_B` $\to$ `main`)
+
+- [x] **Code Clean-up**: Flat repository structure with zero redundant nested `v6/` directories.
+- [x] **Dependencies**: Complete dependency specification in [`requirements.txt`](requirements.txt).
+- [x] **Test Coverage**: 33 / 33 tests passing with 0 failures (`test_integration.py` & `test_security.py`).
+- [x] **Documentation**: Full set of technical specifications ([`SYSTEM_BLUEPRINT.md`](SYSTEM_BLUEPRINT.md), [`FILE_CATALOG.md`](FILE_CATALOG.md), [`SYSTEM_FLOW.md`](SYSTEM_FLOW.md)).
+- [x] **Git Verification**: Branch clean, committed, and pushed to `origin/lane_B`.
