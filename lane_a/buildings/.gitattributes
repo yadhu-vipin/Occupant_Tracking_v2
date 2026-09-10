@@ -1,0 +1,16 @@
+# Keep text files LF on every OS. The vendored core modules are hash-checked
+# byte-for-byte, and a Windows checkout that rewrote them to CRLF used to trip
+# the drift guard (buildinglib/params.check_vendored). That check now normalises
+# line endings, but pinning LF here stops the churn at the source and protects
+# the shared JSON contracts too.
+*.py            text eol=lf
+*.json          text eol=lf
+*.md            text eol=lf
+*.txt           text eol=lf
+*.csv           text eol=lf
+.gitkeep        text eol=lf
+.gitignore      text eol=lf
+
+# never let Git touch these
+*.npy           binary
+*.npz           binary

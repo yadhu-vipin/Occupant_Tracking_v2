@@ -64,8 +64,21 @@ class ContractMismatch(RuntimeError):
 
 
 def sha256_file(path):
-    """Hex SHA-256 of a file's raw bytes."""
+    """Hex SHA-256 of a file's raw bytes. For binary files (the mean face)."""
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def sha256_source(path):
+    """Hex SHA-256 of a text file's content, line-ending-agnostic.
+
+    ``read_text`` collapses ``\\r\\n`` and lone ``\\r`` to ``\\n`` (universal
+    newlines), so a Windows checkout that turned the vendored source into CRLF
+    hashes the same as the LF original. A genuine code edit still changes the
+    content and is still caught.
+    """
+    return hashlib.sha256(
+        Path(path).read_text(encoding="utf-8").encode("utf-8")
+    ).hexdigest()
 
 
 def compute_params_hash(seed, k, L, embed_dim, sizing_occupants, mean_face_sha256):
@@ -128,16 +141,17 @@ def check_vendored(raise_on_mismatch=True):
 
     Returns the dict of actual hashes either way, so ``--resync`` can print them.
     """
-    actual = {name: sha256_file(VENDORED_DIR / name) for name in VENDORED_SHA256}
+    actual = {name: sha256_source(VENDORED_DIR / name) for name in VENDORED_SHA256}
     drifted = {n: (VENDORED_SHA256[n], a) for n, a in actual.items() if a != VENDORED_SHA256[n]}
     if drifted and raise_on_mismatch:
         lines = [f"  {n}\n    recorded {rec}\n    actual   {act}" for n, (rec, act) in drifted.items()]
         raise ContractMismatch(
             "vendored module(s) drifted from the recorded hash:\n"
             + "\n".join(lines)
-            + "\n\nEither you edited a vendored file (don't -- edit lane_a/core/ and re-copy),"
-            "\nor you re-vendored deliberately. In the latter case run:"
-            "\n    python -m buildinglib.params --resync"
+            + "\n\nThis compares CODE, not line endings -- so it means someone actually"
+            "\nedited a vendored file. Don't: edit lane_a/core/ and re-copy. If you"
+            "\nre-vendored deliberately, run  python -m buildinglib.params --resync"
+            "\nand paste the printed VENDORED_SHA256 block into buildinglib/params.py."
         )
     return actual
 
