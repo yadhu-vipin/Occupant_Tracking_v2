@@ -167,8 +167,8 @@ def test_bsts_writes_state_to_store() -> None:
     )
 
 
-def test_bsts_creates_occupancy_between_events() -> None:
-    """A later event closes the previous state into an occupancy interval."""
+def test_bsts_writes_state_for_each_recognition_event() -> None:
+    """Each recognition event persists its updated state snapshot."""
     registry = FakeOccupantRegistry({"O001"})
     store = InMemoryStore(registry)
 
@@ -182,7 +182,6 @@ def test_bsts_creates_occupancy_between_events() -> None:
         },
     )
 
-    # First event creates the initial state.
     table.apply(
         "10:00",
         "z3",
@@ -190,7 +189,6 @@ def test_bsts_creates_occupancy_between_events() -> None:
         store,
     )
 
-    # Second event closes the previous state into an occupancy interval.
     table.apply(
         "10:05",
         "z4",
@@ -198,25 +196,10 @@ def test_bsts_creates_occupancy_between_events() -> None:
         store,
     )
 
-    rows = store.read_occupancy(
-        "O001",
-        "10:00",
-        "10:05",
-    )
+    first_rows = store.read_state("10:00", "O001")
+    second_rows = store.read_state("10:05", "O001")
 
-    assert len(rows) == len(ZONES)
-
-    assert all(
-        row.start_time == "10:00"
-        for row in rows
-    )
-
-    assert all(
-        row.end_time == "10:05"
-        for row in rows
-    )
-
-    assert math.isclose(
-        sum(row.probability for row in rows),
-        1.0,
-    )
+    assert len(first_rows) == len(ZONES)
+    assert len(second_rows) == len(ZONES)
+    assert math.isclose(sum(row.probability for row in second_rows), 1.0)
+    assert not hasattr(store, "write_occupancy")

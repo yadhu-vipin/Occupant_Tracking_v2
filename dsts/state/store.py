@@ -1,4 +1,4 @@
-"""Storage abstractions for occupant state and occupancy data."""
+"""Storage abstractions for probabilistic occupant state."""
 
 from __future__ import annotations
 
@@ -18,17 +18,7 @@ class StateRow:
     probability: float
 
 
-@dataclass(frozen=True)
-class OccupancyRow:
-    """A probabilistic occupancy interval."""
-
-    start_time: str
-    occupant: str
-    zone: str
-    end_time: str
-    probability: float
-
-
+# Work on progress here for later implementation.
 class OccupantRegistry(Protocol):
     """Provides the occupants registered to this building."""
 
@@ -59,16 +49,6 @@ class StateStore(Protocol):
     ) -> None:
         """Store a state record."""
 
-    def write_occupancy(
-        self,
-        start_time: str,
-        occupant: str,
-        zone: str,
-        end_time: str,
-        probability: float,
-    ) -> None:
-        """Store a probabilistic occupancy interval."""
-
     def read_state(
         self,
         time: str,
@@ -76,13 +56,11 @@ class StateStore(Protocol):
     ) -> list[StateRow]:
         """Read the state of an occupant at a given time."""
 
-    def read_occupancy(
-        self,
-        occupant: str,
-        t_start: str,
-        t_end: str,
-    ) -> list[OccupancyRow]:
-        """Read occupancy intervals for an occupant."""
+    def list_state(self, category: str) -> list[StateRow]:
+        """List all state rows in a registered or visitor category."""
+
+    def read_all_state(self) -> list[StateRow]:
+        """List all registered and visitor state rows."""
 
 
 class InMemoryStore:
@@ -92,8 +70,6 @@ class InMemoryStore:
         self._registry = registry
         self._registered_state: list[StateRow] = []
         self._visitor_state: list[StateRow] = []
-        self._registered_occupancy: list[OccupancyRow] = []
-        self._visitor_occupancy: list[OccupancyRow] = []
 
     def write_state(
         self,
@@ -117,37 +93,6 @@ class InMemoryStore:
         ]
         state.append(row)
 
-    def write_occupancy(
-        self,
-        start_time: str,
-        occupant: str,
-        zone: str,
-        end_time: str,
-        probability: float,
-    ) -> None:
-        row = OccupancyRow(
-            start_time,
-            occupant,
-            zone,
-            end_time,
-            probability,
-        )
-
-        occupancy = self._get_occupancy(occupant)
-
-        occupancy[:] = [
-            existing
-            for existing in occupancy
-            if (
-                existing.start_time,
-                existing.occupant,
-                existing.zone,
-            )
-            != (start_time, occupant, zone)
-        ]
-
-        occupancy.append(row)
-
     def read_state(
         self,
         time: str,
@@ -159,28 +104,22 @@ class InMemoryStore:
             if row.time == time and row.occupant == occupant
         ]
 
-    def read_occupancy(
-        self,
-        occupant: str,
-        t_start: str,
-        t_end: str,
-    ) -> list[OccupancyRow]:
-        return [
-            row
-            for row in self._get_occupancy(occupant)
-            if row.start_time < t_end and row.end_time > t_start
-        ]
+    def list_state(self, category: str) -> list[StateRow]:
+        """List state rows for one storage category."""
+        if category == "registered":
+            return list(self._registered_state)
+        if category == "visitor":
+            return list(self._visitor_state)
+        raise ValueError(f"Unknown storage category: {category}")
+
+    def read_all_state(self) -> list[StateRow]:
+        """List all stored state rows."""
+        return self.list_state("registered") + self.list_state("visitor")
 
     def _get_state(self, occupant: str) -> list[StateRow]:
         if self._registry.is_registered(occupant):
             return self._registered_state
         return self._visitor_state
-
-    def _get_occupancy(self, occupant: str) -> list[OccupancyRow]:
-        if self._registry.is_registered(occupant):
-            return self._registered_occupancy
-        return self._visitor_occupancy
-
 
 class SqliteStore:
     """SQLite implementation of the state store."""
@@ -200,7 +139,8 @@ class SqliteStore:
         schema = schema_path.read_text(encoding="utf-8")
 
         with self._connection:
-            self._connection.executescript(schema)
+            cursor = self._connection.executescript(schema)
+            cursor.close()
 
     def write_state(
         self,
@@ -212,7 +152,7 @@ class SqliteStore:
         table = self._state_table(occupant)
 
         with self._connection:
-            self._connection.execute(
+            cursor = self._connection.execute(
                 f"""
                 INSERT OR REPLACE INTO {table}
                 (time, occupant, zone, probability)
@@ -220,32 +160,7 @@ class SqliteStore:
                 """,
                 (time, occupant, zone, probability),
             )
-
-    def write_occupancy(
-        self,
-        start_time: str,
-        occupant: str,
-        zone: str,
-        end_time: str,
-        probability: float,
-    ) -> None:
-        table = self._occupancy_table(occupant)
-
-        with self._connection:
-            self._connection.execute(
-                f"""
-                INSERT OR REPLACE INTO {table}
-                (start_time, occupant, zone, end_time, probability)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    start_time,
-                    occupant,
-                    zone,
-                    end_time,
-                    probability,
-                ),
-            )
+            cursor.close()
 
     def read_state(
         self,
@@ -254,7 +169,7 @@ class SqliteStore:
     ) -> list[StateRow]:
         table = self._state_table(occupant)
 
-        rows = self._connection.execute(
+        cursor = self._connection.execute(
             f"""
             SELECT time, occupant, zone, probability
             FROM {table}
@@ -262,7 +177,11 @@ class SqliteStore:
             ORDER BY zone
             """,
             (time, occupant),
-        ).fetchall()
+        )
+        try:
+            rows = cursor.fetchall()
+        finally:
+            cursor.close()
 
         return [
             StateRow(
@@ -274,47 +193,50 @@ class SqliteStore:
             for row in rows
         ]
 
-    def read_occupancy(
-        self,
-        occupant: str,
-        t_start: str,
-        t_end: str,
-    ) -> list[OccupancyRow]:
-        table = self._occupancy_table(occupant)
-
-        rows = self._connection.execute(
+    def list_state(self, category: str) -> list[StateRow]:
+        """List state rows for one storage category."""
+        table = self._category_table(category, "state")
+        cursor = self._connection.execute(
             f"""
-            SELECT start_time, occupant, zone, end_time, probability
+            SELECT time, occupant, zone, probability
             FROM {table}
-            WHERE occupant = ?
-              AND start_time < ?
-              AND end_time > ?
-            ORDER BY start_time
-            """,
-            (occupant, t_end, t_start),
-        ).fetchall()
-
+            ORDER BY time, occupant, zone
+            """
+        )
+        try:
+            rows = cursor.fetchall()
+        finally:
+            cursor.close()
         return [
-            OccupancyRow(
-                row["start_time"],
-                row["occupant"],
-                row["zone"],
-                row["end_time"],
-                row["probability"],
-            )
+            StateRow(row["time"], row["occupant"], row["zone"], row["probability"])
             for row in rows
         ]
+
+    def read_all_state(self) -> list[StateRow]:
+        """List all stored state rows."""
+        return self.list_state("registered") + self.list_state("visitor")
 
     def _state_table(self, occupant: str) -> str:
         if self._registry.is_registered(occupant):
             return "registered_state"
         return "visitor_state"
 
-    def _occupancy_table(self, occupant: str) -> str:
-        if self._registry.is_registered(occupant):
-            return "registered_occupancy"
-        return "visitor_occupancy"
+    @staticmethod
+    def _category_table(category: str, record_type: str) -> str:
+        if category not in {"registered", "visitor"}:
+            raise ValueError(f"Unknown storage category: {category}")
+        if record_type != "state":
+            raise ValueError(f"Unknown record type: {record_type}")
+        return f"{category}_{record_type}"
 
     def close(self) -> None:
         """Close the SQLite connection."""
         self._connection.close()
+
+    def __enter__(self) -> SqliteStore:
+        """Return this store for use in a context manager."""
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Close the database even when a caller raises an exception."""
+        self.close()

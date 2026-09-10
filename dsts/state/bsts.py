@@ -28,15 +28,6 @@ class StateTable:
                 for occupant, distribution in initial_state.items()
             }
 
-        # Last event time for each occupant.
-        #
-        # This is used to determine the interval:
-        #
-        # previous_time ---------------- current_time
-        #
-        # for occupancy records.
-        self._last_time: dict[str, str] = {}
-
     def apply(
         self,
         time: str,
@@ -53,9 +44,6 @@ class StateTable:
 
         If a store is supplied, the resulting state is persisted.
 
-        When a previous event exists for an occupant, that previous
-        state is also represented as an occupancy interval ending at
-        the current event time.
         """
 
         if detected_zone not in self._zones:
@@ -86,22 +74,7 @@ class StateTable:
                         remaining * old_state[zone]
                     )
 
-            # If this occupant already had a previous event, the
-            # previous state represents the occupancy interval up to
-            # the current event.
-            previous_time = self._last_time.get(occupant)
-
             if store is not None:
-                if previous_time is not None:
-                    self._write_occupancy(
-                        store=store,
-                        start_time=previous_time,
-                        end_time=time,
-                        occupant=occupant,
-                        state=old_state,
-                    )
-
-                # Persist the new state.
                 for zone, zone_probability in new_state.items():
                     store.write_state(
                         time,
@@ -111,8 +84,6 @@ class StateTable:
                     )
 
             self._state[occupant] = new_state
-            self._last_time[occupant] = time
-
         self.verify_constraint()
 
     def get_state(self, occupant: str) -> dict[str, float]:
@@ -124,7 +95,7 @@ class StateTable:
         return self._state[occupant].copy()
 
     def verify_constraint(self) -> None:
-        """Verify that every occupant's probabilities sum to one."""
+        """Verify that every occupant's probabilities sum to one. Or in simple words check if the answer is summing to 1 or not"""
 
         for occupant, distribution in self._state.items():
             total = sum(distribution.values())
@@ -140,25 +111,6 @@ class StateTable:
                     f"sum={total}"
                 )
 
-    def _write_occupancy(
-        self,
-        store: StateStore,
-        start_time: str,
-        end_time: str,
-        occupant: str,
-        state: dict[str, float],
-    ) -> None:
-        """Persist occupancy intervals represented by a previous state."""
-
-        for zone, probability in state.items():
-            store.write_occupancy(
-                start_time=start_time,
-                occupant=occupant,
-                zone=zone,
-                end_time=end_time,
-                probability=probability,
-            )
-
     def _uniform_distribution(self) -> dict[str, float]:
         probability = 1.0 / len(self._zones)
 
@@ -166,7 +118,7 @@ class StateTable:
             zone: probability
             for zone in self._zones
         }
-
+    """Check that the distribution is valid and return a copy of it."""
     def _validate_distribution(
         self,
         distribution: dict[str, float],
