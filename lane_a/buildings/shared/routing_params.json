@@ -1,0 +1,9 @@
+{
+  "_comment": "Routing thresholds. Not part of params_hash (they don't change the filters), but every node should agree. buildings_params_hash pins this to the enrollment contract.",
+  "schema_version": 1,
+  "accept_angle_deg": 80.43,
+  "min_votes": 12,
+  "shortlist_k": 5,
+  "n_probes": 3,
+  "buildings_params_hash": "27dbe4084f0b5c67d132298ef693e52e856fad4b12fa354a68d75a75d369f074"
+}

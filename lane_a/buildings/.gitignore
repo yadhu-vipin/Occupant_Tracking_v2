@@ -1,0 +1,19 @@
+# python
+__pycache__/
+*.py[cod]
+
+# scratch
+work/
+
+# derived -- regenerate with `merge_check.py out/ --summary bloom_summary.csv`
+bloom_summary.csv
+
+# NOTE: out/*.npz and out/*.manifest.json are the deliverable and ARE committed.
+#
+# NOTE: do not create a directory here named artifacts/ results/ dataset_splits/
+# or embeddings_arcface/ -- lane_a/.gitignore lists those without a leading
+# slash, so they match at any depth and your files would be silently untracked.
+
+# the shared corpus -- distributed out-of-band, dropped into corpus/ by each teammate
+corpus/*.npy
+corpus/*.csv
