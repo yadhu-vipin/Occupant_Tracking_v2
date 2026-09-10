@@ -16,12 +16,21 @@ import numpy as np
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 
-from ..dsts.events import RecognitionEvent, HLC
-from ..dsts.zones import (
-    ZONE_NAMES, ZONE_INDEX, NUM_ZONES,
-    adjacent_zones, are_adjacent, ADJACENCY_MATRIX,
-)
-from .campus import BUILDING_IDS, gravity_probability
+try:
+    from dsts.events import RecognitionEvent, HLC
+    from dsts.zones import (
+        ZONE_NAMES, ZONE_INDEX, NUM_ZONES,
+        adjacent_zones, are_adjacent, ADJACENCY_MATRIX,
+    )
+    from sim.campus import BUILDING_IDS, gravity_probability
+except (ImportError, ValueError):
+    from ..dsts.events import RecognitionEvent, HLC
+    from ..dsts.zones import (
+        ZONE_NAMES, ZONE_INDEX, NUM_ZONES,
+        adjacent_zones, are_adjacent, ADJACENCY_MATRIX,
+    )
+    from .campus import BUILDING_IDS, gravity_probability
+
 
 
 # ─── Configuration ────────────────────────────────────────────────────────────

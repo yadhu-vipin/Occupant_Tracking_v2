@@ -16,22 +16,45 @@ import sys
 import os
 import time
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from v6.security.crypto import (
-    NodeIdentity, SecureChannel, ephemeral_handshake,
-    aes_gcm_encrypt, aes_gcm_decrypt, derive_session_key,
-    generate_nonce,
-)
-from v6.security.metadata import (
-    TransitionMetadata, SecureMetadataEnvelope,
-    seal_metadata, open_metadata, create_handoff_metadata,
-)
-from v6.security.replay_guard import ReplayGuard, ValidationResult
-from v6.security.authorize import (
-    authorize, Role, register_node, set_enforce_policy,
-    clear_audit_log, clear_registry, get_audit_log,
-)
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
+try:
+    from security.crypto import (
+        NodeIdentity, SecureChannel, ephemeral_handshake,
+        aes_gcm_encrypt, aes_gcm_decrypt, derive_session_key,
+        generate_nonce,
+    )
+    from security.metadata import (
+        TransitionMetadata, SecureMetadataEnvelope,
+        seal_metadata, open_metadata, create_handoff_metadata,
+    )
+    from security.replay_guard import ReplayGuard, ValidationResult
+    from security.authorize import (
+        authorize, Role, register_node, set_enforce_policy,
+        clear_audit_log, clear_registry, get_audit_log,
+    )
+except ImportError:
+    from v6.security.crypto import (
+        NodeIdentity, SecureChannel, ephemeral_handshake,
+        aes_gcm_encrypt, aes_gcm_decrypt, derive_session_key,
+        generate_nonce,
+    )
+    from v6.security.metadata import (
+        TransitionMetadata, SecureMetadataEnvelope,
+        seal_metadata, open_metadata, create_handoff_metadata,
+    )
+    from v6.security.replay_guard import ReplayGuard, ValidationResult
+    from v6.security.authorize import (
+        authorize, Role, register_node, set_enforce_policy,
+        clear_audit_log, clear_registry, get_audit_log,
+    )
+
 
 
 # ===============================================================================

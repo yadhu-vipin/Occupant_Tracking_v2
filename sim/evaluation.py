@@ -19,11 +19,19 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, field
 
-from ..dsts.metrics import (
-    evaluate_state, evaluate_average_metrics, find_optimal_theta,
-)
-from ..dsts.state import StateTable
-from ..dsts.zones import ZONE_NAMES, ZONE_INDEX
+try:
+    from dsts.metrics import (
+        evaluate_state, evaluate_average_metrics, find_optimal_theta,
+    )
+    from dsts.state import StateTable
+    from dsts.zones import ZONE_NAMES, ZONE_INDEX
+except (ImportError, ValueError):
+    from ..dsts.metrics import (
+        evaluate_state, evaluate_average_metrics, find_optimal_theta,
+    )
+    from ..dsts.state import StateTable
+    from ..dsts.zones import ZONE_NAMES, ZONE_INDEX
+
 
 
 @dataclass

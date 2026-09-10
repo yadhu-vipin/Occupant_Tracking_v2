@@ -17,23 +17,47 @@ import time
 import numpy as np
 
 # Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from v6.dsts.bsts import BSTS
-from v6.dsts.dsts import DSTS
-from v6.dsts.events import RecognitionEvent, HLC
-from v6.dsts.state import StateTable
-from v6.dsts.transition import apply_transition
-from v6.dsts.zones import (
-    ZONE_NAMES, ZONE_INDEX, NUM_ZONES,
-    adjacent_zones, are_adjacent,
-)
-from v6.dsts.metrics import evaluate_state, find_optimal_theta
-from v6.dsts.reasoning import score_track_adjacency
-from v6.sim.scenario_b1_b5 import run_scenario, print_scenario_summary
-from v6.sim.event_generator import EventGenerator
-from v6.sim.evaluation import paper_metrics, routing_metrics
-from v6.monitoring.monitoring import MetricsCollector
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
+try:
+    from dsts.bsts import BSTS
+    from dsts.dsts import DSTS
+    from dsts.events import RecognitionEvent, HLC
+    from dsts.state import StateTable
+    from dsts.transition import apply_transition
+    from dsts.zones import (
+        ZONE_NAMES, ZONE_INDEX, NUM_ZONES,
+        adjacent_zones, are_adjacent,
+    )
+    from dsts.metrics import evaluate_state, find_optimal_theta
+    from dsts.reasoning import score_track_adjacency
+    from sim.scenario_b1_b5 import run_scenario, print_scenario_summary
+    from sim.event_generator import EventGenerator
+    from sim.evaluation import paper_metrics, routing_metrics
+    from monitoring.monitoring import MetricsCollector
+except ImportError:
+    from v6.dsts.bsts import BSTS
+    from v6.dsts.dsts import DSTS
+    from v6.dsts.events import RecognitionEvent, HLC
+    from v6.dsts.state import StateTable
+    from v6.dsts.transition import apply_transition
+    from v6.dsts.zones import (
+        ZONE_NAMES, ZONE_INDEX, NUM_ZONES,
+        adjacent_zones, are_adjacent,
+    )
+    from v6.dsts.metrics import evaluate_state, find_optimal_theta
+    from v6.dsts.reasoning import score_track_adjacency
+    from v6.sim.scenario_b1_b5 import run_scenario, print_scenario_summary
+    from v6.sim.event_generator import EventGenerator
+    from v6.sim.evaluation import paper_metrics, routing_metrics
+    from v6.monitoring.monitoring import MetricsCollector
+
 
 
 # ===============================================================================

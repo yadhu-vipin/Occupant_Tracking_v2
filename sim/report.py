@@ -15,7 +15,11 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from typing import Optional
 
-from .evaluation import PaperMetricsResult, RoutingMetricsResult
+try:
+    from sim.evaluation import PaperMetricsResult, RoutingMetricsResult
+except (ImportError, ValueError):
+    from .evaluation import PaperMetricsResult, RoutingMetricsResult
+
 
 
 # ─── Style configuration ────────────────────────────────────────────────────

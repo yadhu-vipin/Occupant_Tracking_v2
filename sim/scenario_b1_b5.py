@@ -21,12 +21,21 @@ import numpy as np
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass, field
 
-from ..dsts.bsts import BSTS
-from ..dsts.dsts import DSTS
-from ..dsts.events import RecognitionEvent, HLC
-from ..dsts.zones import ZONE_NAMES, ZONE_INDEX, adjacent_zones
-from ..dsts.transition import apply_transition
-from .campus import assign_occupants, BUILDING_IDS
+try:
+    from dsts.bsts import BSTS
+    from dsts.dsts import DSTS
+    from dsts.events import RecognitionEvent, HLC
+    from dsts.zones import ZONE_NAMES, ZONE_INDEX, adjacent_zones
+    from dsts.transition import apply_transition
+    from sim.campus import assign_occupants, BUILDING_IDS
+except (ImportError, ValueError):
+    from ..dsts.bsts import BSTS
+    from ..dsts.dsts import DSTS
+    from ..dsts.events import RecognitionEvent, HLC
+    from ..dsts.zones import ZONE_NAMES, ZONE_INDEX, adjacent_zones
+    from ..dsts.transition import apply_transition
+    from .campus import assign_occupants, BUILDING_IDS
+
 
 
 @dataclass

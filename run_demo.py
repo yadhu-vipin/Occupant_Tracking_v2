@@ -1,35 +1,51 @@
 """
-v6/run_demo.py — DSTS Lane B demonstration entry point
-==========================================================
-Runs the complete B1→B5 scenario, computes evaluation metrics,
-generates report charts, and demonstrates the security layer.
+run_demo.py — DSTS Lane B complete system demonstration entry point
+====================================================================
 
-Usage:
-    python -m v6.run_demo
+OVERVIEW:
+Master CLI orchestrator for Lane B (Events, Evaluation, Security, and Monitoring).
 
-Output:
-    - Console: scenario summary, metrics, security demo
-    - Files:   reports/*.png (evaluation charts)
+DEMONSTRATION FLOW:
+- Phase 1: Executes the deterministic ~40-event B1 -> B5 inter-building handoff scenario.
+- Phase 2: Computes spatio-temporal tracking metrics (Precision, Recall, F1, Optimal Theta) and routing efficiency.
+- Phase 3: Renders publication-quality PNG charts in `reports/`.
+- Phase 4: Demonstrates full cryptographic stack (X25519 ECDH, HKDF-SHA256, AES-128-GCM, Ed25519 signatures, ReplayGuard).
+- Phase 5: Simulates Prometheus metric collection and displays telemetry summary table.
+
+KEY CONTRACTS:
+- Entry function `run_demo()` executed when called directly (`python run_demo.py`).
 """
 
 import sys
 import os
 import time
 
-# Ensure imports work from project root
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Ensure UTF-8 output encoding on Windows consoles
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-from v6.sim.scenario_b1_b5 import run_scenario, print_scenario_summary
-from v6.sim.evaluation import (
-    paper_metrics, routing_metrics, print_metrics_summary,
-)
-from v6.sim.report import generate_evaluation_report
-from v6.security.crypto import NodeIdentity, ephemeral_handshake
-from v6.security.metadata import (
-    create_handoff_metadata, seal_metadata, open_metadata,
-)
-from v6.security.replay_guard import ReplayGuard
-from v6.monitoring.monitoring import MetricsCollector
+# Ensure imports work from current directory and project root
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+try:
+    from sim.scenario_b1_b5 import run_scenario, print_scenario_summary
+    from sim.evaluation import paper_metrics, routing_metrics, print_metrics_summary
+    from sim.report import generate_evaluation_report
+    from security.crypto import NodeIdentity, ephemeral_handshake
+    from security.metadata import create_handoff_metadata, seal_metadata, open_metadata
+    from security.replay_guard import ReplayGuard
+    from monitoring.monitoring import MetricsCollector
+except ImportError:
+    from v6.sim.scenario_b1_b5 import run_scenario, print_scenario_summary
+    from v6.sim.evaluation import paper_metrics, routing_metrics, print_metrics_summary
+    from v6.sim.report import generate_evaluation_report
+    from v6.security.crypto import NodeIdentity, ephemeral_handshake
+    from v6.security.metadata import create_handoff_metadata, seal_metadata, open_metadata
+    from v6.security.replay_guard import ReplayGuard
+    from v6.monitoring.monitoring import MetricsCollector
+
 
 
 def run_demo():
