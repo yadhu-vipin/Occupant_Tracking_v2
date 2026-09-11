@@ -12,3 +12,6 @@ nodes/**/__pycache__/
 nodes/**/*.db-journal
 nodes/**/*.db-wal
 nodes/**/*.db-shm
+recognition/output/*.json
+retrieval/output/*.json
+centralized/output/*.json

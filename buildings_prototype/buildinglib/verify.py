@@ -11,16 +11,27 @@ angle). Accepted only if the winner reached ``min_votes``.
 import numpy as np
 
 
+def vote_evidence(candidate_refs, query, accept_angle_deg):
+    """Return the verifier's actual reference-level angular evidence.
+
+    ``angles_deg`` has shape ``(candidates, references_per_candidate)``.
+    The remaining fields are derived directly from that matrix and are kept
+    separate so existing callers can preserve their established vote contract.
+    """
+    C, R, dim = candidate_refs.shape
+    sims = np.clip(candidate_refs.reshape(-1, dim) @ query, -1.0, 1.0)
+    angles = np.degrees(np.arccos(sims)).reshape(C, R)
+    votes = (angles <= accept_angle_deg).sum(axis=1)
+    return angles, votes
+
+
 def vote(candidate_refs, query, accept_angle_deg, min_votes):
     """``candidate_refs`` (C, R, dim), ``query`` (dim,) -- both preprocessed.
 
     Returns ``(winner_index, winner_votes, accepted)``. ``winner_index`` indexes
     the C axis. Raises on an empty candidate set (C == 0) -- callers check first.
     """
-    C, R, dim = candidate_refs.shape
-    sims = np.clip(candidate_refs.reshape(-1, dim) @ query, -1.0, 1.0)
-    angles = np.degrees(np.arccos(sims)).reshape(C, R)
-    votes = (angles <= accept_angle_deg).sum(axis=1)
+    angles, votes = vote_evidence(candidate_refs, query, accept_angle_deg)
     winner = int(np.lexsort((angles.min(axis=1), -votes))[0])
     return winner, int(votes[winner]), bool(votes[winner] >= min_votes)
 
