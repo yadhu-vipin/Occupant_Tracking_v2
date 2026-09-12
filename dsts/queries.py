@@ -1,7 +1,7 @@
 """
-v6/dsts/queries.py — Template Query Engine (Q1–Q13 from paper Table)
-=====================================================================
-Implements the 13 template queries from the DSTS paper:
+v6/dsts/queries.py — Template Query Engine (Q1, Q2, Q3, Q5, Q6 from paper)
+=======================================================================
+Implements the 5 core template queries from the DSTS paper:
 
   Q1:  Did any occupant stay in building b after time t?
   Q2:  Was the number of visitors more than registered occupants at time t?
@@ -13,13 +13,16 @@ Each query operates on the DSTS global event log and per-building
 BSTS state histories.
 
 Usage:
-    from dsts.queries import QueryEngine
+    from dsts.queries import QueryEngine, QueryType
     engine = QueryEngine(dsts_instance)
     result = engine.Q1(building_id="B1", after_time=50.0)
+    # or via generic dispatcher:
+    result = engine.execute_query(QueryType.Q1_STAYED_AFTER_TIME, building_id="B1", time_t=50.0)
 """
 
 from typing import Dict, List, Optional, Tuple, Set, Any
 from dataclasses import dataclass, field
+from enum import Enum
 
 try:
     from .dsts import DSTS
@@ -31,6 +34,15 @@ except ImportError:
     from dsts.bsts import BSTS
     from dsts.events import RecognitionEvent
     from dsts.zones import ZONE_NAMES, ZONE_INDEX, NUM_ZONES, NUM_INTERNAL_ZONES
+
+
+class QueryType(Enum):
+    """Supported template query types from the DSTS paper."""
+    Q1_STAYED_AFTER_TIME = "Q1"
+    Q2_VISITOR_ANOMALY = "Q2"
+    Q3_LEFT_BEFORE_TIME = "Q3"
+    Q5_VISITED_ALL_ZONES = "Q5"
+    Q6_LOCATION_AT_TIME = "Q6"
 
 
 @dataclass
@@ -50,7 +62,7 @@ class QueryResult:
 
 class QueryEngine:
     """
-    Executes the 13 template queries from the DSTS paper.
+    Executes template queries (Q1, Q2, Q3, Q5, Q6) from the DSTS paper.
 
     Requires a fully populated DSTS instance with registered buildings,
     processed events, and state histories.
@@ -58,6 +70,37 @@ class QueryEngine:
 
     def __init__(self, dsts: DSTS):
         self.dsts = dsts
+
+    def execute_query(self, query_type: Any, **kwargs) -> QueryResult:
+        """
+        Generic dispatcher for template queries.
+        Supports passing enum QueryType or string identifier ('Q1', 'Q2', etc.).
+        """
+        q_str = str(query_type.value if isinstance(query_type, Enum) else query_type).upper()
+        if q_str in ("Q1", "Q1_STAYED_AFTER_TIME"):
+            building_id = kwargs.get("building_id") or kwargs.get("building", "B1")
+            after_time = kwargs.get("after_time") if "after_time" in kwargs else kwargs.get("time_t", 0.0)
+            return self.Q1(building_id=building_id, after_time=float(after_time))
+        elif q_str in ("Q2", "Q2_VISITOR_ANOMALY"):
+            building_id = kwargs.get("building_id") or kwargs.get("building", "B1")
+            at_time = kwargs.get("at_time") if "at_time" in kwargs else kwargs.get("time_t", 0.0)
+            return self.Q2(building_id=building_id, at_time=float(at_time))
+        elif q_str in ("Q3", "Q3_LEFT_BEFORE_TIME"):
+            occupant_id = kwargs.get("occupant_id") or kwargs.get("occupant", "occ_01")
+            building_id = kwargs.get("building_id") or kwargs.get("building", "B1")
+            before_time = kwargs.get("before_time") if "before_time" in kwargs else kwargs.get("time_t", 0.0)
+            return self.Q3(occupant_id=occupant_id, building_id=building_id, before_time=float(before_time))
+        elif q_str in ("Q5", "Q5_VISITED_ALL_ZONES"):
+            occupant_id = kwargs.get("occupant_id") or kwargs.get("occupant", "occ_01")
+            building_id = kwargs.get("building_id") or kwargs.get("building", "B1")
+            return self.Q5(occupant_id=occupant_id, building_id=building_id)
+        elif q_str in ("Q6", "Q6_LOCATION_AT_TIME"):
+            occupant_id = kwargs.get("occupant_id") or kwargs.get("occupant", "occ_01")
+            at_time = kwargs.get("at_time") if "at_time" in kwargs else kwargs.get("time_t", 0.0)
+            theta = kwargs.get("theta", 0.3)
+            return self.Q6(occupant_id=occupant_id, at_time=float(at_time), theta=float(theta))
+        else:
+            raise ValueError(f"Unknown or unsupported query type: {query_type}")
 
     # ─── Q1: Did any occupant stay in building b after time t? ────────────
     def Q1(self, building_id: str, after_time: float) -> QueryResult:
@@ -68,6 +111,16 @@ class QueryEngine:
         sim_time > after_time. If any exist, at least one occupant
         was present (stayed) in that building after time t.
         """
+        if self.dsts.buildings and building_id not in self.dsts.buildings:
+            return QueryResult(
+                query_id="Q1",
+                query_text=f"Did any occupant stay in {building_id} after t={after_time}?",
+                parameters={"building_id": building_id, "after_time": after_time},
+                answer=False,
+                evidence=[f"  Building {building_id} not found in DSTS"],
+                success=False,
+            )
+
         events_after = [
             e for e in self.dsts.global_event_log
             if e.building_id == building_id and e.sim_time > after_time
@@ -153,6 +206,17 @@ class QueryEngine:
           - They were detected in a different building
         at any time before t.
         """
+        if self.dsts.buildings and building_id not in self.dsts.buildings:
+            return QueryResult(
+                query_id="Q3",
+                query_text=f"Did {occupant_id} leave {building_id} before t={before_time}?",
+                parameters={"occupant_id": occupant_id, "building_id": building_id,
+                            "before_time": before_time},
+                answer=False,
+                evidence=[f"  Building {building_id} not found in DSTS"],
+                success=False,
+            )
+
         left = False
         leave_time = None
         leave_evidence = []
@@ -168,7 +232,7 @@ class QueryEngine:
                 continue
             if e.building_id == building_id and e.zone != "z_T":
                 was_in_building = True
-            elif was_in_building:
+            elif was_in_building and not left:
                 # Occupant was in the building and now is either in z_T or another building
                 if e.zone == "z_T" or e.building_id != building_id:
                     left = True
@@ -212,6 +276,16 @@ class QueryEngine:
         (z1–z8) of the specified building. z_T is not counted as an
         internal zone for this query.
         """
+        if self.dsts.buildings and building_id not in self.dsts.buildings:
+            return QueryResult(
+                query_id="Q5",
+                query_text=f"Did {occupant_id} visit all zones in {building_id}?",
+                parameters={"occupant_id": occupant_id, "building_id": building_id},
+                answer=False,
+                evidence=[f"  Building {building_id} not found in DSTS"],
+                success=False,
+            )
+
         internal_zones = set(ZONE_NAMES[:NUM_INTERNAL_ZONES])  # z1..z8
         visited = set()
 
