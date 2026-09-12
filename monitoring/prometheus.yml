@@ -1,0 +1,19 @@
+# Prometheus configuration for DSTS monitoring
+# Scrape config targets the DSTS metrics endpoint
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'dsts'
+    static_configs:
+      - targets: ['host.docker.internal:9090']
+        labels:
+          system: 'dsts'
+          environment: 'development'
+
+  - job_name: 'dsts-pushgateway'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']

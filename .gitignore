@@ -1,7 +1,15 @@
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .pytest_cache/
 .pytest_tmp/
+reports/
+*.png
+reference_db.json
+test_db.json
+Building_B*/
+
 # Generated experiment outputs
 **/output/*.json
