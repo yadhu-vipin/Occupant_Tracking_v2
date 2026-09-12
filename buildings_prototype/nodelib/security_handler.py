@@ -28,12 +28,18 @@ from security.authorize import register_node as authorize_register_node, authori
 class SecureBuildingNodeHandler:
     """
     Wraps inter-building communications for prototype building nodes with zero-trust security.
+    Uses shared network identities and Campus CA so all nodes in the network can mutually
+    authenticate and decrypt messages.
     """
 
+    _shared_transport_manager = TransportSecurityManager(ca_name="DSTS-Campus-CA")
+    _shared_replay_guard = ReplayGuard(window_seconds=300.0)
+    _shared_identities: Dict[str, NodeIdentity] = {}
+
     def __init__(self, ca_name: str = "DSTS-Campus-CA", enforce_rbac: bool = True):
-        self.transport_manager = TransportSecurityManager(ca_name=ca_name)
-        self.replay_guard = ReplayGuard(window_seconds=300.0)
-        self.identities: Dict[str, NodeIdentity] = {}
+        self.transport_manager = self._shared_transport_manager
+        self.replay_guard = self._shared_replay_guard
+        self.identities = self._shared_identities
         if enforce_rbac:
             set_enforce_policy(True)
 
