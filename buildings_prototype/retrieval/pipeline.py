@@ -50,7 +50,8 @@ class RetrievalRuntime:
         for candidate in shortlist:
             reply = respond(query, current, self.nodes[candidate], self.contract)
             record = {"building": candidate, "matched": reply.matched,
-                      "occupant_id": reply.occupant_id, "votes": reply.votes}
+                      "occupant_id": reply.occupant_id, "votes": reply.votes,
+                      "candidate_distances": getattr(reply, "candidate_distances", None)}
             replies.append(record)
             if reply.matched:
                 verified = record
@@ -69,6 +70,11 @@ class RetrievalRuntime:
             "verified_occupant_id": verified["occupant_id"] if verified else None,
             "verification_votes": verified["votes"] if verified else 0,
             "verification_result": "CONFIRMED" if verified else "UNRESOLVED",
+            # Definition 3.3 evidence: {occupant_id: min reference angle deg}
+            # for every occupant of the building that actually confirmed the
+            # identity (None when unresolved). Not a probability -- see
+            # dsts/state/probability.py and dsts/pipeline.py.
+            "verification_distance_evidence": verified["candidate_distances"] if verified else None,
         }
 
 

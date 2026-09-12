@@ -23,7 +23,7 @@ from buildinglib._vendored.lsh import preprocess                     # noqa: E40
 from buildinglib.node import BuildingNode, Reply, load_routing_contract  # noqa: E402
 from buildinglib.params import ContractMismatch                       # noqa: E402
 from buildinglib.split import default_emb_path, default_meta_path  # noqa: E402
-from buildinglib.verify import vote                                   # noqa: E402
+from buildinglib.verify import vote_evidence                          # noqa: E402
 
 DEFAULT_EMB = default_emb_path()
 DEFAULT_META = default_meta_path()
@@ -34,18 +34,31 @@ def respond(capture_q, from_building, node, contract):
 
     Returns a :class:`Reply`. On a match, ``reply.refs`` is the matched
     occupant's ``(R, dim)`` reference tensor -- this is what crosses the boundary.
+
+    Winner selection and acceptance are unchanged from ``buildinglib.verify.vote``
+    (most votes, angle as tie-break, accept at ``min_votes``); this just also
+    keeps the per-occupant angle evidence ``vote`` already computes internally
+    and discarded, so a match can additionally report each of this node's own
+    occupants' minimum reference angle -- the biometric distance evidence
+    Definition 3.3 probability generation (``dsts/state/probability.py``) needs.
     """
-    w, votes, accepted = vote(node.own_refs, capture_q,
-                              contract.accept_angle_deg, contract.min_votes)
+    angles, votes = vote_evidence(node.own_refs, capture_q, contract.accept_angle_deg)
+    w = int(np.lexsort((angles.min(axis=1), -votes))[0])
+    accepted = bool(votes[w] >= contract.min_votes)
     if not accepted:
         return Reply(matched=False, building_id=node.building_id)
+    candidate_distances = {
+        str(occupant_id): float(occupant_angles.min())
+        for occupant_id, occupant_angles in zip(node.own_ids, angles)
+    }
     return Reply(
         matched=True,
         building_id=node.building_id,
         occupant_id=str(node.own_ids[w]),
-        votes=votes,
+        votes=int(votes[w]),
         home_building=node.building_id,
         refs=node.own_refs[w],
+        candidate_distances=candidate_distances,
     )
 
 

@@ -193,6 +193,11 @@ class Reply:
     votes: int = 0
     home_building: str | None = None
     refs: np.ndarray | None = None      # (R, dim) -- only on a match
+    candidate_distances: dict | None = None
+    # {occupant_id: minimum reference angle in degrees} for every one of this
+    # node's own occupants -- the same per-occupant angular evidence already
+    # computed (and voted on) inside respond(), just not previously returned.
+    # Populated only on a match; see buildings/dsts/state/probability.py.
 
 
 @dataclass

@@ -13,12 +13,12 @@ Event generation
   -> remote verification
   -> visitor identification
   -> centralized global-search comparison
-  -> BSTS state update integration (next major phase)
+  -> Definition 3.3 occupant probability + BSTS state integration (Phase 4)
 ```
 
 These are deliberately separate modules. LSH (locality-sensitive hashing) plus a Bloom filter is a *candidate retrieval* mechanism: it ranks buildings likely to contain a matching registered person. It does not identify a person. Identity is established only when a shortlisted remote building verifies the embedding against its own registered reference gallery.
 
-The current Phase 3 runtime does not update BSTS state or admit visitors to a visitor pool. The older interactive/deployment path in `query_node.py` and `nodelib/` does include a visitor-pool and state-recording wrapper; it is not the event-pipeline implementation used by `retrieval/pipeline.py`.
+The older interactive/deployment path in `query_node.py` and `nodelib/` includes its own visitor-pool and state-recording wrapper (`DeployedBuilding._record`, which weights BSTS by `votes / refs_per_occupant`); it is a separate, earlier mechanism and is not the event-pipeline / Definition 3.3 integration described below.
 
 ## Layout
 
@@ -40,20 +40,23 @@ buildings_prototype/
 ├── recognition/                 Phase 2 local recognition and evaluation
 ├── retrieval/                   Phase 3 decentralized retrieval and evaluation
 ├── centralized/                 independent global-search benchmark
-├── dsts/state/                  zones, probabilistic state, and persistence
+├── dsts/state/                  zones, probabilistic state, persistence, Definition 3.3 probability
+├── dsts/pipeline.py             Phase 4 CLI: probability generation + BSTS integration
+├── dsts/evaluate.py             Phase 4 evaluation and per-building database verification
 ├── nodelib/                     generated-node deployment wrapper
 ├── out/                         generated/published Bloom `.npz` artifacts
-└── nodes/                       generated per-building node folders
+└── nodes/                       generated per-building node folders (own registered.db/visitor.db)
 ```
 
 The checked-in `out/` artifacts and manifests are routing artifacts. `nodes/` is generated deployment material; each node has its own embeddings, copied peer filters, configuration, and SQLite databases. The embedding corpus itself is intentionally not included here: defaults look for `corpus/emb_arcface.npy` and `corpus/meta.csv`, then compatible parent-pipeline locations. The expected corpus is a row-aligned `(N, 512)` `float32` ArcFace embedding array plus `meta.csv` with `building`, `occupant_id`, and `split` columns.
 
 ## Setup and complete reproduction
 
-Run all commands below from `buildings_prototype/`. Install the listed packages first:
+Run all commands below from `buildings_prototype/`, with a Python environment active that can `import numpy` and `import pandas` (a `.venv/` may already exist here from a previous setup — activate it with `.venv\Scripts\activate` instead of creating a new one). Install the listed packages first, plus `pytest` for the test commands (`requirements.txt` intentionally stays NumPy/pandas-only for the runtime code; `pytest` is dev-only):
 
 ```powershell
 python -m pip install -r requirements.txt
+python -m pip install pytest
 ```
 
 Place a compatible corpus at `corpus/emb_arcface.npy` and `corpus/meta.csv`, or give the commands `--emb` and `--meta` paths. Build compatible routing artifacts before Phase 3:
@@ -61,6 +64,12 @@ Place a compatible corpus at `corpus/emb_arcface.npy` and `corpus/meta.csv`, or 
 ```powershell
 python build_building.py --all
 python merge_check.py out/
+```
+
+Phase 4 additionally requires per-building deployment folders (once):
+
+```powershell
+python generate_nodes.py --all
 ```
 
 Then reproduce the event experiment in order:
@@ -72,7 +81,9 @@ python -m recognition.run
 python -m retrieval.pipeline
 python -m retrieval.evaluate
 python -m centralized.evaluate
-python -m pytest events/tests recognition/tests retrieval/tests centralized/tests -q
+python -m dsts.pipeline
+python -m dsts.evaluate
+python -m pytest events/tests recognition/tests retrieval/tests centralized/tests dsts/tests -q
 ```
 
 The commands create these artifacts:
@@ -85,18 +96,44 @@ The commands create these artifacts:
 | `python -m retrieval.pipeline` | `retrieval/output/retrieval_attempts.json` |
 | `python -m retrieval.evaluate` | `retrieval/output/retrieval_results.json`, `retrieval/output/retrieval_summary.json` |
 | `python -m centralized.evaluate` | `centralized/output/centralized_results.json`, `centralized/output/centralized_summary.json`, `centralized/output/comparison_results.json` |
+| `python -m dsts.pipeline` | `dsts/output/phase4_results.json`, `dsts/output/phase4_summary.json`, plus updated `nodes/<building>/state/{registered,visitor}.db` |
+| `python -m dsts.evaluate` | `dsts/output/phase4_evaluation.json` (invariant checks, ground-truth-only statistics, sampled database verification) |
 
 All phase CLIs support explicit input/output paths; use `--help` to see their actual arguments. `recognition.run` already evaluates its local results and writes `recognition_evaluation.json`; `recognition.evaluate` is also available when evaluating an existing results file separately.
+
+### What each stage actually produces
+
+- **Phases 1-3 + centralized**: only JSON under each package's `output/` folder. Nothing outside `buildings_prototype/` changes.
+- **`dsts.pipeline` (Phase 4) is the one command that writes into the per-building databases.** For a locally accepted event, or a visitor's first sighting at a building, it writes 9 rows (one per zone) for that ONE identified occupant. For a visitor already present at a building (a present-pool re-match — see "Phase 4" below), it writes 9 rows for **every** occupant currently considered present there, not just the confirmed one. It never writes anything for candidates that were merely considered for an event but not actually observed/present. Over the full 10,000-event corpus this is on the order of 90,000-100,000 writes across all 10 buildings, well under 30 seconds — `dsts.pipeline` also loads the embedding corpus (unlike the rest of Phase 4) because present-pool re-matching needs each present visitor's actual reference embeddings.
+- `dsts.evaluate` does not write to the databases; it only reads them back to verify what Phase 4 wrote, plus writes `dsts/output/phase4_evaluation.json`.
+
+To see the databases are actually populated after running `python -m dsts.pipeline`, from `buildings_prototype/`:
+
+```powershell
+python -c "
+import sqlite3
+from pathlib import Path
+for folder in sorted(Path('nodes').iterdir(), key=lambda p: int(p.name.split('_')[1])):
+    reg = sqlite3.connect(folder / 'state' / 'registered.db')
+    vis = sqlite3.connect(folder / 'state' / 'visitor.db')
+    r = reg.execute('SELECT COUNT(*), COUNT(DISTINCT occupant) FROM registered_state').fetchone()
+    v = vis.execute('SELECT COUNT(*), COUNT(DISTINCT occupant) FROM visitor_state').fetchone()
+    print(f'{folder.name:<12} registered.db: {r[0]:>7} rows / {r[1]:>3} occupants   visitor.db: {v[0]:>7} rows / {v[1]:>3} occupants')
+    reg.close(); vis.close()
+"
+```
+
+Expect every building's `registered.db` to show all ~50 of its own occupants (every one of them is identified locally at some point over 10,000 events), and `visitor.db` to show only the occupants who were *actually* confirmed as visitors there — a much smaller, building-dependent number (tens, not hundreds), never every occupant of every other building. `dsts/output/phase4_evaluation.json`'s `persistence_sample` section shows the same thing pre-computed for a handful of (building, occupant, timestamp) triples, including the actual 9 zone probabilities read back from disk and their sum (always ≈ 1), plus at least one present-pool re-match sample confirming every concurrently present visitor — not only the confirmed one — was actually persisted.
 
 ### Tests
 
 The focused test command is:
 
 ```powershell
-python -m pytest events/tests recognition/tests retrieval/tests centralized/tests -q
+python -m pytest events/tests recognition/tests retrieval/tests centralized/tests dsts/tests -q
 ```
 
-It covers deterministic event generation and identity isolation, local-gallery behavior, retrieval sequencing and evaluation categories, and centralized scoring/comparison. At the time this README was updated, it passed **16 tests**. `buildinglib` also has module-level smoke checks, for example `python -m buildinglib.params`; some development-only checks in that package expect the original parent research repository's `core` module and are not standalone tests.
+It covers deterministic event generation and identity isolation, local-gallery behavior, retrieval sequencing and evaluation categories, centralized scoring/comparison, and (added in Phase 4) Definition 3.3 probability properties plus probability/BSTS/persistence/present-visitor-pool integration. At the time this README was updated, it passed **31 tests** (16 from Phases 1-3/centralized, 15 for Phase 4). `buildinglib` also has module-level smoke checks, for example `python -m buildinglib.params`; some development-only checks in that package expect the original parent research repository's `core` module and are not standalone tests.
 
 ## Phase 1: observable events
 
@@ -190,21 +227,50 @@ The shared contract pins seed, LSH geometry, embedding dimension, sizing, and me
 
 `build_building.py --building-id building_3` or `--all` creates `out/<building>.npz` and a manifest. `verify_building.py out/building_3.npz` checks its integrity and, when corpus files are available, re-derives it; `--offline` skips re-derivation. `merge_check.py out/` ensures the artifact collection shares one compatible contract and can write a CSV with `--summary PATH`.
 
-## BSTS state and deployment nodes
+## BSTS state
 
-`dsts/state/zones.py` declares and validates the nine-zone graph and shortest-hop helpers. `bsts.py` provides `StateTable`, which maintains one probability distribution over zones per occupant and updates it with detected-zone evidence. `store.py` defines state/registry protocols and in-memory and SQLite implementations that split registered and visitor records. `queries.py` offers point-probability, threshold-presence, and known-occupant queries. `schema.sql` creates `registered_state` and `visitor_state`; `__init__.py` marks the packages.
+`dsts/state/zones.py` declares and validates the nine-zone graph and shortest-hop helpers. `bsts.py` provides `StateTable`, which maintains one probability distribution over zones per occupant and updates it with detected-zone evidence. `store.py` defines state/registry protocols and in-memory and SQLite implementations that split registered and visitor records. `queries.py` offers point-probability, threshold-presence, and known-occupant queries. `probability.py` implements Definition 3.3 (below). `schema.sql` creates `registered_state` and `visitor_state`; `__init__.py` marks the packages.
 
 Keep these concepts distinct:
 
 - **Registry:** who belongs to a building.
-- **BSTS:** a probability distribution over an identified person's zones.
+- **Definition 3.3:** the occupant-identity probability distribution built from biometric distance evidence.
+- **BSTS:** a probability distribution over an identified person's zones, driven by that identity distribution.
 - **Store:** persistence of the state rows.
 
-BSTS is not integrated into the Phase 3 `retrieval` event pipeline. The next major integration is: confirmed identity -> recognition evidence/probability distribution -> `StateTable.apply()` / persistent state. A later dashboard/query workflow is separate from real-time recognition.
+`nodelib/deploy.py` creates and loads a self-contained `DeployedBuilding`: its own raw embedding slice and cached references, peer Bloom filters, merged configuration, two SQLite files, and `send()`/`receive()` methods. `send()` calls the existing interactive identification cascade and records an accepted result into registered or visitor state, weighting BSTS by `votes / refs_per_occupant`; `receive()` wraps remote response verification. This is a separate, earlier mechanism from Phase 4 (below) and is unchanged. `nodelib/__init__.py` marks the package.
 
-`nodelib/deploy.py` creates and loads a self-contained `DeployedBuilding`: its own raw embedding slice and cached references, peer Bloom filters, merged configuration, two SQLite files, and `send()`/`receive()` methods. `send()` calls the existing interactive identification cascade and records an accepted result into registered or visitor state; `receive()` wraps remote response verification. `nodelib/__init__.py` marks the package.
+`generate_nodes.py --building-id building_3` or `--all` builds `nodes/building_N/`, requiring corpus files and peer artifacts from `out/`; it refuses an overwrite unless `--force` is supplied. It is also a Phase 4 prerequisite: Phase 4 persists into the `registered.db` / `visitor.db` these folders already contain. `query_node.py --capture-row 12345 --at building_3` demonstrates local, visitor-pool, routed, or abstain behavior, while `respond_node.py --building-id building_9 --capture-row 12345` demonstrates one remote reply. These use function calls in one Python process; no distributed network or RPC layer exists yet.
 
-`generate_nodes.py --building-id building_3` or `--all` builds `nodes/building_N/`, requiring corpus files and peer artifacts from `out/`; it refuses an overwrite unless `--force` is supplied. `query_node.py --capture-row 12345 --at building_3` demonstrates local, visitor-pool, routed, or abstain behavior, while `respond_node.py --building-id building_9 --capture-row 12345` demonstrates one remote reply. These use function calls in one Python process; no distributed network or RPC layer exists yet.
+## Phase 4: Definition 3.3 probability + BSTS integration
+
+```
+biometric distance evidence  (per-candidate min reference angle, already computed by recognition/retrieval)
+      -> sigma = std(D)
+      -> p_i = exp(-d_i^2 / 2*sigma^2) / sum_l exp(-d_l^2 / 2*sigma^2)     (Definition 3.3)
+      -> event probability distribution over candidate occupants
+      -> StateTable.apply()                                                (BSTS transition, unchanged)
+      -> nodes/<current_building>/state/{registered,visitor}.db            (existing per-building Store)
+```
+
+`dsts/state/probability.py` implements `occupant_probabilities(distances)`: the Gaussian/RBF formula above, exactly, with no SVM, sigmoid, or softmax-over-logits, and no Bloom/routing score ever accepted as input. `sigma` is the *population* standard deviation of that one event's distance scores (`D` is the complete set considered for the event, not a sample of a larger population). When every distance in `D` is identical, `sigma` is exactly 0 and the formula is replaced by its own limiting behaviour — uniform probability over the tied candidates — rather than an invented epsilon.
+
+`D = {(o_i, d_i)}` comes from one of two regimes, depending on identity source. Phase 3's own identity decision (who is accepted locally, who is confirmed remotely) is never changed by any of this — Phase 4 only decides how to turn that decision into a probability distribution and what to persist.
+
+- **Locally accepted events:** `recognition/local.py`'s local-gallery search already computes, for every occupant of `current_building`, the minimum reference angle (`candidate_evidence[*]["min_angle_deg"]` in `recognition_results.json`). `D` is exactly that set — the full local gallery — and only the identified occupant's own probability is applied/persisted; the other candidates were merely considered, not observed.
+- **Confirmed visitor events:** here a building can have more than one visitor concurrently present, so `dsts/pipeline.py` tracks that explicitly per building (`BuildingContext.present_visitors`):
+  - **First sighting at this building ("new visitor"):** `D` is the full home-building gallery evidence Phase 3 already computed. The one building that verified the identity computes this per-occupant minimum-angle evidence internally (inside `vote_evidence`) but previously returned only the winner's vote count; `respond_node.respond()` now also returns it as `Reply.candidate_distances` (a new, optional field — the existing `matched`/`occupant_id`/`votes`/`refs` fields and the accept/reject decision are unchanged), and `retrieval/pipeline.py` threads it into `retrieval_attempts.json` as `verification_distance_evidence`. Only the identified occupant's own probability is applied/persisted, and they are admitted into this building's present-visitor pool (their own reference vectors are fetched from the corpus and cached for future re-matching).
+  - **Already present at this building:** `D` is instead built fresh — the current capture's own preprocessed embedding is compared (same angle-distance computation as everywhere else, `buildinglib.verify.vote_evidence`) against every already-present visitor's own cached reference vectors, not the home gallery. Every present visitor's probability is applied/persisted, not just the Phase-3-confirmed one, because an ambiguous capture at a building should be weighed against who might plausibly already be there. Presence lasts until that occupant's own event lands at zone `zT` (the transition/gateway zone), which is treated as their departure — the next time they're seen (anywhere) is a fresh "new visitor" home-gallery lookup. New visitors typically *arrive* at `zT` too, per the movement model, but a first sighting is never treated as an immediate departure — only a re-appearance's own `zT` event is.
+
+Because "already present" re-matching needs each present visitor's actual reference embeddings, `dsts/pipeline.py` (via `CorpusContext`) is the one part of Phase 4 that loads the embedding corpus — everything else in Phase 4 works from the existing Phase 2/3 JSON outputs alone.
+
+Persistence reuses the existing per-building databases exactly as designed: `nodes/<building_id>/building.json` supplies that building's own registered-occupant ids (`FakeOccupantRegistry`), and `nodelib.deploy.SplitSqliteStore` (unmodified) routes each persisted occupant's zone rows into `registered.db` or `visitor.db` accordingly. Crucially, the database written is always **`event["current_building"]`'s own** — the building where the event was *observed* — never a visitor's home building, which is identity information, not an observation location.
+
+`BuildingContext` in `dsts/pipeline.py` sets `PRAGMA journal_mode=WAL` and `PRAGMA synchronous=NORMAL` on each connection it opens (still crash-durable, just without an fsync per row) — a performance tuning of the existing `SplitSqliteStore` connections from the calling side, not a schema or behavior change. It matters most when re-running Phase 4 repeatedly against an already-populated database during development; a full 10,000-event run persists roughly 90,000-100,000 state rows (most events touch one occupant, present-pool re-matches touch every concurrently present visitor) in well under 30 seconds.
+
+`dsts/evaluate.py` reads `dsts/output/phase4_results.json` back plus `ground_truth.json` — the only place Phase 4 code reads ground truth, and only to label already-produced rows after the fact. It checks probability normalization, the distance/probability ordering invariant, the identified occupant's probability rank, BSTS-state normalization, and that the detected zone's post-update probability is always at least the assigned identity probability (true for `zT` specifically and for every zone generally, since `p + (1-p)*old >= p`). It also re-opens a sample of buildings' actual `registered.db`/`visitor.db` files, confirms the nine-zone row set Phase 4 wrote is really there summing to 1, and — for at least one sampled present-pool re-match — confirms every concurrently present visitor's row was actually persisted, not just the confirmed one.
+
+Phase 4 outputs land in `dsts/output/`: `phase4_results.json` (per-event identity source, presence mode, distance scores, sigma, occupant probabilities, and post-update BSTS state), `phase4_summary.json` (counts and averages, including how many identifications were new-visitor home-gallery lookups vs. present-pool re-matches), and `phase4_evaluation.json` (invariant checks, ground-truth-only accuracy stats, and the sampled database verification). `dsts/tests/test_probability.py` and `dsts/tests/test_pipeline.py` cover the formula and the probability/BSTS/persistence/present-visitor-pool/no-leakage integration.
 
 ## Status and Git hygiene
 
@@ -215,7 +281,9 @@ BSTS is not integrated into the Phase 3 `retrieval` event pipeline. The next maj
 | LSH/Bloom candidate retrieval | Implemented |
 | Remote verification and visitor identification | Implemented |
 | Centralized baseline comparison | Implemented experimental benchmark |
-| BSTS integration into Phase 3 | Next phase |
+| Definition 3.3 probability + BSTS integration (Phase 4) | Implemented |
 | Network/RPC and dashboard workflow | Future work |
 
-Keep source code, tests, contracts, manifests, and small configuration in Git. Detailed generated experiment outputs—especially `recognition/output/recognition_results.json`—can become very large and are regenerable from this workflow; normally do not commit them. The project `.gitignore` already excludes recognition, retrieval, and centralized JSON outputs, corpus arrays/CSV, and sensitive generated node embedding arrays. Regenerate outputs when needed rather than treating them as authoritative source.
+Keep source code, tests, contracts, manifests, and small configuration in Git. Detailed generated experiment outputs—especially `recognition/output/recognition_results.json` and `dsts/output/phase4_results.json`—can become very large and are regenerable from this workflow; normally do not commit them. The project `.gitignore` already excludes recognition, retrieval, and centralized JSON outputs (the repo-level `.gitignore` covers `dsts/output/*.json` the same way), corpus arrays/CSV, and sensitive generated node embedding arrays. Regenerate outputs when needed rather than treating them as authoritative source.
+
+Running `dsts.pipeline` writes real rows into `nodes/<building>/state/registered.db` and `visitor.db`, which the repository currently tracks (as the empty schemas `generate_nodes.py` creates). A Phase 4 run therefore leaves those files modified in Git; decide per workflow whether to commit the populated databases, reset them, or move them to `.gitignore` alongside the already-ignored `*.db-wal`/`*.db-shm`/`*.db-journal` — this README does not make that call for you.
