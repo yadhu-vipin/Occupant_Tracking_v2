@@ -172,6 +172,18 @@ class BuildingNode:
     def n_occupants(self):
         return len(self.own_ids)
 
+    @property
+    def security_handler(self):
+        """Lazy-loaded zero-trust security handler bound to this building node."""
+        if not hasattr(self, '_security_handler') or self._security_handler is None:
+            try:
+                from nodelib.security_handler import SecureBuildingNodeHandler
+                self._security_handler = SecureBuildingNodeHandler()
+                self._security_handler.register_node(self.building_id)
+            except Exception:
+                self._security_handler = None
+        return self._security_handler
+
     @classmethod
     def from_corpus(cls, embeddings, meta, building_id, contract):
         ids, refs = reference_tensor(embeddings, meta, building_id,

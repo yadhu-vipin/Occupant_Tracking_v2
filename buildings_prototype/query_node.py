@@ -78,9 +78,18 @@ def identify(capture_q, at_node, filters, nodes, contract):
     ident.shortlist = shortlist
     ident.filter_scores = scores
 
-    # 4. handoff
+    # 4. handoff (with zero-trust envelope encryption & signature verification)
     replies = []
     for b in shortlist:
+        if at_node.security_handler and hasattr(nodes[b], "security_handler") and nodes[b].security_handler:
+            envelope = at_node.security_handler.seal_handoff_request(
+                source_building=at_node.building_id,
+                dest_building=b,
+                visitor_id="UNRESOLVED_VISITOR",
+            )
+            ok, meta, reason = nodes[b].security_handler.unseal_handoff_request(b, envelope)
+            if not ok:
+                continue
         r = respond(capture_q, at_node.building_id, nodes[b], contract)
         replies.append(r)
     ident.replies = replies
