@@ -9,7 +9,6 @@ reports/
 *.png
 reference_db.json
 test_db.json
-Building_B*/
 emb_arcface.npy
 meta.csv
 
