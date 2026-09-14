@@ -138,7 +138,7 @@ def test_bsts_state_transition():
 
 def test_recognition_probability_range():
     """Recognition probabilities are in [0, 1]."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     for e in result.events:
         assert 0.0 <= e.probability <= 1.0, (
             f"Probability out of range: {e.probability}"
@@ -152,7 +152,7 @@ def test_recognition_probability_range():
 
 def test_routing_identifies_home_building():
     """DSTS correctly identifies B1 as home building for B1_P_001."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     home = result.dsts.home_building("B1_P_001")
     assert home == "B1", f"Expected B1, got {home}"
     print("  [PASS] test_routing_identifies_home_building PASSED")
@@ -160,7 +160,7 @@ def test_routing_identifies_home_building():
 
 def test_routing_unknown_occupant():
     """Unknown occupant has no home building."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     home = result.dsts.home_building("UNKNOWN_PERSON")
     assert home is None, f"Expected None, got {home}"
     print("  [PASS] test_routing_unknown_occupant PASSED")
@@ -172,7 +172,7 @@ def test_routing_unknown_occupant():
 
 def test_eq6_throughout_scenario():
     """Eq 6 (row sums = 1) holds after every event in the scenario."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     assert result.b1_bsts.registered_table.verify_eq6()
     print("  [PASS] test_eq6_throughout_scenario PASSED")
 
@@ -193,7 +193,7 @@ def test_state_table_shape():
 
 def test_handoff_b1_to_b5():
     """The B1→B5 handoff completes successfully."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     h = result.handoff
 
     assert h.occupant_id == "B1_P_001", f"Wrong occupant: {h.occupant_id}"
@@ -208,7 +208,7 @@ def test_handoff_b1_to_b5():
 
 def test_visitor_record_in_b5():
     """B5 has a visitor table entry after handoff."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     assert result.b5_bsts.visitor_table is not None, "No visitor table"
     assert "B1_P_001" in result.b5_bsts._visitor_ids, (
         "B1_P_001 not in B5's visitor list"
@@ -222,7 +222,7 @@ def test_visitor_record_in_b5():
 
 def test_query_occupant_location():
     """query_occupant returns correct location for B1_P_001."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     loc = result.dsts.query_occupant("B1_P_001", theta=0.2)
     assert loc is not None, "query_occupant returned None"
     building, zone, prob = loc
@@ -233,7 +233,7 @@ def test_query_occupant_location():
 
 def test_query_all_registered():
     """All registered occupants are queryable."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     for oid in ["B1_P_001", "B1_P_002"]:
         home = result.dsts.home_building(oid)
         assert home is not None, f"No home for {oid}"
@@ -246,7 +246,7 @@ def test_query_all_registered():
 
 def test_paper_metrics_computed():
     """paper_metrics returns valid precision/recall curves."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     pm = paper_metrics(result)
 
     assert len(pm.theta_values) > 0, "No theta values"
@@ -263,7 +263,7 @@ def test_paper_metrics_computed():
 
 def test_routing_metrics_computed():
     """routing_metrics returns valid routing performance data."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     rm = routing_metrics(result)
 
     assert rm.total_lookups > 0, "No routing lookups"
@@ -298,7 +298,7 @@ def test_metrics_collector():
 
 def test_scenario_event_count():
     """Scenario produces approximately 40 events."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     n = len(result.events)
     assert 30 <= n <= 60, f"Expected ~40 events, got {n}"
     print(f"  [PASS] test_scenario_event_count PASSED ({n} events)")
@@ -306,7 +306,7 @@ def test_scenario_event_count():
 
 def test_scenario_has_b1_and_b5_events():
     """Scenario has events in both B1 and B5."""
-    result = run_scenario(seed=2023)
+    result = run_scenario(seed=42)
     assert len(result.b1_events) > 0, "No B1 events"
     assert len(result.b5_events) > 0, "No B5 events"
     print(f"  [PASS] test_scenario_has_b1_and_b5_events PASSED "

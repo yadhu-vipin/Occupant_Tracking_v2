@@ -16,7 +16,7 @@ from dsts.queries import QueryEngine
 
 def _scenario():
     """Run the deterministic scenario (cached per session)."""
-    return run_scenario(seed=2023)
+    return run_scenario(seed=42)
 
 
 def test_q1_occupants_stay_after_midpoint():
