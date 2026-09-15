@@ -28,6 +28,13 @@ class Role(Enum):
     QUERY_CLIENT = "QUERY_CLIENT"
 
 
+class PrecisionLevel(Enum):
+    """Hierarchical query precision tiers for location resolution."""
+    EXACT = "EXACT"        # Level 3: Exact zone ID (z3), label (Office), probability
+    COARSE = "COARSE"      # Level 2: Functional sector / wing on the single floor
+    ABSTRACT = "ABSTRACT"  # Level 1: Building presence only (room details redacted)
+
+
 # Verb permissions per role
 _ROLE_PERMISSIONS: Dict[Role, Set[str]] = {
     Role.BUILDING_NODE: {
@@ -44,8 +51,19 @@ _ROLE_PERMISSIONS: Dict[Role, Set[str]] = {
     },
 }
 
+# Default precision tier per role
+_DEFAULT_ROLE_PRECISION: Dict[Role, PrecisionLevel] = {
+    Role.ADMIN: PrecisionLevel.EXACT,
+    Role.BUILDING_NODE: PrecisionLevel.COARSE,
+    Role.QUERY_CLIENT: PrecisionLevel.ABSTRACT,
+}
+
+
 # Registered principals: {principal_id: Role}
 _principal_registry: Dict[str, Role] = {}
+
+# Principal precision overrides: {principal_id: PrecisionLevel}
+_principal_precision: Dict[str, PrecisionLevel] = {}
 
 # Enforce policy (False = permit-all for backward compatibility)
 _enforce_policy = False
@@ -56,21 +74,47 @@ _audit_log = []
 
 # ─── Node Registration ────────────────────────────────────────────────────────
 
-def register_node(principal_id: str, role: Role) -> None:
+def register_node(
+    principal_id: str,
+    role: Role,
+    precision: Optional[PrecisionLevel] = None,
+) -> None:
     """
-    Register a principal with a role.
+    Register a principal with a role and optional precision tier.
 
     Args:
         principal_id: building ID or client identifier
         role: RBAC role to assign
+        precision: optional override for query precision level
     """
     _principal_registry[principal_id] = role
-    audit("NODE_REGISTERED", principal=principal_id, role=role.value)
+    eff_prec = precision if precision is not None else _DEFAULT_ROLE_PRECISION.get(role, PrecisionLevel.ABSTRACT)
+    _principal_precision[principal_id] = eff_prec
+    audit("NODE_REGISTERED", principal=principal_id, role=role.value, precision=eff_prec.value)
 
 
 def get_role(principal_id: str) -> Optional[Role]:
     """Return the role for a registered principal, or None."""
     return _principal_registry.get(principal_id)
+
+
+def get_precision(principal_id: Optional[str]) -> PrecisionLevel:
+    """Return the precision level for a principal, defaulting to ABSTRACT if unknown."""
+    if principal_id is None:
+        return PrecisionLevel.ABSTRACT
+    if principal_id in _principal_precision:
+        return _principal_precision[principal_id]
+    role = _principal_registry.get(principal_id)
+    if role in _DEFAULT_ROLE_PRECISION:
+        return _DEFAULT_ROLE_PRECISION[role]
+    return PrecisionLevel.ABSTRACT
+
+
+def set_principal_precision(principal_id: str, precision: PrecisionLevel) -> None:
+    """Explicitly override precision level for a principal."""
+    _principal_precision[principal_id] = precision
+    audit("PRECISION_UPDATED", principal=principal_id, precision=precision.value)
+
 
 
 def set_enforce_policy(enforce: bool) -> None:
@@ -152,8 +196,10 @@ def clear_audit_log():
 
 
 def clear_registry():
-    """Clear the principal registry (for testing)."""
+    """Clear the principal registry and precision mapping (for testing)."""
     _principal_registry.clear()
+    _principal_precision.clear()
+
 
 
 def audit(event_type: str, **kwargs):

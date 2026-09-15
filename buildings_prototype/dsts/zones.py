@@ -120,3 +120,45 @@ def zone_label(zone: str) -> str:
 def qualified_zone(zone: str, building_id: str) -> str:
     """Return building-qualified zone name, e.g. 'z1_B3'."""
     return f"{zone}_{building_id}"
+
+
+# Functional sectors on the single floor layout
+ZONE_SECTORS = {
+    "z1": "Circulation & Access Hub",
+    "z2": "Common Amenities Wing",
+    "z3": "Work & Study Wing",
+    "z4": "Common Amenities Wing",
+    "z5": "Work & Study Wing",
+    "z6": "Work & Study Wing",
+    "z7": "Common Amenities Wing",
+    "z8": "Circulation & Access Hub",
+    "z_T": "Campus Grounds & Transit",
+}
+
+
+def zone_sector(zone: str) -> str:
+    """Return the functional single-floor sector for a given zone."""
+    return ZONE_SECTORS.get(zone, "Building Interior")
+
+
+def format_zone_location(zone: str, building_id: str = "", precision: str = "EXACT") -> str:
+    """
+    Format zone location based on requested precision tier:
+      - EXACT:    'z3 (Office)' or 'z3 (Office) in B1'
+      - COARSE:   'Work & Study Wing' or 'Work & Study Wing in B1'
+      - ABSTRACT: 'Campus Grounds & Transit' if z_T, else 'Inside B1' or 'Building Interior'
+    """
+    prec = str(precision).upper()
+    b_suffix = f" in {building_id}" if building_id else ""
+
+    if prec == "EXACT":
+        lbl = zone_label(zone)
+        return f"{zone} ({lbl}){b_suffix}"
+    elif prec == "COARSE":
+        sec = zone_sector(zone)
+        return f"{sec}{b_suffix}"
+    else:  # ABSTRACT
+        if zone == "z_T":
+            return "Campus Grounds & Transit"
+        return f"Inside {building_id}" if building_id else "Building Interior"
+
