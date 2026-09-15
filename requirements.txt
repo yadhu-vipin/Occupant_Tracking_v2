@@ -1,0 +1,23 @@
+# Core Scientific & Data Processing
+numpy>=1.21.0
+
+# Cryptography & Inter-Node Security Layer (Lane B)
+cryptography>=3.4.0
+
+# Monitoring & Real-Time Telemetry (Lane B)
+prometheus_client>=0.14.0
+
+# Visualization & Reporting
+matplotlib>=3.4.0
+pillow>=8.0.0
+
+# Machine Learning & Face Embeddings (Lane A)
+scikit-learn>=0.24.0
+opencv-python>=4.5.0
+
+# System Monitoring & Dashboard (Lane B)
+psutil>=5.8.0
+
+# Testing
+pytest>=7.0.0
+

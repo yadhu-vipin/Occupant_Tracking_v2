@@ -1,0 +1,17 @@
+{
+  "L": 122,
+  "accept_angle_deg": 80.43,
+  "buildings_params_hash": "27dbe4084f0b5c67d132298ef693e52e856fad4b12fa354a68d75a75d369f074",
+  "embed_dim": 512,
+  "k": 11,
+  "mean_face_sha256": "ae9ff0cfd11ec50d5efa7990f9ddae23c3ff0c3aee35eb7936bfebb839e89478",
+  "min_votes": 12,
+  "n_probes": 3,
+  "params_hash": "27dbe4084f0b5c67d132298ef693e52e856fad4b12fa354a68d75a75d369f074",
+  "refs_per_occupant": 20,
+  "schema_version": 1,
+  "seed": 42,
+  "shortlist_k": 5,
+  "sizing_occupants": 50,
+  "target_fpr": 0.01
+}

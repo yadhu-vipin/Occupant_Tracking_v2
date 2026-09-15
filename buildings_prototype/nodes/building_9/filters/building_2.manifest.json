@@ -1,0 +1,18 @@
+{
+  "L": 122,
+  "bits_sha256": "bcf876c5b034d10bc8ac849fd45b338f5e1771a9708a3bfbd0890b690c73d1cf",
+  "building_id": "building_2",
+  "contract_version": 1,
+  "embed_dim": 512,
+  "fill_ratio": 0.514717,
+  "k": 11,
+  "m": 58469,
+  "n_hashes": 7,
+  "n_items": 6100,
+  "n_occupants": 50,
+  "packed_bytes": 7309,
+  "params_hash": "27dbe4084f0b5c67d132298ef693e52e856fad4b12fa354a68d75a75d369f074",
+  "seed": 42,
+  "sizing_occupants": 50,
+  "theoretical_fpr": 0.00999989
+}

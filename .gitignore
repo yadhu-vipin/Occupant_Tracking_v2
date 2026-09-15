@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.pytest_tmp/
+reports/
+*.png
+reference_db.json
+test_db.json
+emb_arcface.npy
+meta.csv
+
+# Generated experiment outputs
+**/output/*.json
