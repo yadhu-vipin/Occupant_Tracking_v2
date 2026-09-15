@@ -33,6 +33,8 @@ buildings_prototype/
 ├── query_node.py                interactive in-process identification cascade
 ├── respond_node.py              interactive remote-building reply CLI/function
 ├── generate_nodes.py            create per-building deployment folders
+├── run_demo.py                  interactive 5-phase zero-trust simulation runner
+├── test_queries_and_security.py 107-check full system integration & audit suite
 ├── shared/                      federation and recognition configuration
 ├── corpus/                      optional, local embedding corpus and metadata
 ├── buildinglib/                 enrollment, artifacts, routing, verification
@@ -40,10 +42,12 @@ buildings_prototype/
 ├── recognition/                 Phase 2 local recognition and evaluation
 ├── retrieval/                   Phase 3 decentralized retrieval and evaluation
 ├── centralized/                 independent global-search benchmark
-├── dsts/state/                  zones, probabilistic state, persistence, Definition 3.3 probability
-├── dsts/pipeline.py             Phase 4 CLI: probability generation + BSTS integration
-├── dsts/evaluate.py             Phase 4 evaluation and per-building database verification
-├── nodelib/                     generated-node deployment wrapper
+├── dsts/                        zones, bsts, queries, evaluation, probabilistic state
+├── security/                    X25519, AES-128-GCM, Ed25519, CA, mTLS, ReplayGuard, RBAC
+├── monitoring/                  real-time metrics collector, server & web dashboard
+├── sim/                         deterministic B1->B5 scenario generator (Seed 42)
+├── nodelib/                     generated-node deployment wrapper & security handler
+├── tests/                       comprehensive pytest suites (68 tests)
 ├── out/                         generated/published Bloom `.npz` artifacts
 └── nodes/                       generated per-building node folders (own registered.db/visitor.db)
 ```
@@ -127,13 +131,30 @@ Expect every building's `registered.db` to show all ~50 of its own occupants (ev
 
 ### Tests
 
-The focused test command is:
+Run all unit and integration tests across the test suite:
 
+```powershell
+python -m pytest tests/ -v
+```
+
+This runs **68 tests** covering:
+- `tests/test_integration.py`: End-to-end deterministic B1→B5 scenario, handoff, and metrics
+- `tests/test_precision_queries.py`: Multi-level hierarchical query precision (`EXACT`, `COARSE`, `ABSTRACT`) and pre-query RBAC gating
+- `tests/test_queries.py`: Core template queries Q1, Q2, Q3, Q5, Q6
+- `tests/test_secure_prototype.py`: Zero-trust envelope sealing, unsealing, replay rejection, tampering checks
+- `tests/test_security.py`: Cryptographic integrity, Ed25519 signatures, MITM resistance, RBAC permissions
+- `tests/test_transport_security.py`: Campus CA, X.509 issuance, mTLS, certificate pinning, and rotation
+
+To run the full 107-check system verification and security hardening audit:
+
+```powershell
+python test_queries_and_security.py
+```
+
+The legacy modular test command also remains available:
 ```powershell
 python -m pytest events/tests recognition/tests retrieval/tests centralized/tests dsts/tests -q
 ```
-
-It covers deterministic event generation and identity isolation, local-gallery behavior, retrieval sequencing and evaluation categories, centralized scoring/comparison, and (added in Phase 4) Definition 3.3 probability properties plus probability/BSTS/persistence/present-visitor-pool integration. At the time this README was updated, it passed **31 tests** (16 from Phases 1-3/centralized, 15 for Phase 4). `buildinglib` also has module-level smoke checks, for example `python -m buildinglib.params`; some development-only checks in that package expect the original parent research repository's `core` module and are not standalone tests.
 
 ## Phase 1: observable events
 
@@ -149,7 +170,7 @@ An observable event has exactly:
 
 `ground_truth.json` contains those same observable fields plus `occupant_id` and `home_building`. It is evaluation-only and is not accepted by local recognition or Phase 3 retrieval. A visitor has `home_building != current_building`.
 
-Zones are `z1` through `z8` plus `zT`. `zT` is the transition/gateway zone: an inter-building movement must leave one building at `zT` and enter the other at `zT`. Internal movement follows the adjacency graph in `dsts/state/zones.py`.
+Zones are `z1` through `z8` plus `z_T`. All 8 internal zones reside on a **single 2D floor** per building (no vertical floors/elevators). `z_T` is the transition/gateway zone: an inter-building movement must leave one building at `z_T` and enter the other at `z_T`. Internal movement follows the single-floor adjacency graph in `dsts/zones.py`.
 
 ## Phase 2: local recognition
 
@@ -272,18 +293,97 @@ Persistence reuses the existing per-building databases exactly as designed: `nod
 
 Phase 4 outputs land in `dsts/output/`: `phase4_results.json` (per-event identity source, presence mode, distance scores, sigma, occupant probabilities, and post-update BSTS state), `phase4_summary.json` (counts and averages, including how many identifications were new-visitor home-gallery lookups vs. present-pool re-matches), and `phase4_evaluation.json` (invariant checks, ground-truth-only accuracy stats, and the sampled database verification). `dsts/tests/test_probability.py` and `dsts/tests/test_pipeline.py` cover the formula and the probability/BSTS/persistence/present-visitor-pool/no-leakage integration.
 
+## Single-Floor Zone Topology & Functional Sectors
+
+Each building's interior layout consists of **8 internal zones + 1 transition zone**, all situated on a **single 2D floor plan** (defined in `dsts/zones.py`):
+
+| Zone ID | Room Label | Connectivity | Functional Single-Floor Sector |
+| :--- | :--- | :--- | :--- |
+| `z1` | **Entrance** | `z_T` (entry), `z8` (exit), `z2`..`z6` | **Circulation & Access Hub** |
+| `z2` | **Mail Room** | `z1` (entrance), `z3` (office), `z8` (exit) | **Common Amenities Wing** |
+| `z3` | **Office** | `z1`, `z2`, `z4` (lounge), `z8` | **Work & Study Wing** |
+| `z4` | **Lounge** | `z1`, `z3`, `z5` (conference), `z8` | **Common Amenities Wing** |
+| `z5` | **Conference Room** | `z1`, `z4`, `z8` | **Work & Study Wing** |
+| `z6` | **Class Room** | `z1`, `z8` | **Work & Study Wing** |
+| `z7` | **Cafeteria** | `z8` (exit concourse only) | **Common Amenities Wing** |
+| `z8` | **Exit** | All internal rooms (`z1`–`z7`), `z_T` (exit) | **Circulation & Access Hub** |
+| `z_T` | **Transition Zone** | Inter-building outdoor / campus grounds | **Campus Grounds & Transit** |
+
+Spatial characteristics:
+- Direct horizontal door & corridor transitions: `z2` (Mail Room) ↔ `z3` (Office) ↔ `z4` (Lounge) ↔ `z5` (Conference Room).
+- Central access through the `Entrance` (`z1`) and `Exit` concourse (`z8`).
+- Cafeteria (`z7`) is accessible solely through the exit corridor.
+- No multi-story vertical layers or stairwells; flat 2D spatial model.
+
+## Zero-Trust Security & RBAC Architecture
+
+The system incorporates zero-trust cryptographic security (`security/` and `nodelib/security_handler.py`):
+
+1. **Cryptographic Foundations**:
+   - **Key Agreement**: X25519 ECDH with HKDF-SHA256 session key derivation.
+   - **Authenticated Encryption**: AES-128-GCM ensures message confidentiality, integrity, and authenticity.
+   - **Digital Signatures**: Ed25519 for non-repudiation and identity attestation.
+   - **Public Key Infrastructure (PKI)**: Internal Campus CA issues X.509 certificates for node provisioning, mTLS session establishment, and certificate pinning.
+   - **Anti-Replay Protection**: `ReplayGuard` uses a sliding time window (300s) and unique nonces to reject replayed envelopes.
+
+2. **Role-Based Access Control (RBAC)**:
+   - **Pre-Execution Gating**: RBAC checks (`security/authorize.py`) are applied **before** querying or executing actions, not as post-execution filters. If a principal is unauthorized or unregistered, requests are blocked prior to accessing state tables.
+   - **Roles**:
+     - `ADMIN`: Full access (`ADMIN`, `CONFIGURE`, `AUDIT_READ`, plus all node operations).
+     - `BUILDING_NODE`: Node operations (`DETECT`, `SEEK`, `RESOLVE`, `GOSSIP`, `SYNC`, `QUERY`, `HANDOFF`, `VISITOR_ADD`).
+     - `QUERY_CLIENT`: Restricted solely to `QUERY` operations.
+   - **Audit Trail**: Every authorization decision (`PERMIT` or `DENY`) is logged with timestamps, requesting principal, verb, target, and outcome.
+
+## Hierarchical Query Precision (Multi-Level Location Abstraction)
+
+DSTS template queries (`Q1`, `Q2`, `Q3`, `Q5`, `Q6` in `dsts/queries.py`) adapt their output precision based on the requesting principal's clearance level / role:
+
+| Clearance / Role | Precision Level | Location Resolution (e.g. Q6) | Evidence Detail |
+| :--- | :--- | :--- | :--- |
+| **High** (`Role.ADMIN`) | **`EXACT`** | `z3` (`Office`), $p=0.950$, $t=42.3\text{s}$ | Full room ID, exact timestamp, state-table probability |
+| **Medium** (`Role.BUILDING_NODE`) | **`COARSE`** | `Work & Study Wing`, High ($p \ge 0.8$) | Functional floor sector, rounded time ($\sim 5\text{s}$), confidence band |
+| **Low** (`Role.QUERY_CLIENT`) | **`ABSTRACT`** | `Inside B1` (or `Campus Grounds`) | Coarse building presence; exact room codes & paths redacted |
+
+### Template Queries Supported
+- **Q1**: Did any occupant stay in building $b$ after time $t$?
+- **Q2**: Was the number of visitors greater than registered occupants in building $b$ at time $t$?
+- **Q3**: Did occupant $o$ leave building $b$ before time $t$?
+- **Q5**: Did occupant $o$ visit all zones in building $b$?
+- **Q6**: Where was occupant $o$ at time $t$?
+
+## DSTS Monitoring Dashboard
+
+A real-time monitoring server and web interface are provided under `monitoring/`:
+- **Server**: `monitoring/dashboard_server.py` runs a lightweight HTTP server on port 8050.
+- **Dashboard UI**: `monitoring/dashboard.html` visualizes live system health:
+  - CPU utilization and memory consumption (RSS / VMS).
+  - Disk I/O throughput (read/write bytes and ops).
+  - Cryptographic security overhead (X25519, AES-GCM, Ed25519, anti-replay latency).
+  - Query latency and throughput across Q1–Q6.
+  - Phase-by-phase execution timeline.
+
+Start the dashboard:
+```powershell
+python monitoring/dashboard_server.py
+```
+Then open `http://localhost:8050/dashboard` in a browser.
+
 ## Status and Git hygiene
 
-| Phase | Status |
+| Phase / Feature | Status |
 | --- | --- |
-| Event generation and validation | Implemented |
-| Local recognition | Implemented |
-| LSH/Bloom candidate retrieval | Implemented |
+| Event generation and validation (Phase 1) | Implemented |
+| Local recognition (Phase 2) | Implemented |
+| Decentralized candidate retrieval (LSH + Bloom) (Phase 3) | Implemented |
 | Remote verification and visitor identification | Implemented |
 | Centralized baseline comparison | Implemented experimental benchmark |
 | Definition 3.3 probability + BSTS integration (Phase 4) | Implemented |
-| Network/RPC and dashboard workflow | Future work |
+| Zero-Trust Cryptographic Security (mTLS, AES-GCM, Replay Guard, RBAC) | Implemented |
+| Hierarchical Query Precision (Multi-Level Location Abstraction) | Implemented |
+| DSTS Real-Time Monitoring Dashboard | Implemented |
+| Full System Test & Hardening Audit (107/107 passed) | Verified |
 
 Keep source code, tests, contracts, manifests, and small configuration in Git. Detailed generated experiment outputs—especially `recognition/output/recognition_results.json` and `dsts/output/phase4_results.json`—can become very large and are regenerable from this workflow; normally do not commit them. The project `.gitignore` already excludes recognition, retrieval, and centralized JSON outputs (the repo-level `.gitignore` covers `dsts/output/*.json` the same way), corpus arrays/CSV, and sensitive generated node embedding arrays. Regenerate outputs when needed rather than treating them as authoritative source.
 
 Running `dsts.pipeline` writes real rows into `nodes/<building>/state/registered.db` and `visitor.db`, which the repository currently tracks (as the empty schemas `generate_nodes.py` creates). A Phase 4 run therefore leaves those files modified in Git; decide per workflow whether to commit the populated databases, reset them, or move them to `.gitignore` alongside the already-ignored `*.db-wal`/`*.db-shm`/`*.db-journal` — this README does not make that call for you.
+
