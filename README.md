@@ -2,8 +2,8 @@
 ### Multi-Building Occupant Tracking, Decentralized Routing & Zero-Trust Metadata Security
 
 [![Branch](https://img.shields.io/badge/branch-test__3-blue.svg)](https://github.com/yadhu-vipin/Occupant_Tracking_v2/tree/test_3)
-[![Build Status](https://img.shields.io/badge/tests-205%2F205%20passed-brightgreen.svg)](#-testing--verification-suite)
-[![Pytest Suite](https://img.shields.io/badge/pytest-98%2F98%20passed-brightgreen.svg)](#2-formal-pytest-integration--unit-suite)
+[![Build Status](https://img.shields.io/badge/tests-329%2F329%20passed-brightgreen.svg)](#-testing--verification-suite)
+[![Pytest Suite](https://img.shields.io/badge/pytest-179%2F179%20passed-brightgreen.svg)](#2-formal-pytest-integration--unit-suite)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](requirements.txt)
 [![Security Standard](https://img.shields.io/badge/crypto-X25519%20DH%20%7C%20AES--128--GCM%20%7C%20Ed25519-green.svg)](#-security--cryptographic-specification)
 [![Seed](https://img.shields.io/badge/seed-42-purple.svg)](#-quick-start--execution-guide)
@@ -42,7 +42,7 @@
    - Architected the end-to-end Zero-Trust User-Seeking-Location Protocol and interactive terminal client ([`security/user_privacy_protocol.py`](buildings_prototype/security/user_privacy_protocol.py) & [`query_user.py`](buildings_prototype/query_user.py)).
 
 5. **Testing Infrastructure & Monitoring**:
-   - Architected the 107-test comprehensive verification test runner (`test_queries_and_security.py`) and 98 formal pytest tests achieving a **100% pass rate (205/205 total)**.
+   - Architected the 150-test comprehensive verification test runner (`test_queries_and_security.py`) and 179 formal pytest tests achieving a **100% pass rate (329/329 total)**.
    - Built Prometheus metric exporter (`monitoring/monitoring.py`) and Grafana monitoring dashboard (`monitoring/grafana_dashboard.json`).
    - Built a real-time **Web Monitoring Dashboard** (`monitoring/dashboard_server.py` + `monitoring/dashboard.html`) displaying CPU load, memory usage, disk I/O, security overhead, and query latency.
 
@@ -499,10 +499,10 @@ python buildings_prototype/monitoring/dashboard_server.py
 Execute all unit, integration, query, transport, and cryptographic security tests:
 
 ```bash
-# Option A: Run 107-Test Comprehensive Verification Runner
+# Option A: Run 150-Test Comprehensive Verification Runner
 python buildings_prototype/test_queries_and_security.py
 
-# Option B: Run 101-Test Pytest Suite (auto-configured via pytest.ini)
+# Option B: Run 179-Test Pytest Suite (auto-configured via pytest.ini)
 python -m pytest
 ```
 
@@ -562,7 +562,7 @@ Detailed architectural specs and control flow documentation are maintained in de
 
 - [x] **Consolidated Architecture**: All modules consolidated into `buildings_prototype/` — security, DSTS, identification, simulation, monitoring, and tests.
 - [x] **Deterministic Seed 42**: All scenario runners, simulations, and tests use Seed 42 for 100% reproducible results across team members.
-- [x] **Comprehensive Test Coverage**: **205 Total Tests Passing 100%** (107 comprehensive runner + 98 pytest suite).
+- [x] **Comprehensive Test Coverage**: **329 Total Tests Passing 100%** (150 comprehensive runner + 179 pytest suite).
 - [x] **Zero-Trust Security & Transport**: X25519 DH Key Exchange, HKDF-SHA256, AES-128-GCM, Ed25519, Campus CA, mTLS, Certificate Pinning, Anti-Replay Nonce Cache, and Target-Aware RBAC integrated.
 - [x] **Contextual Privacy & ReBAC**: Pairwise dual-axis `(AccessScope, LocationGranularity)` policy (`none`, `presence`, `current`, `full_track`), self-query exemption, teacher class-roster override, teacher-to-dean availability (`current/zone`), and entity-level target awareness (`occupant:<id>`, `building:<id>`, `system`).
 - [x] **Zero-Trust User-Seeking-Location Protocol**: End-to-end sealed envelope queries with ReplayGuard, Layer-1 RBAC authorization, Layer-2 Persona ReBAC, and hierarchical precision disclosure (`UserClient` & `SecureLocationQueryGateway`).

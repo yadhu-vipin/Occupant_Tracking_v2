@@ -44,6 +44,14 @@ from dsts.reasoning import score_track_adjacency
 from sim.scenario_b1_b5 import run_scenario, print_scenario_summary
 from sim.event_generator import EventGenerator
 from sim.evaluation import paper_metrics, routing_metrics
+from sim.campus import (
+    NUM_BUILDINGS, BUILDING_IDS, BUILDING_COORDS, DISTANCE_MATRIX,
+    nearest_buildings, gravity_probability, assign_occupants,
+)
+from sim.mobility import MobilityModel, DWELL_PARAMS, R_EXIT, R_RETURN_HOME
+from sim.report import generate_evaluation_report
+import tempfile
+import numpy as np
 
 from security.crypto import (
     NodeIdentity, SecureChannel, ephemeral_handshake,
@@ -698,6 +706,202 @@ def test_building_security_hardening():
         check(f"{zn} has neighbors", len(adj) > 0, f"{len(adj)} neighbors")
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 7: CAMPUS TOPOLOGY, ROUTING & MOBILITY AUDIT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_campus_and_mobility():
+    header("SECTION 7: CAMPUS TOPOLOGY, ROUTING & MOBILITY AUDIT")
+
+    subheader("7.1: Campus Topology & Coordinates")
+    check("10 buildings configured", len(BUILDING_IDS) == NUM_BUILDINGS == 10)
+    check("All 10 buildings have 2D coordinates", len(BUILDING_COORDS) == 10)
+    coords_unique = len(set(BUILDING_COORDS.values())) == 10
+    check("All building coordinates unique", coords_unique)
+
+    subheader("7.2: Distance Matrix Properties")
+    check("Distance matrix is 10x10", DISTANCE_MATRIX.shape == (10, 10))
+    check("Zero diagonal (D_ii == 0)", (np.diag(DISTANCE_MATRIX) == 0.0).all())
+    check("Symmetric distance matrix (D_ij == D_ji)", np.allclose(DISTANCE_MATRIX, DISTANCE_MATRIX.T))
+    off_diag_positive = all(DISTANCE_MATRIX[i, j] > 0 for i in range(10) for j in range(10) if i != j)
+    check("Strictly positive off-diagonal distances", off_diag_positive)
+
+    tri_holds = all(
+        DISTANCE_MATRIX[i, k] <= DISTANCE_MATRIX[i, j] + DISTANCE_MATRIX[j, k] + 1e-9
+        for i in range(10) for j in range(10) for k in range(10)
+    )
+    check("Triangle inequality holds across campus", tri_holds)
+
+    subheader("7.3: Nearest Buildings Proximity Ordering")
+    nb1 = nearest_buildings("B1", exclude_self=True)
+    check("B1 nearest list excludes self", len(nb1) == 9 and "B1" not in [b for b, d in nb1])
+    dists = [d for b, d in nb1]
+    check("Nearest buildings sorted ascending by distance", dists == sorted(dists))
+
+    subheader("7.4: Gravity Probability Model")
+    probs_b1 = gravity_probability("B1")
+    check("Gravity probabilities sum to 1.0", abs(sum(probs_b1.values()) - 1.0) < 1e-6)
+    check("Gravity probabilities exclude source building", "B1" not in probs_b1)
+    check("Closer building has higher gravity probability", probs_b1["B2"] > probs_b1["B10"])
+
+    subheader("7.5: Disjoint Occupant Allocation (Equation 3)")
+    assignments = assign_occupants()
+    check("10 buildings assigned occupants", len(assignments) == 10)
+    check("50 occupants per building", all(len(occs) == 50 for occs in assignments.values()))
+    all_occs = [o for occs in assignments.values() for o in occs]
+    check("500 total occupants registered", len(all_occs) == 500)
+    check("Pairwise disjoint registered sets", len(set(all_occs)) == 500)
+
+    subheader("7.6: Continuous-Time Markov Chain Mobility")
+    rng = np.random.Generator(np.random.PCG64(42))
+    model = MobilityModel("B1", rng, spurious_rate=0.0)
+    dwells = [model.sample_dwell_time("z3") for _ in range(50)]
+    check("Log-normal dwell times strictly positive", all(d > 0.0 for d in dwells))
+    next_z, dest = model.next_zone("z2", "B1")
+    check("Standard transition respects adjacency", are_adjacent("z2", next_z) and dest is None)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 8: EVENT GENERATION & EVALUATION METRICS AUDIT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_event_generation_and_evaluation(scenario_result):
+    header("SECTION 8: EVENT GENERATION & EVALUATION METRICS AUDIT")
+
+    subheader("8.1: Beta Recognition Probability Sampling")
+    gen = EventGenerator(seed=42)
+    p_corr = [gen._sample_recognition_prob(is_correct=True) for _ in range(200)]
+    p_wrong = [gen._sample_recognition_prob(is_correct=False) for _ in range(200)]
+    check("Correct match recognition probability mean > 0.85", np.mean(p_corr) > 0.85)
+    check("Wrong match recognition probability mean < 0.10", np.mean(p_wrong) < 0.10)
+
+    subheader("8.2: Movement Trace & HLC Generation")
+    steps = gen.generate_movement_trace("B1_P_001", "B1", 0.0, 120.0)
+    check("Movement trace generated steps", len(steps) > 0)
+    events = gen.steps_to_events(steps)
+    check("Steps converted to RecognitionEvent objects", len(events) == len(steps))
+    check("Events contain valid HLC timestamps", all(isinstance(e.hlc, HLC) for e in events))
+    evts_40 = gen.generate_n_events(40)
+    check("generate_n_events yields exact count", len(evts_40) == 40)
+
+    subheader("8.3: Spatio-Temporal Paper Metrics Evaluation")
+    pm = paper_metrics(scenario_result, num_thresholds=50)
+    check("Paper metrics evaluated 50 thresholds", len(pm.theta_values) == 50)
+    check("Optimal theta in [0.05, 0.99]", 0.05 <= pm.optimal_theta <= 0.99)
+    check("Optimal precision in [0.0, 1.0]", 0.0 <= pm.optimal_precision <= 1.0)
+    check("Optimal recall in [0.0, 1.0]", 0.0 <= pm.optimal_recall <= 1.0)
+    check("Recognition accuracy > 80%", pm.recognition_accuracy > 0.80)
+
+    subheader("8.4: Distributed Routing Efficiency Metrics")
+    rm = routing_metrics(scenario_result, total_buildings=10)
+    check("Total routing lookups tracked", rm.total_lookups >= 20)
+    check("Rank-1 routing accuracy > 80%", rm.rank1_accuracy > 0.80)
+    check("DSTS contacts fewer buildings than broadcast", rm.dsts_avg_buildings < rm.broadcast_buildings)
+    check("Routing efficiency gain > 50%", rm.efficiency_gain > 0.50)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 9: REPORT GENERATION, LOGIC & INTEGRITY AUDIT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_report_generation_and_integrity(scenario_result):
+    header("SECTION 9: REPORT GENERATION, LOGIC & INTEGRITY AUDIT")
+
+    subheader("9.1: Visual Report Generation (Matplotlib)")
+    pm = paper_metrics(scenario_result, num_thresholds=20)
+    rm = routing_metrics(scenario_result, total_buildings=10)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        report_map = generate_evaluation_report(pm, rm, output_dir=tmpdir)
+        check("All 4 report charts generated", len(report_map) == 4)
+        png_magic = b"\x89PNG\r\n\x1a\n"
+        all_valid_png = True
+        for name, path in report_map.items():
+            if not os.path.exists(path) or os.path.getsize(path) < 5000:
+                all_valid_png = False
+            with open(path, "rb") as fh:
+                if fh.read(8) != png_magic:
+                    all_valid_png = False
+        check("Report charts are valid non-empty PNG files", all_valid_png)
+
+    subheader("9.2: Cryptographic Payload & Signature Tamper Resistance")
+    b1_id = NodeIdentity.generate("B1")
+    b2_id = NodeIdentity.generate("B2")
+    chan_b1, chan_b2 = ephemeral_handshake(b1_id, b2_id)
+    meta = create_handoff_metadata("B1_P_001", "B1", "B2", 0.95)
+    env = seal_metadata(meta, b1_id, chan_b1)
+
+    # Tamper payload
+    p_bytes = bytearray.fromhex(env.encrypted_payload)
+    p_bytes[0] ^= 0x01
+    bad_p_env = SecureMetadataEnvelope(
+        sender_building=env.sender_building,
+        receiver_building=env.receiver_building,
+        encrypted_payload=p_bytes.hex(),
+        encryption_nonce=env.encryption_nonce,
+        signature=env.signature,
+        timestamp=env.timestamp,
+        message_id=env.message_id,
+    )
+    tamper_caught = False
+    try:
+        open_metadata(bad_p_env, chan_b2, b1_id.ed25519_public)
+    except Exception:
+        tamper_caught = True
+    check("Tampered ciphertext rejected (AES-GCM tag failure)", tamper_caught)
+
+    # Tamper signature
+    s_bytes = bytearray.fromhex(env.signature)
+    s_bytes[0] ^= 0xFF
+    bad_s_env = SecureMetadataEnvelope(
+        sender_building=env.sender_building,
+        receiver_building=env.receiver_building,
+        encrypted_payload=env.encrypted_payload,
+        encryption_nonce=env.encryption_nonce,
+        signature=s_bytes.hex(),
+        timestamp=env.timestamp,
+        message_id=env.message_id,
+    )
+    sig_caught = False
+    try:
+        open_metadata(bad_s_env, chan_b2, b1_id.ed25519_public)
+    except Exception:
+        sig_caught = True
+    check("Tampered signature rejected (Ed25519 verification failure)", sig_caught)
+
+    subheader("9.3: State Table Equation 6 Invariant Under Stress")
+    table = StateTable(["B1_P_001", "B1_P_002"], initial_zone="z_T")
+    rng = np.random.Generator(np.random.PCG64(999))
+    eq6_maintained = True
+    for _ in range(50):
+        apply_transition(table, "B1_P_001", str(rng.choice(ZONE_NAMES)), float(rng.uniform(0.1, 0.95)))
+        try:
+            table.verify_eq6(tol=1e-9)
+        except AssertionError:
+            eq6_maintained = False
+            break
+    check("Equation 6 invariant held across 50 transitions", eq6_maintained)
+
+    table.probs[0, 0] += 0.005
+    perturbation_caught = False
+    try:
+        table.verify_eq6(tol=1e-6)
+    except AssertionError:
+        perturbation_caught = True
+    check("Artificial probability perturbation detected", perturbation_caught)
+
+    subheader("9.4: Replay Guard & Nonce Collision Resistance")
+    guard = ReplayGuard(window_seconds=60.0)
+    now = time.time()
+    n_hex = os.urandom(12).hex()
+    r1 = guard.validate(n_hex, now, "msg_1")
+    r2 = guard.validate(n_hex, now, "msg_1")
+    check("Initial message accepted by ReplayGuard", r1.accepted)
+    check("Duplicate nonce rejected as replay", not r2.accepted)
+    nonces_500 = {os.urandom(12).hex() for _ in range(500)}
+    check("500 randomly generated nonces are unique", len(nonces_500) == 500)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN — Run all test sections
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -728,6 +932,15 @@ def main():
 
         # Section 6: Building Security Hardening
         test_building_security_hardening()
+
+        # Section 7: Campus Topology, Routing & Mobility
+        test_campus_and_mobility()
+
+        # Section 8: Event Generation & Evaluation Metrics
+        test_event_generation_and_evaluation(result)
+
+        # Section 9: Report Generation, Logic & Cryptographic Integrity
+        test_report_generation_and_integrity(result)
 
     except Exception as e:
         print(f"\n\n  FATAL ERROR: {e}")

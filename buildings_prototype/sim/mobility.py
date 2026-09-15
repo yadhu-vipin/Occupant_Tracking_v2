@@ -14,10 +14,16 @@ gravity model (prob ∝ 1/distance²).
 
 import numpy as np
 from typing import List, Tuple, Dict, Optional
-from ..dsts.zones import (
-    ZONE_NAMES, ZONE_INDEX, NUM_ZONES, adjacent_zones, ADJACENCY_MATRIX
-)
-from .campus import gravity_probability
+try:
+    from dsts.zones import (
+        ZONE_NAMES, ZONE_INDEX, NUM_ZONES, adjacent_zones, ADJACENCY_MATRIX
+    )
+    from sim.campus import gravity_probability
+except (ImportError, ValueError):
+    from ..dsts.zones import (
+        ZONE_NAMES, ZONE_INDEX, NUM_ZONES, adjacent_zones, ADJACENCY_MATRIX
+    )
+    from .campus import gravity_probability
 
 # Zone-type dwell times (log-normal parameters: mu, sigma for minutes)
 # Median dwell ≈ exp(mu) minutes
