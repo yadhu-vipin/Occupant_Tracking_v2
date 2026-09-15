@@ -1,3 +1,0 @@
-# Enrollment needs the base tier only -- no face model, no GPU, no torch.
-# A teammate building their building's filter installs just this.
--r ../requirements.txt

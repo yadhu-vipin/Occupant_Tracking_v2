@@ -1,5 +1,0 @@
-# Base tier -- pipeline steps 03-07 and everything in core/.
-# Pure NumPy / pandas, runs in seconds, no face model, no GPU.
-numpy==2.5.2
-pandas==3.0.5
-matplotlib==3.11.1
