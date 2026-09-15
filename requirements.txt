@@ -14,3 +14,10 @@ pillow>=8.0.0
 # Machine Learning & Face Embeddings (Lane A)
 scikit-learn>=0.24.0
 opencv-python>=4.5.0
+
+# System Monitoring & Dashboard (Lane B)
+psutil>=5.8.0
+
+# Testing
+pytest>=7.0.0
+
