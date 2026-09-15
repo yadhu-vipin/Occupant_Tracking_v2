@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>DSTS — Campus Command Center</title>
+
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+
+  <!-- ============================================================
+       APP SHELL
+       ============================================================ -->
+
+  <div class="app-shell">
+
+    <!-- ==========================================================
+         SIDEBAR
+         ========================================================== -->
+
+    <aside class="sidebar">
+
+      <div class="brand">
+        <div class="brand-mark">
+          <span class="brand-dot"></span>
+        </div>
+
+        <div>
+          <div class="brand-name">DSTS</div>
+          <div class="brand-subtitle">Lane D · Interface</div>
+        </div>
+      </div>
+
+
+      <div class="sidebar-status">
+        <span id="sidebar-status-dot" class="status-dot"></span>
+
+        <div>
+          <strong id="sidebar-status-text">Connecting</strong>
+          <span>Live system</span>
+        </div>
+      </div>
+
+
+      <nav class="sidebar-nav">
+
+        <div class="nav-label">MONITORING</div>
+
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="nav-icon">⌂</span>
+          <span>Dashboard</span>
+        </button>
+
+        <button class="nav-item" data-tab="occupancy">
+          <span class="nav-icon">◉</span>
+          <span>Occupancy</span>
+        </button>
+
+        <button class="nav-item" data-tab="heatmap">
+          <span class="nav-icon">▦</span>
+          <span>Heatmap</span>
+        </button>
+
+
+        <div class="nav-label">INTELLIGENCE</div>
+
+        <button class="nav-item" data-tab="query">
+          <span class="nav-icon">⌕</span>
+          <span>Query</span>
+        </button>
+
+        <button class="nav-item" data-tab="security">
+          <span class="nav-icon">◇</span>
+          <span>Security</span>
+        </button>
+
+
+        <div class="nav-label">OBSERVABILITY</div>
+
+        <button class="nav-item" data-tab="metrics">
+          <span class="nav-icon">⌁</span>
+          <span>Metrics</span>
+        </button>
+
+      </nav>
+
+
+      <div class="sidebar-bottom">
+
+        <div class="lane-card">
+
+          <div class="lane-card-header">
+            <span>LANE D</span>
+            <span class="mini-live">ACTIVE</span>
+          </div>
+
+          <p>
+            Orchestration, secure transport,
+            retrieval and dashboard interface.
+          </p>
+
+        </div>
+
+        <div class="sidebar-footer">
+          DSTS · Distributed Tracking
+          <br />
+          &amp; Security System
+        </div>
+
+      </div>
+
+    </aside>
+
+
+    <!-- ==========================================================
+         MAIN
+         ========================================================== -->
+
+    <main class="main-area">
+
+
+      <!-- ========================================================
+           TOP HEADER
+           ======================================================== -->
+
+      <header class="topbar">
+
+        <div class="breadcrumb">
+
+          <span class="breadcrumb-main">Campus Command Center</span>
+
+          <span class="breadcrumb-separator">/</span>
+
+          <span id="current-section">Dashboard</span>
+
+        </div>
+
+
+        <div class="topbar-right">
+
+          <div class="connection-pill">
+
+            <span id="live-dot" class="status-dot"></span>
+
+            <span id="connection-text">LIVE</span>
+
+          </div>
+
+
+          <div class="role-display">
+
+            <span class="role-label">ACCESS</span>
+
+            <strong id="header-role">OFFICER</strong>
+
+          </div>
+
+        </div>
+
+      </header>
+
+
+      <!-- ========================================================
+           CONTENT
+           ======================================================== -->
+
+      <div class="content">
+
+
+        <!-- ======================================================
+             DASHBOARD
+             ====================================================== -->
+
+        <section id="tab-dashboard" class="panel active">
+
+          <div class="page-heading">
+
+            <div>
+              <div class="eyebrow">DISTRIBUTED TRACKING &amp; SECURITY</div>
+
+              <h1>Campus Overview</h1>
+
+              <p>
+                Real-time view of buildings, occupancy, movement
+                and system activity.
+              </p>
+            </div>
+
+
+            <div class="dashboard-actions">
+
+              <button id="btn-simulate" class="btn btn-primary">
+                <span>▶</span>
+                Make States
+              </button>
+
+              <button id="btn-walk" class="btn btn-secondary">
+                <span>⇢</span>
+                Run B1 → B5 Demo
+              </button>
+
+              <button id="btn-reset" class="btn btn-ghost">
+                Reset
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <!-- SIMULATION SETTINGS -->
+
+          <div class="simulation-bar">
+
+            <div class="simulation-title">
+              <span class="simulation-icon">⚙</span>
+
+              <div>
+                <strong>Simulation Controls</strong>
+                <span>Generate controlled occupancy states</span>
+              </div>
+            </div>
+
+
+            <label class="compact-field">
+              <span>EVENTS</span>
+              <input
+                id="sim-count"
+                type="number"
+                value="20"
+                min="1"
+                max="200"
+              />
+            </label>
+
+
+            <label class="compact-field">
+              <span>SEED</span>
+              <input
+                id="sim-seed"
+                type="number"
+                value="42"
+              />
+            </label>
+
+
+            <div id="action-status" class="action-status">
+              Ready
+            </div>
+
+          </div>
+
+
+          <!-- KPI CARDS -->
+
+          <div class="stats-grid">
+
+            <article class="stat-card">
+
+              <div class="stat-card-top">
+                <span class="stat-label">CURRENT OCCUPANCY</span>
+                <span class="stat-icon">◉</span>
+              </div>
+
+              <div id="stat-occupants" class="stat-value">—</div>
+
+              <div class="stat-footer">
+                <span class="stat-live"></span>
+                Live tracked occupants
+              </div>
+
+            </article>
+
+
+            <article class="stat-card">
+
+              <div class="stat-card-top">
+                <span class="stat-label">BUILDINGS</span>
+                <span class="stat-icon">⌂</span>
+              </div>
+
+              <div id="stat-buildings" class="stat-value">—</div>
+
+              <div class="stat-footer">
+                <span class="stat-live"></span>
+                Campus nodes
+              </div>
+
+            </article>
+
+
+            <article class="stat-card">
+
+              <div class="stat-card-top">
+                <span class="stat-label">EVENTS PROCESSED</span>
+                <span class="stat-icon">↯</span>
+              </div>
+
+              <div id="stat-events" class="stat-value">0</div>
+
+              <div class="stat-footer">
+                Mobility events
+              </div>
+
+            </article>
+
+
+            <article class="stat-card">
+
+              <div class="stat-card-top">
+                <span class="stat-label">SECURITY EVENTS</span>
+                <span class="stat-icon">◇</span>
+              </div>
+
+              <div id="stat-security" class="stat-value">0</div>
+
+              <div class="stat-footer">
+                Verification / replay activity
+              </div>
+
+            </article>
+
+          </div>
+
+
+          <!-- BUILDINGS -->
+
+          <div class="section-heading">
+
+            <div>
+              <h2>Building Network</h2>
+              <span>Live occupancy by campus node</span>
+            </div>
+
+            <button
+              class="text-button"
+              data-tab-target="occupancy"
+            >
+              View details →
+            </button>
+
+          </div>
+
+
+          <div id="dashboard-buildings" class="building-grid"></div>
+
+
+          <!-- ACTIVITY -->
+
+          <div class="dashboard-two-column">
+
+            <div class="card">
+
+              <div class="card-header">
+
+                <div>
+                  <h3>Live Activity</h3>
+                  <span>Latest system events</span>
+                </div>
+
+                <span class="live-badge">
+                  <span></span>
+                  LIVE
+                </span>
+
+              </div>
+
+              <div id="activity-feed" class="activity-feed">
+
+                <div class="empty-state">
+                  Waiting for activity...
+                </div>
+
+              </div>
+
+            </div>
+
+
+            <div class="card">
+
+              <div class="card-header">
+
+                <div>
+                  <h3>System Status</h3>
+                  <span>Lane D components</span>
+                </div>
+
+              </div>
+
+
+              <div class="system-status-list">
+
+                <div class="system-status-item">
+                  <div class="status-indicator online"></div>
+
+                  <div>
+                    <strong>API Server</strong>
+                    <span>FastAPI interface</span>
+                  </div>
+
+                  <b>ONLINE</b>
+                </div>
+
+
+                <div class="system-status-item">
+                  <div id="ws-status-indicator"
+                       class="status-indicator online"></div>
+
+                  <div>
+                    <strong>Live Stream</strong>
+                    <span>WebSocket /ws/live</span>
+                  </div>
+
+                  <b id="ws-status-text">CONNECTED</b>
+                </div>
+
+
+                <div class="system-status-item">
+                  <div class="status-indicator online"></div>
+
+                  <div>
+                    <strong>Metrics</strong>
+                    <span>Prometheus endpoint</span>
+                  </div>
+
+                  <b>READY</b>
+                </div>
+
+
+                <div class="system-status-item">
+                  <div class="status-indicator online"></div>
+
+                  <div>
+                    <strong>Security</strong>
+                    <span>Transport verification</span>
+                  </div>
+
+                  <b>ACTIVE</b>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ======================================================
+             OCCUPANCY
+             ====================================================== -->
+
+        <section id="tab-occupancy" class="panel">
+
+          <div class="page-heading compact">
+
+            <div>
+              <div class="eyebrow">MONITORING</div>
+              <h1>Occupancy</h1>
+              <p>
+                Current occupant state across the distributed building network.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="card">
+
+            <div class="card-header">
+
+              <div>
+                <h3>Live Occupancy</h3>
+                <span>Updated automatically as events are processed</span>
+              </div>
+
+              <span id="occupancy-count-badge" class="count-badge">
+                0 records
+              </span>
+
+            </div>
+
+
+            <div class="table-wrapper">
+
+              <table class="data-table">
+
+                <thead>
+                  <tr>
+                    <th>BUILDING</th>
+                    <th>ZONE</th>
+                    <th>OCCUPANT</th>
+                    <th>PROBABILITY</th>
+                  </tr>
+                </thead>
+
+                <tbody id="occupancy-body"></tbody>
+
+              </table>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ======================================================
+             HEATMAP
+             ====================================================== -->
+
+        <section id="tab-heatmap" class="panel">
+
+          <div class="page-heading compact">
+
+            <div>
+              <div class="eyebrow">SPATIAL MONITORING</div>
+
+              <h1>Occupancy Heatmap</h1>
+
+              <p>
+                Occupant density per zone and building.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="card">
+
+            <div class="card-header">
+
+              <div>
+                <h3>Zone Density</h3>
+                <span>Darker cells indicate higher occupancy</span>
+              </div>
+
+              <div class="heat-legend">
+                <span>LOW</span>
+                <i class="heat-low"></i>
+                <i class="heat-mid"></i>
+                <i class="heat-high"></i>
+                <span>HIGH</span>
+              </div>
+
+            </div>
+
+
+            <div id="heatmap-grid" class="heatmap-grid"></div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ======================================================
+             QUERY
+             ====================================================== -->
+
+        <section id="tab-query" class="panel">
+
+          <div class="page-heading compact">
+
+            <div>
+              <div class="eyebrow">RETRIEVAL STAGE</div>
+
+              <h1>Query &amp; Retrieval</h1>
+
+              <p>
+                Retrieve occupant state through the role-based access layer.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="query-layout">
+
+            <div class="card query-card">
+
+              <div class="card-header">
+
+                <div>
+                  <h3>Search Occupancy</h3>
+                  <span>Query the current distributed state</span>
+                </div>
+
+                <span class="security-badge">
+                  RBAC PROTECTED
+                </span>
+
+              </div>
+
+
+              <div class="query-form">
+
+                <label class="form-field">
+
+                  <span>ACCESS ROLE</span>
+
+                  <select id="q-role">
+
+                    <option value="officer">Officer</option>
+
+                    <option value="analyst">Analyst</option>
+
+                    <option value="self">Self</option>
+
+                  </select>
+
+                </label>
+
+
+                <label class="form-field">
+
+                  <span>OCCUPANT ID</span>
+
+                  <input
+                    id="q-occupant"
+                    placeholder="e.g. O217"
+                  />
+
+                </label>
+
+
+                <label class="form-field">
+
+                  <span>ZONE</span>
+
+                  <input
+                    id="q-zone"
+                    placeholder="e.g. z1"
+                  />
+
+                </label>
+
+
+                <div class="query-actions">
+
+                  <button id="btn-query" class="btn btn-primary">
+                    Retrieve
+                  </button>
+
+                  <button
+                    id="btn-voice"
+                    class="btn btn-secondary"
+                    title="Ask by voice"
+                  >
+                    🎙 Voice
+                  </button>
+
+                </div>
+
+
+                <label class="speak-toggle">
+
+                  <input type="checkbox" id="q-speak" />
+
+                  <span>Read results aloud</span>
+
+                </label>
+
+              </div>
+
+
+              <div id="voice-status" class="voice-status"></div>
+
+              <div id="query-note" class="query-note"></div>
+
+            </div>
+
+
+            <div class="card access-card">
+
+              <div class="card-header">
+
+                <div>
+                  <h3>Access Policy</h3>
+                  <span>Response visibility</span>
+                </div>
+
+              </div>
+
+
+              <div class="access-role-list">
+
+                <div class="access-role active-role">
+
+                  <div class="role-circle officer">O</div>
+
+                  <div>
+                    <strong>Officer</strong>
+                    <span>Full detail</span>
+                  </div>
+
+                </div>
+
+
+                <div class="access-role">
+
+                  <div class="role-circle analyst">A</div>
+
+                  <div>
+                    <strong>Analyst</strong>
+                    <span>Aggregated detail</span>
+                  </div>
+
+                </div>
+
+
+                <div class="access-role">
+
+                  <div class="role-circle self">S</div>
+
+                  <div>
+                    <strong>Self</strong>
+                    <span>Own record only</span>
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="card query-results-card">
+
+            <div class="card-header">
+
+              <div>
+                <h3>Query Results</h3>
+                <span>Role-filtered response</span>
+              </div>
+
+            </div>
+
+
+            <div class="table-wrapper">
+
+              <table class="data-table">
+
+                <thead>
+                  <tr>
+                    <th>BUILDING</th>
+                    <th>ZONE</th>
+                    <th>OCCUPANT</th>
+                    <th>PROBABILITY</th>
+                  </tr>
+                </thead>
+
+                <tbody id="query-body"></tbody>
+
+              </table>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ======================================================
+             SECURITY
+             ====================================================== -->
+
+        <section id="tab-security" class="panel">
+
+          <div class="page-heading compact">
+
+            <div>
+              <div class="eyebrow">TRUST &amp; PRIVACY</div>
+
+              <h1>Security Monitor</h1>
+
+              <p>
+                Transport authentication, replay detection and
+                building verification events.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="security-overview">
+
+            <div class="security-stat">
+
+              <span>AUTH FAILURES</span>
+
+              <strong id="security-auth-count">0</strong>
+
+              <small>Transport verification</small>
+
+            </div>
+
+
+            <div class="security-stat">
+
+              <span>REPLAY ATTEMPTS</span>
+
+              <strong id="security-replay-count">0</strong>
+
+              <small>Replay protection</small>
+
+            </div>
+
+
+            <div class="security-stat">
+
+              <span>UNKNOWN BUILDINGS</span>
+
+              <strong id="security-unknown-count">0</strong>
+
+              <small>Node validation</small>
+
+            </div>
+
+
+            <div class="security-stat">
+
+              <span>TOTAL EVENTS</span>
+
+              <strong id="security-total-count">0</strong>
+
+              <small>Recorded security events</small>
+
+            </div>
+
+          </div>
+
+
+          <div class="card">
+
+            <div class="card-header">
+
+              <div>
+                <h3>Security Event Log</h3>
+                <span>Latest verification activity</span>
+              </div>
+
+              <span class="security-badge">
+                PROTECTED
+              </span>
+
+            </div>
+
+
+            <div class="table-wrapper">
+
+              <table class="data-table">
+
+                <thead>
+                  <tr>
+                    <th>TIME</th>
+                    <th>KIND</th>
+                    <th>BUILDING</th>
+                    <th>DETAIL</th>
+                  </tr>
+                </thead>
+
+                <tbody id="security-body"></tbody>
+
+              </table>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ======================================================
+             METRICS
+             ====================================================== -->
+
+        <section id="tab-metrics" class="panel">
+
+          <div class="page-heading compact">
+
+            <div>
+              <div class="eyebrow">OBSERVABILITY</div>
+
+              <h1>System Metrics</h1>
+
+              <p>
+                Prometheus metrics and Grafana monitoring.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="metric-card-grid">
+
+            <div class="metric-mini-card">
+              <span>METRICS ENDPOINT</span>
+              <strong>/metrics</strong>
+              <small>Prometheus compatible</small>
+            </div>
+
+            <div class="metric-mini-card">
+              <span>SCRAPING</span>
+              <strong id="metric-status">READY</strong>
+              <small>Application metrics</small>
+            </div>
+
+            <div class="metric-mini-card">
+              <span>LIVE STREAM</span>
+              <strong>WebSocket</strong>
+              <small>/ws/live</small>
+            </div>
+
+          </div>
+
+
+          <div class="grafana-container">
+
+            <div class="grafana-header">
+
+              <div>
+                <h3>Grafana Monitoring</h3>
+                <span>
+                  External observability dashboard
+                </span>
+              </div>
+
+              <div class="grafana-actions">
+
+                <a
+                  href="/metrics"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn btn-secondary"
+                >
+                  Raw Metrics
+                </a>
+
+                <a
+                  href="http://localhost:3000"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn btn-ghost"
+                >
+                  Open Grafana ↗
+                </a>
+
+              </div>
+
+            </div>
+
+
+            <div class="grafana-slot">
+
+              <iframe
+                id="grafana-frame"
+                src="about:blank"
+                title="Grafana Dashboard"
+              ></iframe>
+
+
+              <div id="grafana-placeholder" class="grafana-placeholder">
+
+                <div class="grafana-placeholder-icon">
+                  ⌁
+                </div>
+
+                <h3>Grafana dashboard available</h3>
+
+                <p>
+                  Start the bundled Grafana service to display
+                  your monitoring panels here.
+                </p>
+
+                <a
+                  href="http://localhost:3000"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Open Grafana →
+                </a>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+      </div>
+
+    </main>
+
+  </div>
+
+
+  <script src="/static/app.js"></script>
+
+</body>
+</html>

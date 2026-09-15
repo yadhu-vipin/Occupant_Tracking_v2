@@ -1,0 +1,93 @@
+{
+  "title": "DSTS — Lane D System Monitoring",
+  "uid": "dsts-lane-d",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Events processed / min (per building)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum by (building_id) (rate(dsts_events_processed_total[1m])) * 60", "legendFormat": "{{building_id}}" }
+      ]
+    },
+    { 
+      "id": 2,
+      "title": "Recognition success rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(dsts_recognition_success_total[5m])) / sum(rate(dsts_recognition_attempts_total[5m]))",
+          "legendFormat": "success rate"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Rank-1 building routing accuracy",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(dsts_routing_rank1_success_total) / clamp_min(sum(dsts_routing_requests_total), 1)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Avg buildings contacted per lookup",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
+      "targets": [
+        { "expr": "rate(dsts_buildings_contacted_sum[5m]) / rate(dsts_buildings_contacted_count[5m])" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Avg routing latency (s)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "rate(dsts_routing_latency_seconds_sum[5m]) / rate(dsts_routing_latency_seconds_count[5m])" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Occupancy heatmap (building x zone)",
+      "type": "heatmap",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        { "expr": "dsts_occupancy", "legendFormat": "{{building_id}}/{{zone}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Authentication failures",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 14 },
+      "targets": [ { "expr": "rate(dsts_auth_failures_total[5m])" } ]
+    },
+    {
+      "id": 8,
+      "title": "Replay attempts detected",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 14 },
+      "targets": [ { "expr": "rate(dsts_replay_attempts_detected_total[5m])" } ]
+    },
+    {
+      "id": 9,
+      "title": "Security verification failures by kind",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        { "expr": "sum by (kind) (rate(dsts_security_verification_failures_total[5m]))", "legendFormat": "{{kind}}" }
+      ]
+    }
+  ]
+}

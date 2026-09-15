@@ -1,0 +1,11 @@
+shared_secret: "dev-secret-change-me"
+
+buildings:
+  - id: B1
+    occupants: ["O101", "O102", "O103", "O217", "O140"]
+  - id: B2
+    occupants: ["O201", "O202", "O203", "O204"]
+  - id: B3
+    occupants: ["O301", "O302", "O303"]
+  - id: B5
+    occupants: ["O501", "O502", "O503", "O504"]
