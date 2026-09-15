@@ -18,8 +18,32 @@ import json
 from enum import Enum
 from typing import Optional, Dict, Set
 
+# Re-export Layer-2 Campus Privacy Policy
+try:
+    from security.campus_policy import (
+        CampusRole, DisclosureLevel, QueryPurpose, QueryContext,
+        AccessScope, LocationGranularity, PolicyDecision,
+        MAX_DISCLOSURE_MATRIX, POLICY_MATRIX, evaluate_campus_query_policy,
+        register_occupant_role, get_occupant_role, register_class_roster,
+        is_student_in_roster, clear_campus_registry,
+        register_designated_location, get_designated_location, check_office_presence,
+    )
+except ImportError:
+    try:
+        from .campus_policy import (
+            CampusRole, DisclosureLevel, QueryPurpose, QueryContext,
+            AccessScope, LocationGranularity, PolicyDecision,
+            MAX_DISCLOSURE_MATRIX, POLICY_MATRIX, evaluate_campus_query_policy,
+            register_occupant_role, get_occupant_role, register_class_roster,
+            is_student_in_roster, clear_campus_registry,
+            register_designated_location, get_designated_location, check_office_presence,
+        )
+    except ImportError:
+        pass
+
 
 # ─── Role Definitions ─────────────────────────────────────────────────────────
+
 
 class Role(Enum):
     """RBAC roles for DSTS principals."""
@@ -123,6 +147,65 @@ def set_enforce_policy(enforce: bool) -> None:
     _enforce_policy = enforce
 
 
+# ─── Target Resource Parsing ─────────────────────────────────────────────────
+
+def parse_target_resource(target: str) -> Tuple[str, str]:
+    """
+    Parse a target string into (target_type, target_id).
+
+    Target types:
+      - 'occupant': occupant:<id>, state:<occupant_id>, or registered occupant ID
+      - 'building': building:<id>, target:<bid> (e.g. target:B1)
+      - 'system':   system:<id>, target:system
+      - 'generic':  state_table, transition_metadata, target:state, etc.
+    """
+    if not target:
+        return "generic", ""
+
+    t_lower = target.lower()
+
+    # System target
+    if t_lower in ("system", "target:system") or t_lower.startswith("system:"):
+        return "system", target.split(":", 1)[1] if ":" in target else target
+
+    # Occupant target explicit prefix
+    if t_lower.startswith("occupant:"):
+        return "occupant", target.split(":", 1)[1]
+
+    # State prefix
+    if t_lower.startswith("state:"):
+        parts = target.split(":")
+        val = ":".join(parts[1:])
+        if "_p_" in val.lower() or (len(parts) > 2 and parts[2].lower().startswith("p")):
+            return "occupant", val
+        elif val.upper().startswith("B") and val[1:].isdigit():
+            return "building", val.upper()
+        return "generic", val
+
+    # Building target
+    if t_lower.startswith("building:"):
+        return "building", target.split(":", 1)[1].upper()
+    if t_lower.startswith("target:"):
+        sub = target.split(":", 1)[1]
+        sub_lower = sub.lower()
+        if sub_lower.startswith("b") and len(sub_lower) > 1 and sub_lower[1:].isdigit():
+            return "building", sub.upper()
+    if t_lower.startswith("b") and len(t_lower) > 1 and t_lower[1:].isdigit():
+        return "building", target.upper()
+
+    # Generic targets
+    if t_lower in ("state_table", "transition_metadata", "target:state", "gallery"):
+        return "generic", target
+
+    # Heuristic inference from occupant naming or registry
+    if get_occupant_role is not None and get_occupant_role(target) is not None:
+        return "occupant", target
+    if "_p_" in t_lower or t_lower.startswith("student") or t_lower.startswith("prof") or t_lower.startswith("dean"):
+        return "occupant", target
+
+    return "generic", target
+
+
 # ─── Authorization ─────────────────────────────────────────────────────────────
 
 def authorize(
@@ -132,15 +215,17 @@ def authorize(
     building_id: str = "",
 ) -> bool:
     """
-    Authorization chokepoint.
+    Target-aware authorization chokepoint.
 
-    Called at every data-release point in node/store.py and
+    Called at every data-release point in node/store.py, queries.py, and
     identify/gallery.py.
 
     When policy enforcement is enabled:
       - Registered principals are checked against their role's permissions
       - Unregistered principals are denied
       - None principals are denied
+      - System targets ('target:system') strictly require Role.ADMIN
+      - Occupant targets ('occupant:<id>') evaluate caller-to-target ReBAC
 
     When enforcement is disabled (default for backward compatibility):
       - All requests are permitted
@@ -148,7 +233,7 @@ def authorize(
     Args:
         principal: requesting principal (None = anonymous/deferred)
         verb: action verb (e.g., "RESOLVE", "QUERY", "GOSSIP")
-        target: target resource (e.g., "gallery:B3", "state:B1_P_042")
+        target: target resource (e.g., "occupant:B1_P_042", "building:B1", "target:system")
         building_id: local building ID for audit context
 
     Returns:
@@ -156,6 +241,7 @@ def authorize(
     """
     decision = "PERMIT"
     reason = ""
+    target_type, target_id = parse_target_resource(target)
 
     if _enforce_policy:
         if principal is None:
@@ -170,6 +256,23 @@ def authorize(
             if verb not in allowed_verbs:
                 decision = "DENY"
                 reason = f"role_{role.value}_cannot_{verb}"
+            else:
+                # ── Target-Aware Policy Evaluation ──
+                # 1. System target requires Role.ADMIN
+                if target_type == "system" and role != Role.ADMIN:
+                    decision = "DENY"
+                    reason = "system_target_requires_role_admin"
+
+                # 2. Occupant target evaluated against campus ReBAC policy
+                elif target_type == "occupant" and target_id:
+                    caller_has_campus_role = (
+                        get_occupant_role is not None and get_occupant_role(principal) is not None
+                    )
+                    if caller_has_campus_role and evaluate_campus_query_policy is not None:
+                        p_decision = evaluate_campus_query_policy(caller_id=principal, target_id=target_id)
+                        if not p_decision.permitted or p_decision.access.value == "none":
+                            decision = "DENY"
+                            reason = f"target_occupant_denied_by_policy: {p_decision.reason}"
 
     entry = {
         "timestamp": time.time(),
@@ -177,12 +280,15 @@ def authorize(
         "principal": principal,
         "verb": verb,
         "target": target,
+        "target_type": target_type,
+        "target_id": target_id,
         "decision": decision,
         "reason": reason,
     }
     _audit_log.append(entry)
 
     return decision == "PERMIT"
+
 
 
 def get_audit_log():
@@ -199,6 +305,11 @@ def clear_registry():
     """Clear the principal registry and precision mapping (for testing)."""
     _principal_registry.clear()
     _principal_precision.clear()
+    try:
+        clear_campus_registry()
+    except Exception:
+        pass
+
 
 
 

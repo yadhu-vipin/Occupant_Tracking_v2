@@ -149,3 +149,45 @@ def test_q6_unknown_occupant():
     )
     assert qr.success is False
     assert qr.answer is None
+
+
+# ─── Track Analytics & Spatial Dwell Tests ───────────────────────────────────
+
+def test_track_analytics_exact_precision():
+    """Track analytics with EXACT precision discloses room dwell times and pattern metrics."""
+    result = _scenario()
+    engine = QueryEngine(result.dsts)
+    occ = result.handoff.occupant_id
+
+    qr = engine.analyze_occupant_track(occupant_id=occ, precision="EXACT")
+    assert qr.success is True
+    assert qr.precision == "EXACT"
+    ans = qr.answer
+    assert ans["occupant_id"] == occ
+    assert ans["total_events"] == 20
+    assert ans["total_tracked_time_seconds"] > 0
+    assert "dwell_times_by_room" in ans
+    assert "most_frequented_zone" in ans
+    assert "longest_stay_zone" in ans
+    assert ans["most_frequented_zone"]["room"] == "Entrance"
+    assert ans["most_frequented_zone"]["visit_count"] == 4
+    assert ans["longest_stay_zone"]["room"] == "Lounge"
+    assert ans["longest_stay_zone"]["duration_seconds"] > 100.0
+
+
+def test_track_analytics_coarse_precision():
+    """Track analytics with COARSE precision redacts room IDs and exposes sector dwell times."""
+    result = _scenario()
+    engine = QueryEngine(result.dsts)
+    occ = result.handoff.occupant_id
+
+    qr = engine.analyze_occupant_track(occupant_id=occ, precision="COARSE")
+    assert qr.success is True
+    assert qr.precision == "COARSE"
+    ans = qr.answer
+    assert "dwell_times_by_sector" in ans
+    assert "dwell_times_by_building" in ans
+    assert "dwell_times_by_room" not in ans  # Room IDs redacted
+    assert "most_frequented_sector" in ans
+    assert ans["most_frequented_sector"]["sector"] == "Circulation & Access Hub"
+

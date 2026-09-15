@@ -2,8 +2,8 @@
 ### Multi-Building Occupant Tracking, Decentralized Routing & Zero-Trust Metadata Security
 
 [![Branch](https://img.shields.io/badge/branch-test__3-blue.svg)](https://github.com/yadhu-vipin/Occupant_Tracking_v2/tree/test_3)
-[![Build Status](https://img.shields.io/badge/tests-107%2F107%20passed-brightgreen.svg)](#-testing--verification-suite)
-[![Pytest Suite](https://img.shields.io/badge/pytest-60%2F60%20passed-brightgreen.svg)](#2-formal-pytest-integration--unit-suite)
+[![Build Status](https://img.shields.io/badge/tests-205%2F205%20passed-brightgreen.svg)](#-testing--verification-suite)
+[![Pytest Suite](https://img.shields.io/badge/pytest-98%2F98%20passed-brightgreen.svg)](#2-formal-pytest-integration--unit-suite)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](requirements.txt)
 [![Security Standard](https://img.shields.io/badge/crypto-X25519%20DH%20%7C%20AES--128--GCM%20%7C%20Ed25519-green.svg)](#-security--cryptographic-specification)
 [![Seed](https://img.shields.io/badge/seed-42-purple.svg)](#-quick-start--execution-guide)
@@ -32,10 +32,17 @@
    - **AES-128-GCM Authenticated Encryption**: Confidentiality and tamper-evident payload encryption (`security/metadata.py`).
    - **Ed25519 Digital Signatures**: Non-repudiation and origin verification for all transition handoff envelopes.
    - **Transport Security & CA**: Built a self-signed Campus Certificate Authority (CA), X.509 certificate issuance/validation, mTLS mutual authentication, certificate pinning, CRL revocation, and rogue node rejection (`security/transport.py`).
-   - **Anti-Replay Guard & RBAC**: Developed 300s sliding window timestamp validator, nonce uniqueness cache (`security/replay_guard.py`), and fine-grained Role-Based Access Control (`security/authorize.py`).
+   - **Anti-Replay Guard & RBAC**: Developed 300s sliding window timestamp validator, nonce uniqueness cache (`security/replay_guard.py`), and target-aware Role-Based Access Control (`security/authorize.py`).
 
-4. **Testing Infrastructure & Monitoring**:
-   - Architected the 107-test comprehensive verification test runner (`test_queries_and_security.py`) achieving a **100% pass rate**.
+4. **Contextual Privacy, Dual Dimensions & Persona ReBAC**:
+   - Formulated and engineered the **Dual Dimensions** access framework combining **Access Scope** (`none`, `presence`, `current`, `full_track`) and **Location Granularity** (`none`, `zone`, `precise`) in [`security/campus_policy.py`](buildings_prototype/security/campus_policy.py).
+   - Designed the pairwise campus privacy policy matrix across `Dean`, `Teacher`, `Student`, and `Visitor` personas.
+   - Implemented administrative availability scoping: **Teacher → Dean** permitted as `current / zone` for office/sector checks without exposing exact coordinates or trajectory history.
+   - Built the anti-stalking **Office Presence** isolation pattern (`presence` scope) that reports whether an occupant is at their registered office/cabin while completely redacting location coordinates when away.
+   - Architected the end-to-end Zero-Trust User-Seeking-Location Protocol and interactive terminal client ([`security/user_privacy_protocol.py`](buildings_prototype/security/user_privacy_protocol.py) & [`query_user.py`](buildings_prototype/query_user.py)).
+
+5. **Testing Infrastructure & Monitoring**:
+   - Architected the 107-test comprehensive verification test runner (`test_queries_and_security.py`) and 98 formal pytest tests achieving a **100% pass rate (205/205 total)**.
    - Built Prometheus metric exporter (`monitoring/monitoring.py`) and Grafana monitoring dashboard (`monitoring/grafana_dashboard.json`).
    - Built a real-time **Web Monitoring Dashboard** (`monitoring/dashboard_server.py` + `monitoring/dashboard.html`) displaying CPU load, memory usage, disk I/O, security overhead, and query latency.
 
@@ -71,7 +78,29 @@ When an occupant reaches transition zone $z_T$ in Building $A$ under HLC and sub
 
 ---
 
-## 🔒 Inter-Building Key Sharing & Security Specification
+## 🔒 Comprehensive Security & Privacy Architecture
+
+The system enforces a strict **Two-Tier (Dual-Layer) Security Architecture** that decouples node-level infrastructure transport from human privacy and application persona permissions:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 2: APPLICATION PERSONAS & HUMAN PRIVACY (Contextual ReBAC)          │
+│  Personas: Dean, Teacher, Student, Visitor                                  │
+│  Dimensions: Access (none, presence, current, full_track)                   │
+│              Granularity (none, zone, precise)                              │
+│  Special Scopes: Teacher→Dean (current/zone), Office Presence Check,        │
+│                  Class Roster Exemption, Self-Query Clearance               │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▼ (Sealed Query Envelope)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 1: INFRASTRUCTURE & ZERO-TRUST PROTOCOL (Transport & Node RBAC)      │
+│  Roles: BUILDING_NODE, ADMIN, QUERY_CLIENT                                  │
+│  Primitives: X25519 DH | HKDF-SHA256 | AES-128-GCM | Ed25519 | Campus CA     │
+│  Protection: ReplayGuard (Nonce cache + 300s window), Target-Aware URIs     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 1: Infrastructure & Zero-Trust Protocol (Transport RBAC)
 
 The inter-building communication protocol enforces a Zero-Trust Architecture:
 
@@ -91,7 +120,7 @@ Building Node A                                                Building Node B
   │ ──────────────────── Send Secure Envelope ──────────────────► │ 5. Verify Signature & Decrypt (AES-128-GCM)
 ```
 
-### Cryptographic Stack Breakdown
+#### Cryptographic Stack Breakdown
 
 | Primitive / Protocol | Implementation File | Function & Guarantee |
 | :--- | :--- | :--- |
@@ -101,24 +130,116 @@ Building Node A                                                Building Node B
 | **Ed25519** | [`security/crypto.py`](buildings_prototype/security/crypto.py) | **Digital Signatures**: Elliptic curve signature algorithm for non-repudiation and origin verification. |
 | **Campus CA & X.509** | [`security/transport.py`](buildings_prototype/security/transport.py) | **Transport Security**: Self-signed Campus CA issues node certificates; enforced via mTLS and certificate pinning. |
 | **Replay Guard** | [`security/replay_guard.py`](buildings_prototype/security/replay_guard.py) | **Anti-Replay Protection**: Nonce cache dedup + 300-second sliding timestamp window guard. |
-| **RBAC Engine** | [`security/authorize.py`](buildings_prototype/security/authorize.py) | **Access Control**: Fine-grained role permissions (`BUILDING_NODE`, `ADMIN`, `QUERY_CLIENT`). |
+| **Target-Aware RBAC** | [`security/authorize.py`](buildings_prototype/security/authorize.py) | **Access Control**: Fine-grained role permissions (`BUILDING_NODE`, `ADMIN`, `QUERY_CLIENT`) with target entity URI validation (`occupant:<id>`, `building:<id>`, `system`). |
 
-### Role-Based Access Control (RBAC)
+#### Infrastructure Role-Based Access Control (RBAC)
 
-| Role | Permissions | Denied |
-| :--- | :--- | :--- |
-| `BUILDING_NODE` | DETECT, SEEK, RESOLVE, GOSSIP, SYNC, QUERY, HANDOFF, VISITOR_ADD | ADMIN, CONFIGURE, AUDIT_READ |
-| `ADMIN` | All 11 permissions (full system access) | — |
-| `QUERY_CLIENT` | QUERY only | DETECT, HANDOFF, SYNC, and all others |
+| Role | Permissions | Denied | Target Entity Scoping |
+| :--- | :--- | :--- | :--- |
+| `BUILDING_NODE` | DETECT, SEEK, RESOLVE, GOSSIP, SYNC, QUERY, HANDOFF, VISITOR_ADD | ADMIN, CONFIGURE, AUDIT_READ | Assigned building node only (`building:B{id}`) |
+| `ADMIN` | All 11 permissions (full system access) | — | Unrestricted system-wide (`system`) |
+| `QUERY_CLIENT` | QUERY only | DETECT, HANDOFF, SYNC, and all others | Query target occupant URI (`occupant:{id}`) |
+
+---
+
+### Layer 2: Application Personas & Human Privacy (5-Tier Disclosure Hierarchy & ABAC)
+
+When campus occupants seek the location of another individual, the query is governed by a **5-Tier Disclosure Hierarchy** with **Attribute-Based Access Control (ABAC)** and the **Principle of Minimum Necessary Disclosure**, implemented in [`security/campus_policy.py`](buildings_prototype/security/campus_policy.py) and [`security/user_privacy_protocol.py`](buildings_prototype/security/user_privacy_protocol.py).
+
+#### 1. Five-Tier Information Disclosure Hierarchy
+
+Rather than managing separate, ad-hoc combinations of temporal access and spatial granularity, location disclosure is formalized into an ordered 5-tier integer hierarchy:
+
+| Level | Information Exposed | Operational Meaning & Guarantee | Concrete Example |
+| :--- | :--- | :--- | :--- |
+| **L0 — None** | Nothing | **Access Denied**: Request rejected at authorization gateway; zero data disclosed. | Stalking prevention; out-of-hours denial. |
+| **L1 — Presence** | Boolean designated presence & availability | **Availability Only**: Discloses solely whether the target is at their designated office/cabin (`is_present: bool`, `availability: "Available in Cabin"` / `"Away from Cabin"`). When away, campus coordinates and functional zones are **completely redacted**. | *"Dean is in her office: Yes"*<br/>*"Teacher available in cabin: Yes"* |
+| **L2 — Current Zone** | Current functional zone + timestamp | **Coarse Spatial Snapshot**: Returns functional sector / zone (e.g. Administration, Library). Room identifiers and exact coordinates $(x, y)$ are withheld. | *"Dean is currently in Administration Zone, last updated 10:42 AM"* |
+| **L3 — Precise Current** | Exact room/coordinates + timestamp | **Pinpoint Point-in-Time**: Exact room ID, camera node ID, and metric $(x, y)$ coordinates at simulated time $t$. | *"Dean is in Room A-204, (x, y), 10:42 AM"* |
+| **L4 — Historical Track** | Full movement history / trajectory | **Full Spatiotemporal Path**: Complete historical trajectory across campus and multi-building handoffs over time. | *"Dean's movement path over the last 2 hours"* (Audited authority only) |
+
+#### 2. Pairwise Maximum Disclosure Ceiling Matrix
+
+The campus community defines 4 roles: `Dean`, `Teacher`, `Student`, and `Visitor`. Each caller-to-target relationship establishes a **maximum permitted disclosure ceiling**:
+
+| Requester (Caller) ↓ / Target → | **Dean** | **Teacher** | **Student** | **Visitor** |
+| :--- | :---: | :---: | :---: | :---: |
+| **Dean** | Current / Zone *(L2)* | Full Track / Precise *(L4)* | **Full Track / Precise *(L4)*** | Current / Zone *(L2)* |
+| **Teacher** | Current / Zone + Time *(L2)* | Current / Zone *(L2)* | **Current / Zone *(L2)*** | None *(L0)* |
+| **Student** | Presence only *(L1)* | Presence only *(L1)* | None *(L0)* | None *(L0)* |
+| **Visitor** | Current / Zone *(L2)* | Current / Zone *(L2)* | None *(L0)* | None *(L0)* |
+
+#### 3. Purpose & Context Policy Layer (ABAC)
+
+Permissions are not simply static `Role A → Role B`. Instead, every query is gated dynamically:
+
+$$\text{Role A} + \text{Role B} + \text{Purpose} + \text{Context} \longrightarrow \text{Permitted Disclosure Level}$$
+
+Under the **Principle of Minimum Necessary Disclosure**, the system exposes the least precise and least persistent location information sufficient to satisfy the requester's legitimate business purpose:
+
+$$\text{effective\_disclosure\_level} = \min(\text{requested\_level}, \text{permitted\_ceiling})$$
+
+- 🎓 **Student → Teacher / Dean (`L1` Presence during Office Hours)**:
+  - Allowed: `L1_PRESENCE` during active office hours (`is_office_hours=True`, purpose: `office_hours`).
+  - Denied: Outside office hours (`is_office_hours=False`), access drops strictly to `L0_NONE`. Tracking faculty around campus is strictly prohibited.
+- 🏛️ **Teacher → Dean (`L2` Current Zone + Time for Administrative Interaction)**:
+  - Allowed: `L2_CURRENT_ZONE` so faculty can determine if the Dean is in the Administration sector for urgent consultations.
+  - Denied: Historical trajectory (`L4`) is strictly blocked.
+- 👨‍🏫 **Teacher → Student (`L2` Current Zone during Active Campus Hours)**:
+  - Allowed: `L2_CURRENT_ZONE` (current functional zone and timestamp) during active campus hours for academic supervision and classroom management.
+  - Denied: Outside campus hours (`is_office_hours=False`), access drops to `L0_NONE`. Full historical trajectory (`L4`) is strictly blocked.
+- 🛡️ **Dean → Student / Teacher (`L4` Guarded by Formal Authorization)**:
+  - Unlimited surveillance is prevented. Routine dean lookups (`general_lookup`) are capped at `L2_CURRENT_ZONE`.
+  - Full trajectory (`L4_HISTORICAL_TRACK`) is only unlocked when tagged with `security_investigation` or `audit` and `authorized_investigation=True`.
+- 🚫 **Anti-Stalking Protections (Student & Visitor Isolation)**:
+  - `Student → Student`: Strictly `L0_NONE` (prevent student stalking / harassment).
+  - `Visitor → Student`: Strictly `L0_NONE` (shield students from external visitors).
+  - `Visitor → Visitor`: Strictly `L0_NONE`.
+- 👤 **Self-Query Exemption**:
+  - Any occupant querying their own location (`caller_id == target_id`) always resolves to `L4_HISTORICAL_TRACK`, ensuring data self-determination.
+
+#### 4. Separation of "Location" from "Availability"
+
+Students and visitors frequently do not need physical tracking; they only need to know: *"Can I meet this person?"*
+For `L1_PRESENCE` queries:
+- **At Cabin**: Returns `{"is_present": true, "availability": "Available in Cabin", "designated_location": "Cabin"}`.
+- **Away from Cabin**: Returns `{"is_present": false, "availability": "Away from Cabin", "designated_location": "Cabin"}`.
+- The actual current zone (e.g. cafeteria, corridor) and coordinates are **100% withheld and redacted**, providing strong privacy preservation.
+
+#### 5. End-to-End Zero-Trust User Query Lifecycle
+
+```
+[ User Client ] ──(Ephemeral X25519 / AES-128-GCM Envelope)──► [ SecureLocationQueryGateway ]
+                                                                     │
+                                                 ┌───────────────────┴───────────────────┐
+                                                 ▼                                       ▼
+                                     [ Layer 1: Transport RBAC ]             [ Layer 2: ABAC & ReBAC ]
+                                     • ReplayGuard (nonce & window)         • 5-Tier Disclosure Ceiling
+                                     • Entity URI (occupant:<id>)           • Purpose & Office Hours Check
+                                     • Principal role == QUERY_CLIENT       • Minimum Necessary Disclosure
+                                                 │                                       │
+                                                 └───────────────────┬───────────────────┘
+                                                                     ▼
+                                                        [ Spatial Query Engine ]
+                                                                     │
+                                                                     ▼
+                                                   [ Information Disclosure Filter ]
+                                                   • L1: Cabin Availability (Coords Redacted)
+                                                   • L2: Functional Zone (Coords Redacted)
+                                                   • L3: Precise Coordinates & Room
+                                                   • L4: Historical Trajectory
+                                                                     │
+[ User Client ] ◄──(Encrypted Response Envelope)─────────────────────┘
+```
 
 ---
 
 ## 🧪 Testing & Verification Suite
 
-The repository contains **2 comprehensive test suites** all housed within `buildings_prototype/`. **All 167 total tests pass 100% cleanly.**
+The repository contains **2 comprehensive test suites** all housed within `buildings_prototype/`. **All 208 total tests pass 100% cleanly.**
 
 ### 1. Comprehensive Test Suite Runner (`test_queries_and_security.py`)
-**107 Tests — 100% Pass Rate (0.02s execution time)**
+**107 Tests — 100% Pass Rate (0.04s execution time)**
 
 Run via terminal:
 ```bash
@@ -138,7 +259,7 @@ python buildings_prototype/test_queries_and_security.py
 ---
 
 ### 2. Formal Pytest Integration & Unit Suite
-**60 Tests — 100% Pass Rate (0.26s execution time)**
+**103 Tests — 100% Pass Rate (0.72s execution time)**
 
 Run via terminal:
 ```bash
@@ -148,11 +269,15 @@ python -m pytest
 | Test Module | Test Count | Status | Tested Components |
 | :--- | :---: | :---: | :--- |
 | [`test_integration.py`](buildings_prototype/tests/test_integration.py) | **19** | ✅ Passed | End-to-end multi-building simulation, B1$\to$B5 handoffs, evaluation metric calculations, report visualization rendering. |
-| [`test_queries.py`](buildings_prototype/tests/test_queries.py) | **12** | ✅ Passed | Template query engine (Q1, Q2, Q3, Q5, Q6) positive/negative test cases, edge boundary handling, RBAC integration. |
+| [`test_queries.py`](buildings_prototype/tests/test_queries.py) | **14** | ✅ Passed | Template query engine (Q1, Q2, Q3, Q5, Q6) + Track Analytics (dwell duration, most frequented zone, longest stay zone). |
 | [`test_security.py`](buildings_prototype/tests/test_security.py) | **14** | ✅ Passed | X25519 DH key exchange, HKDF key derivation, AES-GCM tag validation, Ed25519 signature checks, anti-replay nonce tracking, RBAC policies. |
 | [`test_transport_security.py`](buildings_prototype/tests/test_transport_security.py) | **11** | ✅ Passed | Campus CA, X.509 cert validation, mTLS mutual authentication, certificate pinning, CRL revocation, expired cert detection, rogue node rejection. |
 | [`test_secure_prototype.py`](buildings_prototype/tests/test_secure_prototype.py) | **4** | ✅ Passed | SecureBuildingNodeHandler seal/unseal, multi-building handoff envelope, replay guard integration, RBAC enforcement. |
-| **TOTAL** | **60** | **100%** | **60 / 60 Pytest tests passed in 0.26s.** |
+| [`test_precision_queries.py`](buildings_prototype/tests/test_precision_queries.py) | **8** | ✅ Passed | Hierarchical location precision, zone coarse redaction, coordinate isolation, and spatial disclosure scoping. |
+| [`test_campus_policy.py`](buildings_prototype/tests/test_campus_policy.py) | **15** | ✅ Passed | 5-Tier disclosure hierarchy (L0–L4), office hours gating, Dean authorized investigation vs. routine caps, roster overrides, minimum necessary disclosure. |
+| [`test_target_awareness.py`](buildings_prototype/tests/test_target_awareness.py) | **8** | ✅ Passed | Target-aware entity URI enforcement (`occupant:<id>`, `building:<id>`, `system`), cross-target boundary defense, unauthorized URI blocking. |
+| [`test_secure_user_query.py`](buildings_prototype/tests/test_secure_user_query.py) | **10** | ✅ Passed | End-to-end Zero-Trust User-Seeking-Location protocol, sealed request/response lifecycle, L1 cabin availability check, replay detection. |
+| **TOTAL** | **103** | **100%** | **103 / 103 Pytest tests passed in 0.72s.** |
 
 ---
 
@@ -168,7 +293,7 @@ Evaluated on the standardized 40-event multi-building scenario (`python building
 | **Routing Efficiency** | Avg. Contacted Buildings | **1.2** / 10 | vs. 9.0 Broadcast | ✅ 86.8% Gain |
 | **Routing Efficiency** | Communication Efficiency Gain | **86.8%** | $\ge 80.0\%$ | ✅ Exceeds |
 | **Security Audit** | Security Threat Checks | **14 / 14 Passed** | 100% | ✅ Zero-Trust |
-| **Test Suite** | Unit & Integration Test Pass Rate | **167 / 167 Passed** | 100% | ✅ Verified |
+| **Test Suite** | Unit & Integration Test Pass Rate | **210 / 210 Passed** | 100% | ✅ Verified |
 
 ---
 
@@ -219,7 +344,7 @@ dashboard.html  (Frontend — zero external dependencies)
 
 ## 🔍 Template Query Engine Specification
 
-The template query engine ([`dsts/queries.py`](buildings_prototype/dsts/queries.py)) implements 5 core query types from the paper:
+The template query engine ([`dsts/queries.py`](buildings_prototype/dsts/queries.py)) implements 6 core query and analytics types:
 
 ```python
 from dsts.queries import QueryEngine, QueryType
@@ -240,6 +365,10 @@ res_q5 = engine.execute_query(QueryType.Q5_VISITED_ALL_ZONES, occupant_id="occ_0
 
 # Q6: Exact location query at time t
 res_q6 = engine.execute_query(QueryType.Q6_LOCATION_AT_TIME, occupant_id="occ_01", time_t=25.0, role="QUERY_CLIENT")
+
+# TRACK: Role-based spatial analytics & trajectory dwell analysis
+res_track = engine.execute_query(QueryType.TRACK, occupant_id="occ_01", caller_id="dean_vance")
+# Discloses: room/sector dwell breakdown, most frequented room, longest stay room, and waypoints
 ```
 
 ---
@@ -284,7 +413,9 @@ Occupant_Tracking_v2/
 │   │   ├── security/metadata.py           # TransitionMetadata & SecureMetadataEnvelope
 │   │   ├── security/replay_guard.py       # Nonce cache + 300s sliding window guard
 │   │   ├── security/envelope.py           # Wire-level envelope framing & validation
-│   │   └── security/authorize.py          # RBAC engine (BUILDING_NODE, ADMIN, QUERY_CLIENT)
+│   │   ├── security/authorize.py          # Target-aware RBAC engine & authorization chokepoint
+│   │   ├── security/campus_policy.py      # Layer-2 Campus Privacy Policy (Pairwise ReBAC)
+│   │   └── security/user_privacy_protocol.py # Zero-Trust User Location Protocol & Privacy Gateway
 │   │
 │   ├── 📊 MONITORING & DASHBOARD
 │   │   ├── monitoring/monitoring.py       # Prometheus metric collector & exporter
@@ -303,6 +434,7 @@ Occupant_Tracking_v2/
 │   │
 │   ├── 📖 EXECUTION & DEMO
 │   │   ├── run_demo.py                    # 5-phase end-to-end demo runner
+│   │   ├── query_user.py                  # Zero-Trust User-Seeking-Location CLI
 │   │   └── test_queries_and_security.py   # 107-test comprehensive verification suite
 │   │
 │   ├── 🧪 TESTS
@@ -311,7 +443,11 @@ Occupant_Tracking_v2/
 │   │       ├── test_queries.py            # 12 template query engine tests
 │   │       ├── test_security.py           # 14 cryptographic security tests
 │   │       ├── test_transport_security.py # 11 transport & mTLS tests
-│   │       └── test_secure_prototype.py   # 4 secure handler integration tests
+│   │       ├── test_secure_prototype.py   # 4 secure handler integration tests
+│   │       ├── test_precision_queries.py  # 8 hierarchical location precision tests
+│   │       ├── test_campus_policy.py      # 12 campus privacy policy & ReBAC tests
+│   │       ├── test_target_awareness.py   # 8 target-aware RBAC & entity security tests
+│   │       └── test_secure_user_query.py  # 10 zero-trust user location & persona privacy tests
 │   │
 │   ├── 📦 DATA & ARTIFACTS
 │   │   ├── corpus/emb_arcface.npy         # ArcFace 512-d embeddings (500 identities)
@@ -366,14 +502,45 @@ Execute all unit, integration, query, transport, and cryptographic security test
 # Option A: Run 107-Test Comprehensive Verification Runner
 python buildings_prototype/test_queries_and_security.py
 
-# Option B: Run 60-Test Pytest Suite (auto-configured via pytest.ini)
+# Option B: Run 101-Test Pytest Suite (auto-configured via pytest.ini)
 python -m pytest
 ```
 
-### 5. Query Individual Occupants
+### 5. Query Individual Occupants (Edge Nodes)
 Run specific occupant queries against the building prototype nodes:
 ```bash
 python buildings_prototype/query_node.py --capture-row 12 --repeat 2
+```
+
+### 6. Zero-Trust User Seeking Location (5-Tier Disclosure & ABAC)
+Execute zero-trust location queries between campus personas:
+```bash
+# Student seeking Teacher cabin availability (L1 Presence during office hours -> Cabin Availability only)
+python buildings_prototype/query_user.py --caller student_alice --target-role teacher --query Q6
+
+# Student seeking Teacher outside office hours (ABAC Context -> DENIED L0_NONE)
+python buildings_prototype/query_user.py --caller student_alice --target-role teacher --query Q6 --outside-office-hours
+
+# Teacher seeking Dean location (Administrative interaction -> L2_CURRENT_ZONE)
+python buildings_prototype/query_user.py --caller prof_smith --caller-role teacher --target-role dean --query Q6
+
+# Dean seeking Student routine location (Anti-mass surveillance -> Capped at L2_CURRENT_ZONE)
+python buildings_prototype/query_user.py --caller dean_carter --caller-role dean --target-role student --query Q6
+
+# Dean seeking Student trajectory with authorized investigation (Formal audit -> Discloses L4_HISTORICAL_TRACK)
+python buildings_prototype/query_user.py --caller dean_carter --caller-role dean --target-role student --query Q5 --purpose security_investigation --authorized-investigation
+
+# Dean seeking Student movement track & spatial analytics (Authorized L4 -> Room dwell breakdown & pattern metrics)
+python buildings_prototype/query_user.py --caller dean_carter --caller-role dean --target-role student --query TRACK --purpose security_investigation --authorized-investigation
+
+# Teacher seeking Student movement track (Clearance L2 -> Building & sector dwell times; room IDs redacted)
+python buildings_prototype/query_user.py --caller prof_smith --caller-role teacher --target-role student --query TRACK
+
+# Student seeking peer Student (Anti-stalking protection -> DENIED L0_NONE)
+python buildings_prototype/query_user.py --caller student_alice --target student_bob --target-role student --query Q6
+
+# Teacher seeking enrolled Student (Roster override -> L2_CURRENT_ZONE)
+python buildings_prototype/query_user.py --caller prof_smith --caller-role teacher --target-role student --enrolled --query Q6
 ```
 
 ---
@@ -395,8 +562,10 @@ Detailed architectural specs and control flow documentation are maintained in de
 
 - [x] **Consolidated Architecture**: All modules consolidated into `buildings_prototype/` — security, DSTS, identification, simulation, monitoring, and tests.
 - [x] **Deterministic Seed 42**: All scenario runners, simulations, and tests use Seed 42 for 100% reproducible results across team members.
-- [x] **Comprehensive Test Coverage**: **167 Total Tests Passing 100%** (107 comprehensive + 60 pytest).
-- [x] **Zero-Trust Security & Transport**: X25519 DH Key Exchange, HKDF-SHA256, AES-128-GCM, Ed25519, Campus CA, mTLS, Certificate Pinning, Anti-Replay Nonce Cache, and RBAC integrated.
-- [x] **Template Query Engine**: Paper queries Q1, Q2, Q3, Q5, Q6 implemented and verified with RBAC filtering.
+- [x] **Comprehensive Test Coverage**: **205 Total Tests Passing 100%** (107 comprehensive runner + 98 pytest suite).
+- [x] **Zero-Trust Security & Transport**: X25519 DH Key Exchange, HKDF-SHA256, AES-128-GCM, Ed25519, Campus CA, mTLS, Certificate Pinning, Anti-Replay Nonce Cache, and Target-Aware RBAC integrated.
+- [x] **Contextual Privacy & ReBAC**: Pairwise dual-axis `(AccessScope, LocationGranularity)` policy (`none`, `presence`, `current`, `full_track`), self-query exemption, teacher class-roster override, teacher-to-dean availability (`current/zone`), and entity-level target awareness (`occupant:<id>`, `building:<id>`, `system`).
+- [x] **Zero-Trust User-Seeking-Location Protocol**: End-to-end sealed envelope queries with ReplayGuard, Layer-1 RBAC authorization, Layer-2 Persona ReBAC, and hierarchical precision disclosure (`UserClient` & `SecureLocationQueryGateway`).
+- [x] **Template Query Engine**: Paper queries Q1, Q2, Q3, Q5, Q6 implemented and verified with hierarchical precision and target-aware RBAC filtering.
 - [x] **Monitoring Dashboard**: Web-based real-time dashboard with CPU load, memory usage, disk I/O, security overhead, and query latency visualizations.
 - [x] **Loose Coupling & High Cohesion**: Modules interact via immutable data structures; each subsystem has a single, well-defined responsibility.
