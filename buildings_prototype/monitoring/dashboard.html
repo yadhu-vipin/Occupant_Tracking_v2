@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSTS Monitoring Dashboard — Brother Eye</title>
+  <meta name="description" content="Real-time monitoring dashboard for the Distributed Surveillance Tracking System (DSTS) — CPU, memory, security overhead, query latency, and system health.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ── CSS Reset & Variables ───────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-card: #1a1f36;
+      --bg-card-hover: #212845;
+      --bg-glass: rgba(26, 31, 54, 0.7);
+      --border: rgba(99, 128, 255, 0.12);
+      --border-glow: rgba(99, 128, 255, 0.25);
+      --text-primary: #e8ecf4;
+      --text-secondary: #8892b0;
+      --text-muted: #5a6580;
+      --accent-blue: #6380ff;
+      --accent-cyan: #22d3ee;
+      --accent-green: #34d399;
+      --accent-amber: #fbbf24;
+      --accent-red: #f87171;
+      --accent-purple: #a78bfa;
+      --accent-pink: #f472b6;
+      --gradient-main: linear-gradient(135deg, #6380ff 0%, #22d3ee 100%);
+      --gradient-green: linear-gradient(135deg, #34d399 0%, #22d3ee 100%);
+      --gradient-amber: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+      --gradient-red: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+      --gradient-purple: linear-gradient(135deg, #a78bfa 0%, #6380ff 100%);
+      --shadow-card: 0 4px 24px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2);
+      --shadow-glow: 0 0 40px rgba(99, 128, 255, 0.08);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Ambient Background ──────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(99,128,255,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 80%, rgba(34,211,238,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(167,139,250,0.03) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .app { position: relative; z-index: 1; }
+
+    .header {
+      padding: 28px 40px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      background: rgba(10, 14, 26, 0.8);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 16px; }
+
+    .logo {
+      width: 44px; height: 44px;
+      background: var(--gradient-main);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800;
+      box-shadow: 0 0 20px rgba(99,128,255,0.3);
+    }
+
+    .header h1 {
+      font-size: 22px; font-weight: 700;
+      background: var(--gradient-main);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      letter-spacing: -0.3px;
+    }
+
+    .header-subtitle {
+      font-size: 12px; color: var(--text-muted);
+      font-weight: 400; margin-top: 2px;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 16px; }
+
+    .status-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(52, 211, 153, 0.1);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 500; color: var(--accent-green);
+    }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent-green);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(52,211,153,0); }
+    }
+
+    .main { padding: 28px 40px 60px; max-width: 1600px; margin: 0 auto; }
+
+    /* ── Loading State ───────────────────────────────────────────── */
+    .loading-overlay {
+      position: fixed; inset: 0;
+      background: var(--bg-primary);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 999; gap: 24px;
+      transition: opacity 0.5s ease;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .loading-spinner {
+      width: 56px; height: 56px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      color: var(--text-secondary); font-size: 14px; font-weight: 500;
+    }
+
+    /* ── Section Headers ─────────────────────────────────────────── */
+    .section-title {
+      font-size: 16px; font-weight: 700; color: var(--text-primary);
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .section-title .icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+
+    /* ── Grid Layout ─────────────────────────────────────────────── */
+    .grid { display: grid; gap: 20px; margin-bottom: 28px; }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-1-2 { grid-template-columns: 1fr 2fr; }
+    .grid-2-1 { grid-template-columns: 2fr 1fr; }
+
+    /* ── Cards ────────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card), var(--shadow-glow);
+    }
+
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .card:hover::before { opacity: 0.6; }
+
+    /* ── KPI Cards ───────────────────────────────────────────────── */
+    .kpi-card {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .kpi-label {
+      font-size: 12px; font-weight: 500; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
+
+    .kpi-value {
+      font-size: 36px; font-weight: 800; letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .kpi-sub {
+      font-size: 13px; color: var(--text-secondary); font-weight: 400;
+    }
+
+    .kpi-value.blue { color: var(--accent-blue); }
+    .kpi-value.cyan { color: var(--accent-cyan); }
+    .kpi-value.green { color: var(--accent-green); }
+    .kpi-value.amber { color: var(--accent-amber); }
+    .kpi-value.red { color: var(--accent-red); }
+    .kpi-value.purple { color: var(--accent-purple); }
+
+    /* ── Progress Bars ───────────────────────────────────────────── */
+    .progress-container {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .progress-item {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+
+    .progress-header {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .progress-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+    .progress-value { font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+    .progress-bar {
+      height: 8px; background: rgba(255,255,255,0.05);
+      border-radius: 4px; overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%; border-radius: 4px;
+      transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+      width: 0;
+    }
+
+    /* ── Canvas Charts ───────────────────────────────────────────── */
+    .chart-container { position: relative; width: 100%; }
+    canvas { width: 100% !important; }
+
+    .chart-label {
+      font-size: 11px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin-bottom: 12px; font-weight: 600;
+    }
+
+    /* ── Table ────────────────────────────────────────────────────── */
+    .data-table {
+      width: 100%; border-collapse: collapse;
+    }
+
+    .data-table th {
+      font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--text-muted);
+      font-weight: 600; text-align: left;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      font-size: 13px; padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-secondary);
+    }
+
+    .data-table tr:hover td { background: rgba(99,128,255,0.04); }
+
+    .data-table .val { color: var(--accent-cyan); font-weight: 500; }
+    .data-table .good { color: var(--accent-green); }
+    .data-table .warn { color: var(--accent-amber); }
+    .data-table .bad { color: var(--accent-red); }
+
+    /* ── Phase Timeline ──────────────────────────────────────────── */
+    .phase-bar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 16px; border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.2s;
+    }
+    .phase-bar:hover { background: rgba(99,128,255,0.05); }
+
+    .phase-number {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .phase-info { flex: 1; }
+    .phase-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .phase-stats {
+      font-size: 12px; color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace; margin-top: 2px;
+    }
+
+    .phase-timing {
+      text-align: right; flex-shrink: 0;
+    }
+    .phase-wall {
+      font-size: 18px; font-weight: 700; color: var(--accent-cyan);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .phase-cpu {
+      font-size: 11px; color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Security Badges ─────────────────────────────────────────── */
+    .crypto-stack {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .crypto-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      background: rgba(52, 211, 153, 0.04);
+      border: 1px solid rgba(52, 211, 153, 0.1);
+    }
+
+    .crypto-icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; background: rgba(52,211,153,0.1);
+    }
+
+    .crypto-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+    /* ── Monospace Values ─────────────────────────────────────────── */
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Responsive ──────────────────────────────────────────────── */
+    @media (max-width: 1200px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+      .grid-1-2, .grid-2-1 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+      .header { padding: 16px 20px; }
+      .main { padding: 20px; }
+    }
+
+    /* ── Fade-in Animation ───────────────────────────────────────── */
+    .fade-in {
+      opacity: 0; transform: translateY(12px);
+      animation: fadeIn 0.6s ease forwards;
+    }
+    @keyframes fadeIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+    .delay-5 { animation-delay: 0.5s; }
+    .delay-6 { animation-delay: 0.6s; }
+    .delay-7 { animation-delay: 0.7s; }
+  </style>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Collecting DSTS metrics...</div>
+  </div>
+
+  <div class="app" id="app" style="display:none;">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">⦿</div>
+        <div>
+          <h1>DSTS Monitoring Dashboard</h1>
+          <div class="header-subtitle">Distributed Surveillance Tracking System — Brother Eye v6</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="status-badge">
+          <div class="status-dot"></div>
+          <span id="statusText">System Online</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- ═══ KPI Row ═══ -->
+      <div class="grid grid-4 fade-in delay-1" id="kpiRow"></div>
+
+      <!-- ═══ Resource Charts ═══ -->
+      <div class="section-title fade-in delay-2">
+        <div class="icon" style="background:rgba(99,128,255,0.12);color:var(--accent-blue);">📊</div>
+        System Resource Utilization
+      </div>
+      <div class="grid grid-2 fade-in delay-2" id="resourceCharts">
+        <div class="card">
+          <div class="chart-label">CPU Load (%) over time</div>
+          <div class="chart-container"><canvas id="cpuChart" height="200"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="chart-label">Memory Usage (MB) over time</div>
+          <div class="chart-container"><canvas id="memChart" height="200"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══ Disk & Phase Timing ═══ -->
+      <div class="grid grid-2 fade-in delay-3">
+        <!-- Disk Usage -->
+        <div class="card" id="diskCard">
+          <div class="section-title" style="margin-bottom:20px;">
+            <div class="icon" style="background:rgba(251,191,36,0.12);color:var(--accent-amber);">💾</div>
+            Disk &amp; I/O Usage
+          </div>
+          <div id="diskContent"></div>
+        </div>
+
+        <!-- Phase Timing -->
+        <div class="card" id="phaseCard">
+          <div class="section-title" style="margin-bottom:20px;">
+            <div class="icon" style="background:rgba(167,139,250,0.12);color:var(--accent-purple);">⏱</div>
+            Phase Execution Timeline
+          </div>
+          <div id="phaseContent" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+      </div>
+
+      <!-- ═══ Security Overhead ═══ -->
+      <div class="section-title fade-in delay-4">
+        <div class="icon" style="background:rgba(52,211,153,0.12);color:var(--accent-green);">🔒</div>
+        Security &amp; Cryptographic Overhead
+      </div>
+      <div class="grid grid-3 fade-in delay-4">
+        <!-- Security Timing Table -->
+        <div class="card" style="grid-column: span 2;">
+          <div class="chart-label">Cryptographic Operation Latency</div>
+          <table class="data-table" id="securityTable">
+            <thead><tr><th>Operation</th><th>Latency</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <!-- Crypto Stack -->
+        <div class="card">
+          <div class="chart-label">Active Cryptographic Stack</div>
+          <div class="crypto-stack" id="cryptoStack"></div>
+          <div style="margin-top:16px;">
+            <div class="chart-label" style="margin-bottom:8px;">RBAC Summary</div>
+            <div id="rbacSummary"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Query Performance ═══ -->
+      <div class="section-title fade-in delay-5">
+        <div class="icon" style="background:rgba(34,211,238,0.12);color:var(--accent-cyan);">⚡</div>
+        Query Performance &amp; Database Access
+      </div>
+      <div class="grid grid-2 fade-in delay-5">
+        <div class="card">
+          <div class="chart-label">query_occupant() Latency Distribution (μs)</div>
+          <div class="chart-container"><canvas id="queryChart" height="220"></canvas></div>
+        </div>
+        <div class="card" id="queryStatsCard">
+          <div class="chart-label">Query Latency Statistics</div>
+          <div id="queryStatsContent"></div>
+        </div>
+      </div>
+
+      <!-- ═══ Recognition & Routing ═══ -->
+      <div class="section-title fade-in delay-6">
+        <div class="icon" style="background:rgba(244,114,182,0.12);color:var(--accent-pink);">🎯</div>
+        Recognition &amp; Routing Performance
+      </div>
+      <div class="grid grid-2 fade-in delay-6">
+        <div class="card">
+          <div class="chart-label">Precision / Recall / F1 vs Threshold (θ)</div>
+          <div class="chart-container"><canvas id="prChart" height="240"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="chart-label">Routing Efficiency — DSTS vs Broadcast</div>
+          <div id="routingContent"></div>
+        </div>
+      </div>
+
+      <!-- ═══ Replay Guard & Audit ═══ -->
+      <div class="grid grid-3 fade-in delay-7">
+        <div class="card kpi-card">
+          <div class="kpi-label">Replay Guard</div>
+          <div id="replayContent"></div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">Audit Trail</div>
+          <div id="auditContent"></div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">Inter-Building Handoff</div>
+          <div id="handoffContent"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // ── Chart Drawing Utilities ──────────────────────────────────────
+
+    function drawLineChart(canvasId, datasets, opts = {}) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = (opts.height || 200) * dpr;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = (opts.height || 200) + 'px';
+      ctx.scale(dpr, dpr);
+
+      const W = rect.width, H = opts.height || 200;
+      const pad = { top: 20, right: 20, bottom: 34, left: 50 };
+      const cw = W - pad.left - pad.right;
+      const ch = H - pad.top - pad.bottom;
+
+      // Compute bounds
+      let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      datasets.forEach(ds => {
+        ds.data.forEach(p => {
+          if (p.x < xMin) xMin = p.x;
+          if (p.x > xMax) xMax = p.x;
+          if (p.y < yMin) yMin = p.y;
+          if (p.y > yMax) yMax = p.y;
+        });
+      });
+      if (opts.yMin !== undefined) yMin = opts.yMin;
+      if (opts.yMax !== undefined) yMax = opts.yMax;
+      const yRange = yMax - yMin || 1;
+      const xRange = xMax - xMin || 1;
+
+      function toX(v) { return pad.left + ((v - xMin) / xRange) * cw; }
+      function toY(v) { return pad.top + ch - ((v - yMin) / yRange) * ch; }
+
+      // Grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      const yTicks = 5;
+      for (let i = 0; i <= yTicks; i++) {
+        const y = pad.top + (i / yTicks) * ch;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+        const val = yMax - (i / yTicks) * yRange;
+        ctx.fillStyle = '#5a6580';
+        ctx.font = '11px "JetBrains Mono"';
+        ctx.textAlign = 'right';
+        ctx.fillText(val.toFixed(opts.yDecimals ?? 1), pad.left - 8, y + 4);
+      }
+
+      // X axis labels
+      const xTicks = 5;
+      ctx.textAlign = 'center';
+      for (let i = 0; i <= xTicks; i++) {
+        const val = xMin + (i / xTicks) * xRange;
+        const x = toX(val);
+        ctx.fillStyle = '#5a6580';
+        ctx.fillText(val.toFixed(opts.xDecimals ?? 1), x, H - pad.bottom + 18);
+      }
+
+      // X label
+      if (opts.xLabel) {
+        ctx.fillStyle = '#5a6580';
+        ctx.font = '10px "Inter"';
+        ctx.fillText(opts.xLabel, W / 2, H - 2);
+      }
+
+      // Lines
+      datasets.forEach(ds => {
+        if (ds.data.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = ds.color;
+        ctx.lineWidth = ds.lineWidth || 2;
+        ctx.lineJoin = 'round';
+
+        ds.data.forEach((p, i) => {
+          const x = toX(p.x), y = toY(p.y);
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Fill area
+        if (ds.fill) {
+          ctx.lineTo(toX(ds.data[ds.data.length - 1].x), toY(yMin));
+          ctx.lineTo(toX(ds.data[0].x), toY(yMin));
+          ctx.closePath();
+          ctx.fillStyle = ds.fillColor || ds.color.replace(')', ',0.1)').replace('rgb', 'rgba');
+          ctx.fill();
+        }
+      });
+
+      // Legend
+      if (datasets.length > 1) {
+        let lx = pad.left + 8;
+        datasets.forEach(ds => {
+          if (!ds.label) return;
+          ctx.fillStyle = ds.color;
+          ctx.fillRect(lx, pad.top - 12, 12, 3);
+          ctx.fillStyle = '#8892b0';
+          ctx.font = '10px "Inter"';
+          ctx.textAlign = 'left';
+          ctx.fillText(ds.label, lx + 16, pad.top - 7);
+          lx += ctx.measureText(ds.label).width + 36;
+        });
+      }
+    }
+
+    function drawBarChart(canvasId, labels, values, colors, opts = {}) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const H = opts.height || 220;
+      canvas.width = rect.width * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = H + 'px';
+      ctx.scale(dpr, dpr);
+
+      const W = rect.width;
+      const pad = { top: 20, right: 20, bottom: 44, left: 50 };
+      const cw = W - pad.left - pad.right;
+      const ch = H - pad.top - pad.bottom;
+
+      const maxVal = Math.max(...values) * 1.15 || 1;
+      const barW = Math.min(40, (cw / values.length) * 0.6);
+      const gap = cw / values.length;
+
+      // Grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (i / 4) * ch;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+        ctx.fillStyle = '#5a6580';
+        ctx.font = '11px "JetBrains Mono"';
+        ctx.textAlign = 'right';
+        ctx.fillText((maxVal - (i / 4) * maxVal).toFixed(0), pad.left - 8, y + 4);
+      }
+
+      // Bars
+      values.forEach((v, i) => {
+        const x = pad.left + i * gap + (gap - barW) / 2;
+        const barH = (v / maxVal) * ch;
+        const y = pad.top + ch - barH;
+
+        // Gradient bar
+        const grad = ctx.createLinearGradient(x, y, x, y + barH);
+        grad.addColorStop(0, colors[i % colors.length]);
+        grad.addColorStop(1, colors[i % colors.length] + '66');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+        ctx.fill();
+
+        // Value on top
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.font = '11px "JetBrains Mono"';
+        ctx.textAlign = 'center';
+        ctx.fillText(v.toFixed(1), x + barW / 2, y - 6);
+
+        // Label
+        ctx.fillStyle = '#5a6580';
+        ctx.font = '10px "Inter"';
+        ctx.save();
+        ctx.translate(x + barW / 2, H - pad.bottom + 14);
+        ctx.rotate(-0.4);
+        ctx.textAlign = 'right';
+        ctx.fillText(labels[i], 0, 0);
+        ctx.restore();
+      });
+    }
+
+
+    // ── Build Dashboard ─────────────────────────────────────────────
+
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/metrics');
+        const m = await res.json();
+        buildDashboard(m);
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        document.getElementById('app').style.display = 'block';
+      } catch (e) {
+        document.querySelector('.loading-text').textContent = 'Failed to load metrics. Retrying...';
+        setTimeout(loadDashboard, 2000);
+      }
+    }
+
+    function buildDashboard(m) {
+      // ── KPI Row ──
+      const kpiRow = document.getElementById('kpiRow');
+      const kpis = [
+        { label: 'Total Wall Time', value: m.system.total_wall_time_ms?.toFixed(0) + 'ms', color: 'blue', sub: `${m.system.total_phases} phases completed` },
+        { label: 'Peak Memory (RSS)', value: m.system.peak_rss_mb?.toFixed(1) + ' MB', color: 'cyan', sub: `Baseline: ${m.system.baseline_rss_mb} MB` },
+        { label: 'Recognition Accuracy', value: m.recognition.accuracy + '%', color: 'green', sub: `${m.recognition.correct}/${m.recognition.total_events} correct` },
+        { label: 'Routing Rank-1', value: m.routing.rank1_accuracy + '%', color: 'purple', sub: `Efficiency gain: ${m.routing.efficiency_gain}%` },
+      ];
+      kpiRow.innerHTML = kpis.map(k => `
+        <div class="card kpi-card">
+          <div class="kpi-label">${k.label}</div>
+          <div class="kpi-value ${k.color}">${k.value}</div>
+          <div class="kpi-sub">${k.sub}</div>
+        </div>
+      `).join('');
+
+      // ── CPU Chart ──
+      if (m.resource_samples?.length > 1) {
+        const cpuData = m.resource_samples.map(s => ({ x: s.t, y: s.cpu_percent }));
+        drawLineChart('cpuChart', [
+          { data: cpuData, color: '#6380ff', fill: true, fillColor: 'rgba(99,128,255,0.08)', label: 'CPU %' }
+        ], { height: 200, yMin: 0, xLabel: 'Time (s)', xDecimals: 1, yDecimals: 0 });
+
+        // ── Memory Chart ──
+        const memData = m.resource_samples.map(s => ({ x: s.t, y: s.rss_mb }));
+        drawLineChart('memChart', [
+          { data: memData, color: '#22d3ee', fill: true, fillColor: 'rgba(34,211,238,0.08)', label: 'RSS (MB)' }
+        ], { height: 200, xLabel: 'Time (s)', xDecimals: 1, yDecimals: 1 });
+      }
+
+      // ── Disk Card ──
+      const diskContent = document.getElementById('diskContent');
+      const ioLast = m.resource_samples?.length ? m.resource_samples[m.resource_samples.length - 1] : {};
+      const ioFirst = m.resource_samples?.length ? m.resource_samples[0] : {};
+      const readDelta = ((ioLast.read_bytes || 0) - (ioFirst.read_bytes || 0)) / 1024;
+      const writeDelta = ((ioLast.write_bytes || 0) - (ioFirst.write_bytes || 0)) / 1024;
+      const readOps = (ioLast.read_count || 0) - (ioFirst.read_count || 0);
+      const writeOps = (ioLast.write_count || 0) - (ioFirst.write_count || 0);
+
+      diskContent.innerHTML = `
+        <div class="progress-container">
+          <div class="progress-item">
+            <div class="progress-header">
+              <span class="progress-label">Disk Space Used</span>
+              <span class="progress-value" style="color:var(--accent-amber)">${m.system.disk_percent}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:${m.system.disk_percent}%;background:var(--gradient-amber);"></div>
+            </div>
+            <div class="kpi-sub">${m.system.disk_used_gb} GB used of ${m.system.disk_total_gb} GB</div>
+          </div>
+          <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <div class="kpi-label">Read I/O</div>
+              <div style="font-size:20px;font-weight:700;color:var(--accent-cyan);margin-top:4px;" class="mono">${readDelta.toFixed(1)} KB</div>
+              <div class="kpi-sub">${readOps} operations</div>
+            </div>
+            <div>
+              <div class="kpi-label">Write I/O</div>
+              <div style="font-size:20px;font-weight:700;color:var(--accent-purple);margin-top:4px;" class="mono">${writeDelta.toFixed(1)} KB</div>
+              <div class="kpi-sub">${writeOps} operations</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <div class="progress-item">
+              <div class="progress-header">
+                <span class="progress-label">RAM Utilization</span>
+                <span class="progress-value" style="color:var(--accent-cyan)">${((m.system.total_ram_mb - m.system.available_ram_mb) / m.system.total_ram_mb * 100).toFixed(1)}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width:${((m.system.total_ram_mb - m.system.available_ram_mb) / m.system.total_ram_mb * 100).toFixed(1)}%;background:var(--gradient-main);"></div>
+              </div>
+              <div class="kpi-sub">${((m.system.total_ram_mb - m.system.available_ram_mb)/1024).toFixed(1)} GB used of ${(m.system.total_ram_mb/1024).toFixed(1)} GB</div>
+            </div>
+          </div>
+        </div>
+      `;
+      // Animate progress bars
+      setTimeout(() => {
+        document.querySelectorAll('.progress-fill').forEach(el => {
+          el.style.width = el.style.width;
+        });
+      }, 100);
+
+      // ── Phase Timeline ──
+      const phaseContent = document.getElementById('phaseContent');
+      const phaseColors = ['var(--accent-blue)', 'var(--accent-green)', 'var(--accent-amber)', 'var(--accent-red)', 'var(--accent-purple)'];
+      const phaseIcons = ['🏃', '📐', '📊', '🔐', '⚡'];
+      phaseContent.innerHTML = (m.phases || []).map((p, i) => `
+        <div class="phase-bar">
+          <div class="phase-number" style="background:${phaseColors[i]}22;color:${phaseColors[i]}">${phaseIcons[i]}</div>
+          <div class="phase-info">
+            <div class="phase-name">${p.name}</div>
+            <div class="phase-stats">CPU: ${p.cpu_time_ms.toFixed(1)}ms · Mem Δ: ${p.memory_delta_kb > 0 ? '+' : ''}${p.memory_delta_kb.toFixed(0)} KB</div>
+          </div>
+          <div class="phase-timing">
+            <div class="phase-wall">${p.wall_time_ms.toFixed(1)}ms</div>
+            <div class="phase-cpu">wall time</div>
+          </div>
+        </div>
+      `).join('');
+
+      // ── Security Table ──
+      const secTbody = document.querySelector('#securityTable tbody');
+      const timings = m.security?.timings || {};
+      const secRows = [
+        ['Ed25519 + X25519 Key Generation (B1)', timings.keygen_b1_us, 'μs'],
+        ['Ed25519 + X25519 Key Generation (B5)', timings.keygen_b5_us, 'μs'],
+        ['X25519 ECDH Handshake + HKDF', timings.ecdh_handshake_us, 'μs'],
+        ['Seal Metadata (AES-GCM + Sign)', timings.seal_metadata_us, 'μs'],
+        ['Unseal Metadata (Verify + Decrypt)', timings.unseal_metadata_us, 'μs'],
+        ['Anti-Replay Check', timings.replay_check_us, 'μs'],
+        ['RBAC Authorization (per check)', timings.rbac_per_check_us, 'μs'],
+        ['RBAC Authorization (100 checks)', timings.rbac_100_checks_us, 'μs'],
+      ];
+      secTbody.innerHTML = secRows.map(([name, val, unit]) => {
+        const cls = val < 100 ? 'good' : val < 1000 ? 'val' : 'warn';
+        return `<tr><td style="color:var(--text-primary)">${name}</td><td class="val">${val?.toFixed(1) ?? '—'} ${unit}</td><td class="${cls}">✓ Nominal</td></tr>`;
+      }).join('');
+
+      // ── Crypto Stack ──
+      const cryptoStack = document.getElementById('cryptoStack');
+      const stackIcons = ['🔑', '🔗', '🛡️', '✍️'];
+      cryptoStack.innerHTML = (m.security?.crypto_stack || []).map((item, i) => `
+        <div class="crypto-item">
+          <div class="crypto-icon">${stackIcons[i]}</div>
+          <div class="crypto-name">${item}</div>
+        </div>
+      `).join('');
+
+      // RBAC summary
+      const rbac = m.security?.rbac || {};
+      document.getElementById('rbacSummary').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div><span class="kpi-label">Principals</span><br><span class="mono" style="color:var(--accent-cyan)">${rbac.registered_principals}</span></div>
+          <div><span class="kpi-label">Audit Entries</span><br><span class="mono" style="color:var(--accent-amber)">${rbac.audit_entries}</span></div>
+          <div><span class="kpi-label">Permits</span><br><span class="mono" style="color:var(--accent-green)">${rbac.permit_count}</span></div>
+          <div><span class="kpi-label">Denials</span><br><span class="mono" style="color:var(--accent-red)">${rbac.deny_count}</span></div>
+        </div>
+      `;
+
+      // ── Query Chart ──
+      if (m.query?.query_occupant_samples?.length) {
+        const samples = m.query.query_occupant_samples;
+        // Histogram bins
+        const bins = 12;
+        const qMin = Math.min(...samples), qMax = Math.max(...samples);
+        const binWidth = (qMax - qMin) / bins || 1;
+        const counts = new Array(bins).fill(0);
+        const labels = [];
+        samples.forEach(v => {
+          let idx = Math.floor((v - qMin) / binWidth);
+          if (idx >= bins) idx = bins - 1;
+          counts[idx]++;
+        });
+        for (let i = 0; i < bins; i++) {
+          labels.push((qMin + i * binWidth).toFixed(0));
+        }
+        const colors = counts.map(() => '#22d3ee');
+        drawBarChart('queryChart', labels, counts, colors, { height: 220 });
+      }
+
+      // Query Stats
+      const queryStats = document.getElementById('queryStatsContent');
+      const qs = m.query || {};
+      queryStats.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px;">
+          <div class="kpi-card">
+            <div class="kpi-label">Mean Latency</div>
+            <div class="kpi-value cyan" style="font-size:28px;">${qs.mean_us?.toFixed(1) ?? '—'} μs</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">P50 Latency</div>
+            <div class="kpi-value blue" style="font-size:28px;">${qs.p50_us?.toFixed(1) ?? '—'} μs</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">P99 Latency</div>
+            <div class="kpi-value amber" style="font-size:28px;">${qs.p99_us?.toFixed(1) ?? '—'} μs</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Min / Max</div>
+            <div class="kpi-value green" style="font-size:28px;">${qs.min_us?.toFixed(1) ?? '—'}</div>
+            <div class="kpi-sub">/ ${qs.max_us?.toFixed(1) ?? '—'} μs</div>
+          </div>
+        </div>
+        <div style="margin-top:20px;">
+          <div class="progress-item">
+            <div class="progress-header">
+              <span class="progress-label">State Table Access Overhead</span>
+              <span class="progress-value" style="color:var(--accent-green)">< 1ms</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:${Math.min(100, (qs.mean_us || 0) / 10)}%;background:var(--gradient-green);"></div>
+            </div>
+            <div class="kpi-sub">Vectorised numpy state table (in-memory) — no disk I/O per query</div>
+          </div>
+        </div>
+      `;
+
+      // ── PR Curve ──
+      if (m.recognition?.pr_curve) {
+        const pr = m.recognition.pr_curve;
+        const pData = pr.thetas.map((t, i) => ({ x: t, y: pr.precisions[i] }));
+        const rData = pr.thetas.map((t, i) => ({ x: t, y: pr.recalls[i] }));
+        const fData = pr.thetas.map((t, i) => ({ x: t, y: pr.f1_scores[i] }));
+        drawLineChart('prChart', [
+          { data: pData, color: '#6380ff', label: 'Precision', lineWidth: 2 },
+          { data: rData, color: '#34d399', label: 'Recall', lineWidth: 2 },
+          { data: fData, color: '#fbbf24', label: 'F1 Score', lineWidth: 1.5 },
+        ], { height: 240, yMin: 0, yMax: 1.05, xLabel: 'Threshold (θ)', xDecimals: 2, yDecimals: 1 });
+      }
+
+      // ── Routing Content ──
+      const routingContent = document.getElementById('routingContent');
+      const r = m.routing || {};
+      routingContent.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+          <div class="kpi-card">
+            <div class="kpi-label">Rank-1 Successes</div>
+            <div class="kpi-value green" style="font-size:28px;">${r.rank1_successes} / ${r.total_lookups}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Avg Buildings Contacted</div>
+            <div class="kpi-value cyan" style="font-size:28px;">${r.avg_buildings_contacted}</div>
+            <div class="kpi-sub">vs ${r.broadcast_buildings} (broadcast)</div>
+          </div>
+        </div>
+        <div style="margin-top:20px;">
+          <div class="progress-item">
+            <div class="progress-header">
+              <span class="progress-label">Routing Efficiency Gain</span>
+              <span class="progress-value" style="color:var(--accent-green)">${r.efficiency_gain}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:${r.efficiency_gain}%;background:var(--gradient-green);"></div>
+            </div>
+            <div class="kpi-sub">Reduction in inter-building messages vs naive broadcast</div>
+          </div>
+          <div class="progress-item" style="margin-top:14px;">
+            <div class="progress-header">
+              <span class="progress-label">Rank-1 Accuracy</span>
+              <span class="progress-value" style="color:var(--accent-purple)">${r.rank1_accuracy}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:${r.rank1_accuracy}%;background:var(--gradient-purple);"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // ── Replay Guard ──
+      const rg = m.security?.replay_guard || {};
+      document.getElementById('replayContent').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px;">
+          <div>
+            <div style="font-size:28px;font-weight:800;color:var(--accent-green)" class="mono">${rg.validated}</div>
+            <div class="kpi-sub">Validated</div>
+          </div>
+          <div>
+            <div style="font-size:28px;font-weight:800;color:var(--accent-red)" class="mono">${rg.rejected}</div>
+            <div class="kpi-sub">Rejected</div>
+          </div>
+          <div>
+            <div style="font-size:28px;font-weight:800;color:var(--accent-amber)" class="mono">${rg.replay_attempts}</div>
+            <div class="kpi-sub">Replays</div>
+          </div>
+        </div>
+        <div class="kpi-sub" style="margin-top:12px;">Sliding window: 120s freshness · Nonce dedup active</div>
+      `;
+
+      // ── Audit Trail ──
+      document.getElementById('auditContent').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+          <div>
+            <div style="font-size:28px;font-weight:800;color:var(--accent-cyan)" class="mono">${rbac.audit_entries}</div>
+            <div class="kpi-sub">Total Entries</div>
+          </div>
+          <div>
+            <div style="font-size:28px;font-weight:800;color:var(--accent-green)" class="mono">${rbac.permit_count}</div>
+            <div class="kpi-sub">Permits</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <div style="font-size:22px;font-weight:800;color:var(--accent-red)" class="mono">${rbac.deny_count} <span style="font-size:12px;color:var(--text-muted);font-weight:400;">denials logged</span></div>
+        </div>
+        <div class="kpi-sub" style="margin-top:8px;">${rbac.registered_principals} principals · 3 roles enforced</div>
+      `;
+
+      // ── Handoff ──
+      document.getElementById('handoffContent').innerHTML = `
+        <div style="margin-top:8px;">
+          <div style="font-size:32px;font-weight:800;color:var(--accent-green)" class="mono">${m.recognition.handoff_success ? '✓ SUCCESS' : '✗ FAILED'}</div>
+          <div class="kpi-sub" style="margin-top:8px;">B1 → B5 occupant handoff</div>
+          <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div><span class="kpi-label">B1 Events</span><br><span class="mono" style="color:var(--accent-blue)">${m.recognition.b1_events}</span></div>
+            <div><span class="kpi-label">B5 Events</span><br><span class="mono" style="color:var(--accent-purple)">${m.recognition.b5_events}</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ── Init ──
+    loadDashboard();
+  </script>
+</body>
+</html>
