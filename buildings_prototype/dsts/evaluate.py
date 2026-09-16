@@ -15,7 +15,7 @@ import math
 import sqlite3
 from pathlib import Path
 
-from dsts.state.zones import ZONES
+from dsts.legacy_state.zones import ZONES
 
 TOLERANCE = 1e-6
 

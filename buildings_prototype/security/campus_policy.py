@@ -8,12 +8,15 @@ policy for campus location queries, separating what information is exposed from 
      L0 — None:             Nothing exposed; query rejected.
      L1 — Presence:         Boolean presence at designated location / cabin availability.
                             ("Teacher available in cabin: Yes / No")
-     L2 — Current Zone:     Current functional zone / sector + timestamp.
-                            ("Dean is in Administration Zone, 10:42 AM")
-     L3 — Precise Current:  Exact room ID + metric coordinates + timestamp.
-                            ("Dean is in Room A-204, (x,y), 10:42 AM")
-     L4 — Historical Track: Full historical trajectory / movement history.
-                            ("Student movements over the last 2 hours")
+     L2 — Current Zone:     Current functional sector (a group of zones on the single floor)
+                            + quantized timestamp; the exact zone is withheld.
+                            ("Dean is in the Work & Study Wing, ~10:40 AM")
+     L3 — Precise Current:  Exact zone ID + zone label + detection confidence + exact timestamp.
+                            The building is a single floor with 8-9 zones — there is no
+                            room-level or coordinate-level granularity beyond the zone itself.
+                            ("Dean is in z3 (Office), 94% confidence, 10:42 AM")
+     L4 — Historical Track: Full historical trajectory / movement across zones over time.
+                            ("Student's zone-by-zone movements over the last 2 hours")
 
 2. Maximum Disclosure Matrix (Requester -> Target ceiling):
      Requester ↓ / Target →  Dean  Teacher  Student  Visitor
@@ -61,9 +64,9 @@ class DisclosureLevel(IntEnum):
     """
     L0_NONE = 0              # Nothing exposed / query rejected
     L1_PRESENCE = 1          # Boolean presence at designated location / availability (e.g. cabin)
-    L2_CURRENT_ZONE = 2      # Current functional zone / sector + timestamp
-    L3_PRECISE_CURRENT = 3   # Exact room ID, camera identifier, and metric coordinates + timestamp
-    L4_HISTORICAL_TRACK = 4  # Movement history / trajectory across time intervals
+    L2_CURRENT_ZONE = 2      # Current functional sector (zone-group) + quantized timestamp; exact zone withheld
+    L3_PRECISE_CURRENT = 3   # Exact zone ID, zone label, and detection confidence + exact timestamp (single floor, no rooms)
+    L4_HISTORICAL_TRACK = 4  # Movement history / trajectory across zones over time intervals
 
     @classmethod
     def from_str(cls, val: Union[str, int]) -> "DisclosureLevel":
@@ -133,8 +136,8 @@ class AccessScope(Enum):
 class LocationGranularity(Enum):
     """Spatial resolution granted by policy (legacy compatibility)."""
     NONE = "none"              # No location data
-    ZONE = "zone"              # Building / functional sector only (no room/camera ID)
-    PRECISE = "precise"        # Exact room / camera-level location
+    ZONE = "zone"              # Building / functional sector only (exact zone withheld)
+    PRECISE = "precise"        # Exact zone-level location (finest granularity — single floor, no rooms)
 
 
 LEVEL_TO_SCOPE_GRANULARITY: Dict[DisclosureLevel, Tuple[AccessScope, LocationGranularity]] = {
@@ -218,6 +221,7 @@ class PolicyDecision:
 _occupant_roles: Dict[str, CampusRole] = {}
 _teacher_rosters: Dict[str, Set[str]] = {}  # {teacher_id: {student_id, ...}}
 _designated_locations: Dict[str, Tuple[str, str]] = {}  # {occupant_id: (zone_id, label)}
+_occupant_buildings: Dict[str, str] = {}  # {occupant_id: home_building_id}
 
 DEFAULT_DESIGNATED_OFFICE = "z3"
 DEFAULT_DESIGNATED_LABEL = "Cabin"
@@ -296,11 +300,22 @@ def is_student_in_roster(teacher_id: str, student_id: str) -> bool:
     return student_id in _teacher_rosters.get(teacher_id, set())
 
 
+def register_occupant_building(occupant_id: str, building_id: str) -> None:
+    """Assign an occupant's home building, for the Dean-only cross-building rule below."""
+    _occupant_buildings[occupant_id] = building_id
+
+
+def get_occupant_building(occupant_id: str) -> Optional[str]:
+    """Return the occupant's registered home building, or None if never registered."""
+    return _occupant_buildings.get(occupant_id)
+
+
 def clear_campus_registry() -> None:
-    """Clear all occupant roles, class rosters, and designated locations."""
+    """Clear all occupant roles, class rosters, buildings, and designated locations."""
     _occupant_roles.clear()
     _teacher_rosters.clear()
     _designated_locations.clear()
+    _occupant_buildings.clear()
 
 
 # ─── Contextual Policy Evaluation ─────────────────────────────────────────────
@@ -412,6 +427,24 @@ def evaluate_campus_query_policy(
             purpose=context.purpose,
             context=context,
         )
+
+    # Rule 2b: Dean-only cross-building access. Every other role is confined
+    # to querying occupants of their OWN building; only Dean may cross. Only
+    # fires when both occupants' home buildings are actually registered (via
+    # register_occupant_building) -- callers/tests that never register a
+    # building see no change in behavior.
+    if c_role != CampusRole.DEAN:
+        caller_building = get_occupant_building(caller_id) if caller_id else None
+        target_building = get_occupant_building(target_id) if target_id else None
+        if caller_building and target_building and caller_building != target_building:
+            return PolicyDecision(
+                permitted=False,
+                level=DisclosureLevel.L0_NONE,
+                reason=(f"Policy denied: {c_role.value} '{caller_id}' (home {caller_building}) may not query "
+                        f"an occupant of {target_building} -- only Dean has cross-building access"),
+                purpose=context.purpose,
+                context=context,
+            )
 
     # Rule 3: Matrix ceiling lookup
     matrix_row = MAX_DISCLOSURE_MATRIX.get(c_role, {})

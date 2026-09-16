@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dsts.state.store import StateStore
+from dsts.legacy_state.store import StateStore
 
 
 def point_probability(

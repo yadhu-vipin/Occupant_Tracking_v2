@@ -163,7 +163,7 @@ tables without touching embeddings, filters, or config:
 python -c "
 import json
 from pathlib import Path
-from dsts.state.store import FakeOccupantRegistry
+from dsts.legacy_state.store import FakeOccupantRegistry
 from nodelib.deploy import SplitSqliteStore
 
 for folder in Path('nodes').iterdir():

@@ -40,11 +40,11 @@ from buildinglib._vendored.lsh import preprocess, random_hyperplanes   # noqa: E
 from buildinglib.artifact import load_building        # noqa: E402
 from buildinglib.node import BuildingNode as RoutingNode, RoutingContract, VisitorPool  # noqa: E402
 from buildinglib.params import ContractMismatch, Params, compute_params_hash, sha256_file  # noqa: E402
-from dsts.state.bsts import StateTable                # noqa: E402
-from dsts.state.store import FakeOccupantRegistry, StateRow  # noqa: E402
-from dsts.state.zones import ZONES                    # noqa: E402
+from dsts.legacy_state.bsts import StateTable                # noqa: E402
+from dsts.legacy_state.store import FakeOccupantRegistry, StateRow  # noqa: E402
+from dsts.legacy_state.zones import ZONES                    # noqa: E402
 
-SCHEMA_SQL = _BUILDINGS / "dsts" / "state" / "schema.sql"
+SCHEMA_SQL = _BUILDINGS / "dsts" / "legacy_state" / "schema.sql"
 _FILE_FOR_TABLE = {"registered_state": "registered.db", "visitor_state": "visitor.db"}
 
 
@@ -139,7 +139,7 @@ def load_node_contract(folder):
 
 def _table_ddl():
     """``{table_name: "CREATE TABLE IF NOT EXISTS ..."}`` parsed from the one
-    ``dsts/state/schema.sql`` -- so the DDL has a single source of truth.
+    ``dsts/legacy_state/schema.sql`` -- so the DDL has a single source of truth.
     """
     text = SCHEMA_SQL.read_text(encoding="utf-8")
     ddl = {}
@@ -151,10 +151,10 @@ def _table_ddl():
 
 
 class SplitSqliteStore:
-    """Duck-types ``dsts.state.store.StateStore``, backed by two SQLite files
+    """Duck-types ``dsts.legacy_state.store.StateStore``, backed by two SQLite files
     instead of one -- ``registered.db`` holds ``registered_state``,
     ``visitor.db`` holds ``visitor_state``. Routed the same way
-    ``dsts.state.store.SqliteStore`` routes: by ``registry.is_registered()``.
+    ``dsts.legacy_state.store.SqliteStore`` routes: by ``registry.is_registered()``.
     """
 
     def __init__(self, state_dir, registry):
@@ -260,10 +260,11 @@ class DeployedBuilding:
         filters = {}
         for p in sorted((folder / "filters").glob("*.npz")):
             filters[p.stem] = load_building(p).bloom
+        expected = len(manifest["filters_held"])
         if building_id in filters:
-            raise ContractMismatch(f"{building_id} holds its own filter -- should hold only the other 9")
-        if len(filters) != 9:
-            raise ContractMismatch(f"{building_id}: expected 9 filters, found {len(filters)}")
+            raise ContractMismatch(f"{building_id} holds its own filter -- should hold only the other {expected}")
+        if len(filters) != expected:
+            raise ContractMismatch(f"{building_id}: expected {expected} filters, found {len(filters)}")
 
         registry = FakeOccupantRegistry(set(str(i) for i in ids))
         store = SplitSqliteStore(folder / "state", registry)

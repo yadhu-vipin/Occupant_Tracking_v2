@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from typing import Optional
+from typing import Optional, Dict
 
 try:
     from sim.evaluation import PaperMetricsResult, RoutingMetricsResult

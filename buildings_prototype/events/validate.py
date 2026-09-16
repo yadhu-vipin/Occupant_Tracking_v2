@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from buildinglib.split import default_emb_path, default_meta_path, list_buildings, normalise_occupant_ids
-from dsts.state.zones import ZONE_ADJACENCY, ZONES
+from dsts.legacy_state.zones import ZONE_ADJACENCY, ZONES
 from .io import load_events
 
 

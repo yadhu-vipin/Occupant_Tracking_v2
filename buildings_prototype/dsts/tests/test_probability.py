@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from dsts.state.probability import occupant_probabilities
+from dsts.legacy_state.probability import occupant_probabilities
 
 
 def test_known_distance_example():

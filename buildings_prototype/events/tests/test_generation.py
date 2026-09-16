@@ -59,7 +59,7 @@ def test_every_same_building_hop_is_adjacent_and_visitors_enter_at_gateway():
     for history in histories.values():
         for previous, current in zip(history, history[1:]):
             if previous.current_building == current.current_building:
-                from dsts.state.zones import ZONE_ADJACENCY
+                from dsts.legacy_state.zones import ZONE_ADJACENCY
                 assert current.current_zone in ZONE_ADJACENCY[previous.current_zone]
             else:
                 assert previous.current_zone == current.current_zone == "zT"

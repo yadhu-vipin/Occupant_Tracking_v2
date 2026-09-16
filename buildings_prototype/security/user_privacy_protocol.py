@@ -31,9 +31,12 @@ for a user seeking the location of another user:
    - Historical trajectory queries (e.g. Q3, Q5) strictly require FULL_TRACK access.
 
 5. Hierarchical Location Precision Obfuscation:
-   - PRECISE -> EXACT room code (e.g. z3), room label (Office), probability, coordinates.
-   - ZONE -> COARSE functional sector on single floor (e.g. North-West Wing), quantized time.
-   - NONE / Minimal -> ABSTRACT building presence only (e.g. Inside B1), room details redacted.
+   - PRECISE -> EXACT zone ID (e.g. z3), zone label (Office), detection confidence, exact
+     timestamp. The building is a single floor with 8-9 zones — there are no rooms or
+     metric coordinates below zone-level granularity.
+   - ZONE -> COARSE functional sector on the single floor (e.g. Work & Study Wing),
+     quantized time, exact zone withheld.
+   - NONE / Minimal -> ABSTRACT building presence only (e.g. Inside B1), zone/sector details redacted.
 
 6. Auditing & Sealed Transmission:
    - Full audit trail recorded.
@@ -675,7 +678,7 @@ class UserClient:
     ) -> LocationQueryResponse:
         """
         Query and analyze occupant movement track, dwell times, and spatial patterns.
-        Permitted for L4 (exact rooms/dwell) and L2 (building/sector dwell), denied for L1/L0.
+        Permitted for L4 (exact zone/dwell) and L2 (building/sector dwell), denied for L1/L0.
         """
         params = {}
         if building_id:

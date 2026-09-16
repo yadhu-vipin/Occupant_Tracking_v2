@@ -16,7 +16,7 @@ Roles:
 import time
 import json
 from enum import Enum
-from typing import Optional, Dict, Set
+from typing import Optional, Dict, Set, Tuple
 
 # Re-export Layer-2 Campus Privacy Policy
 try:

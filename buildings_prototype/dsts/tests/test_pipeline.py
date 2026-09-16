@@ -10,7 +10,7 @@ import pytest
 
 from dsts import pipeline
 from dsts.pipeline import CorpusContext, process_event, run, summary
-from dsts.state.zones import ZONES
+from dsts.legacy_state.zones import ZONES
 
 
 def make_building(nodes_dir, building_id, occupant_ids):

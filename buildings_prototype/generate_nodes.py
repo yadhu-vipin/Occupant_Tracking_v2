@@ -40,7 +40,7 @@ from buildinglib.params import ContractMismatch, check_vendored, load_params  # 
 from buildinglib.refs import reference_tensor                                  # noqa: E402
 from buildinglib.split import (default_emb_path, default_meta_path,             # noqa: E402
                                list_buildings, split_building)
-from dsts.state.store import FakeOccupantRegistry                              # noqa: E402
+from dsts.legacy_state.store import FakeOccupantRegistry                       # noqa: E402
 from nodelib.deploy import DeployedBuilding, SplitSqliteStore, write_node_config  # noqa: E402
 
 DEFAULT_EMB = default_emb_path()
@@ -132,10 +132,10 @@ def build_one(raw, meta, building_id, all_buildings, params, args):
     assert dep.building_id == building_id
     assert len(dep.routing.own_ids) == len(ids) == manifest["n_occupants"]
     assert dep.routing.own_refs.shape == (len(ids), params.refs_per_occupant, params.embed_dim)
-    assert len(dep.filters) == 9 and building_id not in dep.filters
+    assert len(dep.filters) == len(all_buildings) - 1 and building_id not in dep.filters
     dep.close()
 
-    print(f"  {building_id}: {len(ids)} occupants, 9 filters, refs {dep.routing.own_refs.shape}")
+    print(f"  {building_id}: {len(ids)} occupants, {len(all_buildings) - 1} filters, refs {dep.routing.own_refs.shape}")
 
 
 def main(argv=None):

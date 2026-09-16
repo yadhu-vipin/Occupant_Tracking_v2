@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from dsts.state.store import StateStore
+from dsts.legacy_state.store import StateStore
 
 
 class StateTable:

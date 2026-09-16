@@ -3,8 +3,8 @@
     event
       -> existing recognition/retrieval result   (identity + candidate set)
       -> biometric distance evidence               (per-candidate min angle)
-      -> dsts.state.probability.occupant_probabilities()   (Definition 3.3)
-      -> dsts.state.bsts.StateTable.apply()
+      -> dsts.legacy_state.probability.occupant_probabilities()   (Definition 3.3)
+      -> dsts.legacy_state.bsts.StateTable.apply()
       -> nodes/<current_building>/state/{registered,visitor}.db
 
 This module only ever reads observable events plus the existing Phase 2/3
@@ -71,10 +71,10 @@ from buildinglib.node import load_routing_contract
 from buildinglib.refs import reference_tensor
 from buildinglib.split import default_emb_path, default_meta_path, normalise_occupant_ids
 from buildinglib.verify import vote_evidence
-from dsts.state.bsts import StateTable
-from dsts.state.probability import occupant_probabilities
-from dsts.state.store import FakeOccupantRegistry
-from dsts.state.zones import ZONES
+from dsts.legacy_state.bsts import StateTable
+from dsts.legacy_state.probability import occupant_probabilities
+from dsts.legacy_state.store import FakeOccupantRegistry
+from dsts.legacy_state.zones import ZONES
 from nodelib.deploy import SplitSqliteStore
 
 EVENT_FIELDS = {"event_id", "timestamp", "current_building", "current_zone", "embedding_row"}
