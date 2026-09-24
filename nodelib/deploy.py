@@ -19,12 +19,15 @@ Try it:
     python -m nodelib.deploy
 """
 import json
+import logging
 import re
 import shutil
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -34,14 +37,16 @@ import sys                                          # noqa: E402
 if str(_BUILDINGS) not in sys.path:
     sys.path.insert(0, str(_BUILDINGS))
 
-import query_node                                    # noqa: E402
-import respond_node                                   # noqa: E402
-from buildinglib._vendored.lsh import preprocess, random_hyperplanes   # noqa: E402
+from buildinglib._vendored.lsh import encode_with_margins, preprocess, random_hyperplanes  # noqa: E402
 from buildinglib.artifact import load_building        # noqa: E402
-from buildinglib.node import BuildingNode as RoutingNode, RoutingContract, VisitorPool  # noqa: E402
+from buildinglib.node import (BuildingNode as RoutingNode, Identification, RoutingContract,  # noqa: E402
+                              Visitor, VisitorPool)
 from buildinglib.params import ContractMismatch, Params, compute_params_hash, sha256_file  # noqa: E402
+from buildinglib.route import route                   # noqa: E402
+from buildinglib.verify import vote                    # noqa: E402
 from dsts.legacy_state.bsts import StateTable                # noqa: E402
 from dsts.legacy_state.store import FakeOccupantRegistry, StateRow  # noqa: E402
+from pipeline.recognize import confirm_at_candidate    # noqa: E402
 from dsts.legacy_state.zones import ZONES                    # noqa: E402
 
 SCHEMA_SQL = _BUILDINGS / "dsts" / "legacy_state" / "schema.sql"
@@ -214,6 +219,203 @@ class SplitSqliteStore:
         self.close()
 
 
+def _pointers_ddl():
+    """Parse ``CREATE TABLE visitor_pointers`` and its index straight out of
+    the one ``dsts/legacy_state/schema.sql`` -- same single-source-of-truth
+    idiom as :func:`_table_ddl`, just not restricted to ``CREATE TABLE``.
+    """
+    text = SCHEMA_SQL.read_text(encoding="utf-8")
+    statements = [s.strip() for s in text.split(";") if s.strip()]
+    create_table, create_index = None, None
+    for stmt in statements:
+        if re.search(r"CREATE TABLE\s+visitor_pointers", stmt):
+            create_table = stmt.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1) + ";"
+        elif re.search(r"CREATE INDEX\s+idx_pointers_occupant_open", stmt):
+            create_index = stmt.replace("CREATE INDEX", "CREATE INDEX IF NOT EXISTS", 1) + ";"
+    if create_table is None:
+        raise RuntimeError(f"{SCHEMA_SQL} has no CREATE TABLE visitor_pointers statement")
+    return create_table, create_index
+
+
+class PointerStore:
+    """Per-building ``state/pointers.db`` -- the visit-pointer redirect table.
+
+    When a visitor is confirmed at a non-home building, a pointer
+    (``visit_id`` + current location) is minted here, in the *home*
+    building's own store, anchored to the already-enforced transition-zone
+    (``zT``) entry/exit events. Carries only occupant_id + location +
+    timestamps -- no embeddings, no votes, no reference vectors, preserving
+    the "no building holds another's raw biometric data" property.
+
+    ``visit_id`` format: ``f"{occupant_id}:{home_building}:{entry_timestamp}"``
+    -- deterministic, no extra ID-generation state.
+    """
+
+    def __init__(self, state_dir):
+        state_dir = Path(state_dir)
+        state_dir.mkdir(parents=True, exist_ok=True)
+        create_table, create_index = _pointers_ddl()
+        self._conn = sqlite3.connect(state_dir / "pointers.db")
+        self._conn.row_factory = sqlite3.Row
+        with self._conn:
+            self._conn.execute(create_table)
+            if create_index:
+                self._conn.execute(create_index)
+
+    def mint(self, occupant_id, current_building, entry_time):
+        """Open a pointer for ``occupant_id`` now present at
+        ``current_building``. Idempotent: re-minting the same
+        (occupant, building, entry_time) triple is a no-op via
+        ``INSERT OR REPLACE`` on the deterministic ``visit_id``.
+        """
+        visit_id = f"{occupant_id}:{current_building}:{entry_time}"
+        with self._conn:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO visitor_pointers "
+                "(visit_id, occupant_id, current_building, entry_time, exit_time, status) "
+                "VALUES (?, ?, ?, ?, NULL, 'OPEN')",
+                (visit_id, occupant_id, current_building, entry_time),
+            )
+        return visit_id
+
+    def clear(self, occupant_id, exit_time):
+        """Close the OPEN pointer for ``occupant_id``. If more than one OPEN
+        row somehow exists for the same occupant (a data-integrity anomaly
+        that should be rare given zT enforcement), clear the most-recently
+        -entered one and log a warning rather than silently ignoring it.
+        """
+        cur = self._conn.execute(
+            "SELECT visit_id FROM visitor_pointers WHERE occupant_id = ? AND status = 'OPEN' "
+            "ORDER BY entry_time DESC",
+            (occupant_id,),
+        )
+        rows = cur.fetchall()
+        if not rows:
+            return
+        if len(rows) > 1:
+            log.warning(
+                "PointerStore.clear: %d simultaneous OPEN pointers for occupant %s "
+                "(expected at most 1) -- closing only the most recent (%s)",
+                len(rows), occupant_id, rows[0]["visit_id"],
+            )
+        with self._conn:
+            self._conn.execute(
+                "UPDATE visitor_pointers SET status = 'CLOSED', exit_time = ? WHERE visit_id = ?",
+                (exit_time, rows[0]["visit_id"]),
+            )
+
+    def lookup_open(self, occupant_id):
+        cur = self._conn.execute(
+            "SELECT * FROM visitor_pointers WHERE occupant_id = ? AND status = 'OPEN' "
+            "ORDER BY entry_time DESC LIMIT 1",
+            (occupant_id,),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def lookup_history(self, occupant_id):
+        cur = self._conn.execute(
+            "SELECT * FROM visitor_pointers WHERE occupant_id = ? ORDER BY entry_time",
+            (occupant_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
+# --------------------------------------------------------------------------
+# the interactive identification cascade (ex query_node.py / respond_node.py)
+# --------------------------------------------------------------------------
+#
+# This is the interactive/live-simulation cascade used by DeployedBuilding's
+# own send()/receive() below -- a different surface from the batch Phase
+# 2/3 event-log scripts under pipeline/, which is why it lives here rather
+# than in pipeline/route_and_recognize.py. The handoff step reuses
+# pipeline.recognize.confirm_at_candidate (the same shared vote core as
+# Phase 3's candidate check, ex respond_node.py:respond) instead of
+# duplicating it.
+
+def identify(capture_q, at_node, filters, nodes, contract):
+    """Run the full cascade for one capture. ``capture_q`` is preprocessed (dim,).
+
+    ``filters`` : {building_id: BloomFilter} for the buildings this node can route
+                  to (its own excluded).
+    ``nodes``   : {building_id: BuildingNode} -- the local stand-in for the network;
+                  a real deployment replaces the handoff loop with RPC.
+    """
+    ident = Identification(source="abstain", occupant_id=None, home_building=None,
+                           votes=0, at_building=at_node.building_id)
+
+    # 1. own occupants
+    w, v, ok = vote(at_node.own_refs, capture_q, contract.accept_angle_deg, contract.min_votes)
+    ident.local_votes = v
+    if ok:
+        ident.source = "local"
+        ident.occupant_id = str(at_node.own_ids[w])
+        ident.home_building = at_node.building_id
+        ident.votes = v
+        return ident
+
+    # 2. visitor pool
+    hit = at_node.pool.match(capture_q, contract)
+    if hit is not None:
+        visitor, votes = hit
+        ident.pool_votes = votes
+        ident.source = "pool"
+        ident.occupant_id = visitor.occupant_id
+        ident.home_building = visitor.home_building
+        ident.votes = votes
+        return ident
+
+    # 3. route
+    codes, margins = encode_with_margins(capture_q[None], contract.hyperplanes, contract.params.k)
+    reachable = [b for b in filters if b != at_node.building_id]
+    shortlist, scores = route(codes[0], margins[0], filters, reachable,
+                              contract.space, contract.n_probes, contract.shortlist_k)
+    ident.shortlist = shortlist
+    ident.filter_scores = scores
+
+    # 4. handoff (with zero-trust envelope encryption & signature verification)
+    replies = []
+    for b in shortlist:
+        if at_node.security_handler and hasattr(nodes[b], "security_handler") and nodes[b].security_handler:
+            envelope = at_node.security_handler.seal_handoff_request(
+                source_building=at_node.building_id,
+                dest_building=b,
+                visitor_id="UNRESOLVED_VISITOR",
+            )
+            ok, meta, reason = nodes[b].security_handler.unseal_handoff_request(b, envelope)
+            if not ok:
+                continue
+        r = confirm_at_candidate(capture_q, at_node.building_id, nodes[b], contract)
+        replies.append(r)
+    ident.replies = replies
+
+    # 5. aggregate
+    matched = [r for r in replies if r.matched]
+    if matched:
+        best = max(matched, key=lambda r: r.votes)
+        at_node.pool.admit(Visitor(
+            occupant_id=best.occupant_id, home_building=best.home_building,
+            refs=best.refs, vote_fraction=best.votes / contract.params.refs_per_occupant,
+        ))
+        ident.source = "routed"
+        ident.occupant_id = best.occupant_id
+        ident.home_building = best.home_building
+        ident.votes = best.votes
+        return ident
+
+    # 6. abstain
+    return ident
+
+
 # --------------------------------------------------------------------------
 # the deployed building
 # --------------------------------------------------------------------------
@@ -279,21 +481,22 @@ class DeployedBuilding:
         ``{building_id: DeployedBuilding}`` for (at least) the buildings in
         this folder's ``filters`` -- their ``receive()`` answers the handoff.
 
-        Runs the existing 6-step cascade unchanged (``query_node.identify``):
-        own occupants -> visitor pool -> route -> handoff -> aggregate ->
-        abstain. On anything but abstain, records the result into *this*
-        building's own state DB before returning.
+        Runs the existing 6-step cascade unchanged (this module's own
+        ``identify()``, ex ``query_node.identify``): own occupants -> visitor
+        pool -> route -> handoff -> aggregate -> abstain. On anything but
+        abstain, records the result into *this* building's own state DB
+        before returning.
         """
         q = preprocess(np.asarray(capture_emb, dtype=np.float32)[None], self.contract.mean_face)[0]
         nodes = {bid: p.routing for bid, p in peers.items()}
-        ident = query_node.identify(q, self.routing, self.filters, nodes, self.contract)
+        ident = identify(q, self.routing, self.filters, nodes, self.contract)
         if ident.occupant_id:
             self._record(ident, time=time, zone=zone)
         return ident
 
     # -- RECEIVE: another building is asking "is this one of yours?" --
     def receive(self, capture_q, from_building):
-        return respond_node.respond(capture_q, from_building, self.routing, self.contract)
+        return confirm_at_candidate(capture_q, from_building, self.routing, self.contract)
 
     def _record(self, ident, time=None, zone="z1"):
         """Land ``ident`` in this building's own state: ``registered_state``

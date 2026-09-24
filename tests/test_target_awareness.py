@@ -26,8 +26,14 @@ from security.authorize import (
 from security.campus_policy import (
     CampusRole, register_occupant_role, register_class_roster, clear_campus_registry,
 )
-from dsts.queries import QueryEngine
-from sim.scenario_b1_b5 import run_scenario
+
+# test_5 restructuring: section 5's "QueryEngine Target-Aware Integration
+# Tests" depended on the old toy `dsts.queries.QueryEngine` +
+# `sim.scenario_b1_b5.run_scenario`, both dropped (unused-WIP `sim/` and the
+# synthetic query engine, superseded by the real `pipeline/query.py` engine).
+# That section is dropped along with them; sections 1-4 exercise
+# `security/authorize.py` + `security/campus_policy.py` directly and are
+# unaffected.
 
 
 @pytest.fixture(autouse=True)
@@ -201,93 +207,3 @@ def test_audit_log_target_metadata():
     assert auth_logs[3]["target_id"] == "state_table"
 
 
-# ─── 5. QueryEngine Target-Aware Integration Tests ───────────────────────────
-
-@pytest.fixture(scope="module")
-def sim_engine():
-    result = run_scenario(seed=42)
-    engine = QueryEngine(result.dsts)
-    primary_occ = result.handoff.occupant_id
-    last_time = result.events[-1].sim_time
-    return engine, primary_occ, last_time
-
-
-def test_query_engine_typed_targets(sim_engine):
-    """Verify QueryEngine Q1-Q6 invoke authorize() with proper typed target strings."""
-    engine, primary_occ, last_time = sim_engine
-
-    clear_registry()
-    clear_audit_log()
-    set_enforce_policy(True)
-
-    try:
-        register_node("admin_auditor", Role.ADMIN)
-
-        # Execute Q1 (building target)
-        res_q1 = engine.Q1(building_id="B1", after_time=10.0, principal="admin_auditor")
-        assert res_q1.success is True
-
-        # Execute Q2 (building target)
-        res_q2 = engine.Q2(building_id="B1", at_time=50.0, principal="admin_auditor")
-        assert res_q2.success is True
-
-        # Execute Q6 (occupant target)
-        res_q6 = engine.Q6(occupant_id=primary_occ, at_time=last_time, principal="admin_auditor")
-        assert res_q6.success is True
-
-        logs = get_audit_log()
-        q1_log = [l for l in logs if l.get("target") == "building:B1"]
-        assert len(q1_log) >= 2  # Q1 and Q2
-        assert q1_log[0]["target_type"] == "building"
-        assert q1_log[0]["target_id"] == "B1"
-
-        q6_log = [l for l in logs if l.get("target") == f"occupant:{primary_occ}"]
-        assert len(q6_log) >= 1
-        assert q6_log[0]["target_type"] == "occupant"
-        assert q6_log[0]["target_id"] == primary_occ
-
-    finally:
-        set_enforce_policy(False)
-        clear_registry()
-        clear_audit_log()
-
-
-def test_query_engine_campus_target_blocking(sim_engine):
-    """Verify student principal attempting Q6 on peer occupant is denied by target-aware policy."""
-    engine, primary_occ, last_time = sim_engine
-
-    clear_registry()
-    clear_campus_registry()
-    clear_audit_log()
-    set_enforce_policy(True)
-
-    try:
-        # Register student caller in both RBAC and campus policy
-        register_node("student_charlie", Role.QUERY_CLIENT)
-        register_occupant_role("student_charlie", CampusRole.STUDENT)
-
-        # Register target as peer student
-        register_occupant_role(primary_occ, CampusRole.STUDENT)
-
-        # Charlie queries primary_occ
-        res = engine.Q6(occupant_id=primary_occ, at_time=last_time, principal="student_charlie")
-        assert res.success is False
-        assert res.precision == "DENIED"
-        assert "Access DENIED" in res.evidence[0]
-
-        # Audit log verification
-        logs = get_audit_log()
-        denials = [
-            l for l in logs
-            if l.get("principal") == "student_charlie" and l.get("decision") == "DENY"
-        ]
-        assert len(denials) == 1
-        assert denials[0]["target_type"] == "occupant"
-        assert denials[0]["target_id"] == primary_occ
-        assert "target_occupant_denied_by_policy" in denials[0]["reason"]
-
-    finally:
-        set_enforce_policy(False)
-        clear_registry()
-        clear_campus_registry()
-        clear_audit_log()

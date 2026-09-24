@@ -1,6 +1,7 @@
 import inspect
 import json
 import sqlite3
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,9 +9,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dsts import pipeline
-from dsts.pipeline import CorpusContext, process_event, run, summary
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from pipeline import phase4_state as pipeline
+from pipeline.phase4_state import CorpusContext, process_event, run, summary
 from dsts.legacy_state.zones import ZONES
+from nodelib.deploy import PointerStore
 
 
 def make_building(nodes_dir, building_id, occupant_ids):
@@ -231,6 +238,11 @@ def test_reappearance_redistributes_over_present_pool_and_persists_everyone(tmp_
         context = contexts["building_1"]
         assert set(context.present_visitors) == {"0000009", "0000020"}
 
+        # Simulate the pointer that Phase 3's MINT hook would already have
+        # opened for 0000009 at their zT-entry into building_1.
+        with PointerStore(tmp_path / "building_2" / "state") as pointers:
+            pointers.mint("0000009", "building_1", "08:00:00")
+
         # 0000009 is seen again -- Phase 3 still says so (unchanged), but since
         # they are already present, D must be built from the actual capture
         # (row 4, closely matching 0000009) against the present pool's own
@@ -249,6 +261,14 @@ def test_reappearance_redistributes_over_present_pool_and_persists_everyone(tmp_
         # bystander in the pool and is unaffected by someone else's departure.
         assert "0000009" not in context.present_visitors
         assert "0000020" in context.present_visitors
+
+        # NEW (test_5): departure via zT also closes 0000009's visit pointer
+        # in their HOME building's (building_2) own pointers.db.
+        with PointerStore(tmp_path / "building_2" / "state") as pointers:
+            history = pointers.lookup_history("0000009")
+            assert history and history[-1]["status"] == "CLOSED"
+            assert history[-1]["exit_time"] == "08:10:00"
+            assert pointers.lookup_open("0000009") is None
 
         # Every present visitor was actually persisted for this event's timestamp,
         # not just the Phase-3-confirmed occupant.

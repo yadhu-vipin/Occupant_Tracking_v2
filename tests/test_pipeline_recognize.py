@@ -1,12 +1,18 @@
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from buildinglib.verify import vote
-from recognition.evaluate import evaluate
-from recognition.local import LocalRecognizer
+from pipeline.recognize import LocalRecognizer
 
 
 def fixture_recognizer():
@@ -30,7 +36,7 @@ def event(row, building="building_1"):
 
 
 def test_correct_local_recognition_and_evidence():
-    result = fixture_recognizer().recognize(event(20))
+    result = fixture_recognizer().recognize_locally(event(20))
     assert result.accepted and result.predicted_occupant_id == "0000001"
     assert result.event_id == "E000001" and len(result.candidate_evidence) == 1
     assert len(result.candidate_evidence[0]["reference_angles_deg"]) == 20
@@ -38,7 +44,7 @@ def test_correct_local_recognition_and_evidence():
 
 def test_visitor_is_searched_only_in_current_building_and_rejected():
     # Row 20 belongs to building_1 but the observable event names building_2.
-    result = fixture_recognizer().recognize(event(20, "building_2"))
+    result = fixture_recognizer().recognize_locally(event(20, "building_2"))
     assert not result.accepted and result.predicted_occupant_id is None
     assert result.best_candidate_id == "0000002"
 
@@ -47,7 +53,14 @@ def test_identity_fields_are_rejected_at_recognition_boundary():
     leaky = event(20)
     leaky["occupant_id"] = "0000001"
     with pytest.raises(ValueError, match="observable"):
-        fixture_recognizer().recognize(leaky)
+        fixture_recognizer().recognize_locally(leaky)
+
+
+def test_recognize_alias_matches_recognize_locally():
+    # `.recognize` is kept as an alias for callers migrated from the old
+    # recognition/local.py::LocalRecognizer.recognize.
+    result = fixture_recognizer().recognize(event(20))
+    assert result.accepted and result.predicted_occupant_id == "0000001"
 
 
 def test_vote_threshold_and_tie_breaking():
@@ -57,13 +70,3 @@ def test_vote_threshold_and_tie_breaking():
     # Equal zero votes: the smaller best angle determines the winner.
     winner, votes, accepted = vote(refs, np.array([.7, .7]), 1., 12)
     assert winner == 0 and votes == 0 and not accepted
-
-
-def test_ground_truth_comparison_categories():
-    result = fixture_recognizer().recognize(event(20)).to_dict()
-    truth = [{"event_id": "E000001", "timestamp": "08:00:00", "occupant_id": "0000001",
-              "home_building": "building_1", "current_building": "building_1",
-              "current_zone": "z1", "embedding_row": 20}]
-    rows, metrics = evaluate([result], truth)
-    assert rows[0]["outcome"] == "CORRECT_LOCAL"
-    assert metrics["correct_local_identities"] == 1

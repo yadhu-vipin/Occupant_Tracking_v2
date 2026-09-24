@@ -1,7 +1,10 @@
-"""Physically valid stochastic Stage 1 events using existing corpus TEST rows only."""
+"""Physically valid stochastic Stage 1 events using existing corpus TEST rows only.
+
+This module is the library: ``GenerationConfig`` + ``EventGenerator``. The
+CLI entry point lives in ``pipeline/generate_events.py``.
+"""
 from __future__ import annotations
 
-import argparse
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -178,42 +181,3 @@ def print_report(events, truth, config):
     visitors = sum(item.home_building != item.current_building for item in truth)
     print("\nSUMMARY\n" + "=" * 78)
     print(f"total events: {len(events)}\ntotal occupants: {len(set(item.occupant_id for item in truth))}\nlocal events: {len(events) - visitors}\nvisitor events: {visitors}\nvisitor percentage: {100 * visitors / len(events):.2f}%\nbuildings involved: {len(set(item.current_building for item in truth))}\nunique test embeddings: {len(set(event.embedding_row for event in events))}\nstart timestamp: {events[0].timestamp}\nend timestamp: {events[-1].timestamp}\nrandom seed: {config.seed}")
-
-
-def _normalise_clock(value: str) -> str:
-    """Accept the documented HH:MM shorthand as well as HH:MM:SS."""
-    if len(value) == 5:
-        value = f"{value}:00"
-    datetime.strptime(value, "%H:%M:%S")
-    return value
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Generate Stage 1 events from existing TEST embeddings.")
-    parser.add_argument("--meta", type=Path, default=default_meta_path())
-    parser.add_argument("--emb", type=Path, default=default_emb_path())
-    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent / "output")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--visitor-ratio", type=float, default=.20)
-    parser.add_argument("--min-interval", type=int, default=30,
-                        help="Minimum stochastic interval between this occupant's events, in seconds.")
-    parser.add_argument("--max-interval", type=int, default=180,
-                        help="Maximum stochastic interval between this occupant's events, in seconds.")
-    parser.add_argument("--start-time", default="08:00:00", help="Inclusive HH:MM[:SS] simulation start.")
-    parser.add_argument("--end-time", default="17:00:00", help="Inclusive HH:MM[:SS] simulation end.")
-    parser.add_argument("--events-per-occupant", type=int, default=20)
-    parser.add_argument("--occupant-limit", type=int, default=None)
-    args = parser.parse_args()
-    config = GenerationConfig(seed=args.seed, visitor_ratio=args.visitor_ratio,
-                              min_interval=args.min_interval, max_interval=args.max_interval,
-                              start_time=_normalise_clock(args.start_time),
-                              end_time=_normalise_clock(args.end_time),
-                              events_per_occupant=args.events_per_occupant,
-                              occupant_limit=args.occupant_limit)
-    events, truth = EventGenerator.from_corpus(args.meta, args.emb, config).generate()
-    save_events(events, truth, args.output_dir)
-    print_report(events, truth, config)
-
-
-if __name__ == "__main__":
-    main()

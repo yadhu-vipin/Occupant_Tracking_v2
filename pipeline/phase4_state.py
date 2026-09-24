@@ -10,10 +10,16 @@
 This module only ever reads observable events plus the existing Phase 2/3
 outputs (``recognition_results.json``, ``retrieval_attempts.json``). It never
 reads ``ground_truth.json`` -- ground truth is a Phase 4 *evaluation* concern
-(see ``dsts/evaluate.py``), not a prediction input. Phase 3's own identity
-decision (who is accepted locally, who is confirmed remotely) is never
-changed by this module -- it only decides how to turn that decision into a
-probability distribution and what to persist.
+(see ``pipeline/evaluate_pipeline.py``), not a prediction input. Phase 3's own
+identity decision (who is accepted locally, who is confirmed remotely) is
+never changed by this module -- it only decides how to turn that decision
+into a probability distribution and what to persist.
+
+Also owns the visit-pointer CLEAR hook (test_5): the existing zT-departure
+eviction below (``del context.present_visitors[occupant_id]``) additionally
+closes that occupant's open pointer in their HOME building's own
+``state/pointers.db`` -- see ``nodelib.deploy.PointerStore`` and the MINT
+hook in ``pipeline/route_and_recognize.py``.
 
 Two candidate-set regimes, depending on identity source:
 
@@ -61,10 +67,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from buildinglib._vendored.lsh import preprocess
 from buildinglib.node import load_routing_contract
@@ -75,7 +87,7 @@ from dsts.legacy_state.bsts import StateTable
 from dsts.legacy_state.probability import occupant_probabilities
 from dsts.legacy_state.store import FakeOccupantRegistry
 from dsts.legacy_state.zones import ZONES
-from nodelib.deploy import SplitSqliteStore
+from nodelib.deploy import PointerStore, SplitSqliteStore
 
 EVENT_FIELDS = {"event_id", "timestamp", "current_building", "current_zone", "embedding_row"}
 TRANSITION_ZONE = "zT"
@@ -252,7 +264,15 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         # departure -- the NEXT time they are seen (anywhere), it is a fresh
         # "new visitor" home-gallery lookup, not a present-pool re-match.
         if row["presence_mode"] == "present_visitor_pool" and event["current_zone"] == TRANSITION_ZONE:
+            home_building = context.present_visitors[occupant_id]["home_building"]
             del context.present_visitors[occupant_id]
+            # NEW -- pointer CLEAR hook: the same zT-departure event that
+            # evicts this visitor from the present-visitor pool also closes
+            # their open visit pointer, anchored in the HOME building's own
+            # pointer store (mirrors the MINT hook in
+            # pipeline/route_and_recognize.py, anchored on zT-entry).
+            with PointerStore(Path(nodes_dir) / home_building / "state") as pointers:
+                pointers.clear(occupant_id, exit_time=event["timestamp"])
     except Exception as exc:  # persistence/BSTS-layer failure -- keep the run going
         row["status"] = "PERSISTENCE_ERROR"
         row["error"] = str(exc)
@@ -303,7 +323,7 @@ def summary(rows):
 
 
 def main():
-    here = Path(__file__).resolve().parent.parent
+    here = ROOT
     parser = argparse.ArgumentParser(
         description="Phase 4: Definition 3.3 probability generation + BSTS state integration."
     )

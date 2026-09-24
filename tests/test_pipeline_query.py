@@ -1,8 +1,9 @@
 """
-buildings_prototype/tests/test_query_engine.py — Query Engine Tests (Q1, Q2, Q3, Q5, Q6)
-==========================================================================================
-Tests the real Phase 4 query engine (query_engine.py) against a small, deterministic
-in-memory event log -- no dependency on the full pipeline having been run.
+tests/test_pipeline_query.py — Query Engine Tests (Q1, Q2, Q3, Q5, Q6, TRACK)
+==============================================================================
+Tests the real Phase 4 query engine (pipeline/query.py) against a small,
+deterministic in-memory event log -- no dependency on the full pipeline
+having been run.
 """
 
 import sys
@@ -15,7 +16,8 @@ PROTO_DIR = HERE.parent
 if str(PROTO_DIR) not in sys.path:
     sys.path.insert(0, str(PROTO_DIR))
 
-from query_engine import IdentifiedEvent, QueryEngine
+from pipeline.query import IdentifiedEvent, QueryEngine
+from nodelib.deploy import PointerStore
 from security import authorize as az
 
 
@@ -153,3 +155,52 @@ def test_rbac_permits_registered_query_client():
     engine = _fixture_engine(principal="console", enforce_rbac=True)
     qr = engine.Q1("building_1", "08:00:00")  # registration happens in __init__
     assert qr.success
+
+
+# ─── NEW (test_5): pointer consultation ────────────────────────────────────
+
+def test_q6_answers_from_open_pointer_without_full_scan(tmp_path):
+    """An OPEN pointer at the occupant's home building answers Q6 directly,
+    without needing that event to even be in the Phase 4 log."""
+    registry = {"building_1": {"A"}, "building_2": {"C"}}
+    engine = QueryEngine([], registry, enforce_rbac=False, nodes_dir=tmp_path)
+    with PointerStore(tmp_path / "building_1" / "state") as pointers:
+        pointers.mint("A", "building_2", "09:00:00")
+
+    qr = engine.Q6("A", "10:00:00")
+    assert qr.success
+    assert qr.answer["building"] == "building_2"
+    assert qr.answer["source"] == "pointer_redirect"
+    assert any("Pointer redirect" in line for line in qr.evidence)
+
+
+def test_q6_ignores_pointer_minted_after_query_time(tmp_path):
+    registry = {"building_1": {"A"}}
+    engine = QueryEngine(
+        [IdentifiedEvent("E1", "08:00:00", "building_1", "z1", "A", "building_1", 0.9, None,
+                        "local_registered_gallery")],
+        registry, enforce_rbac=False, nodes_dir=tmp_path,
+    )
+    with PointerStore(tmp_path / "building_1" / "state") as pointers:
+        pointers.mint("A", "building_2", "12:00:00")
+
+    qr = engine.Q6("A", "09:00:00")   # before the pointer's own entry_time
+    assert qr.success
+    assert qr.answer["building"] == "building_1"   # falls back to the full-log scan
+
+
+def test_track_merges_closed_pointer_history(tmp_path):
+    registry = {"building_1": {"A"}}
+    engine = QueryEngine(
+        [IdentifiedEvent("E1", "08:00:00", "building_1", "z1", "A", "building_1", 0.9, None,
+                        "local_registered_gallery")],
+        registry, enforce_rbac=False, nodes_dir=tmp_path,
+    )
+    with PointerStore(tmp_path / "building_1" / "state") as pointers:
+        pointers.mint("A", "building_2", "09:00:00")
+        pointers.clear("A", "10:00:00")
+
+    result = engine.track("A")
+    assert "pointer_history" in result
+    assert result["pointer_history"][0]["status"] == "CLOSED"
+    assert result["pointer_history"][0]["current_building"] == "building_2"

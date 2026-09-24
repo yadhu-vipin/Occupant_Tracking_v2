@@ -25,8 +25,15 @@ from security.campus_policy import (
     register_class_roster, clear_campus_registry,
     register_designated_location, check_office_presence,
 )
-from dsts.queries import QueryEngine, QueryResult
-from sim.scenario_b1_b5 import run_scenario
+
+# test_5 restructuring: the old toy `dsts.queries.QueryEngine` +
+# `sim.scenario_b1_b5.run_scenario` this file's "QueryEngine Integration
+# Tests" section depended on were dropped as part of test_5 (unused-WIP
+# `sim/` and the synthetic `dsts.queries` engine, superseded by the real
+# `pipeline/query.py` engine over actual Phase-4 output). Those
+# QueryEngine-integration tests are dropped here along with them; the
+# policy-matrix and contextual-purpose tests below exercise
+# `security/campus_policy.py` directly and are unaffected.
 
 
 @pytest.fixture(autouse=True)
@@ -186,109 +193,8 @@ def test_visitor_matrix_rules():
     assert v4.access == AccessScope.NONE
 
 
-# ─── 2. QueryEngine Integration Tests ─────────────────────────────────────────
-
-@pytest.fixture(scope="module")
-def sim_engine():
-    """Run deterministic B1->B5 scenario once for all tests."""
-    result = run_scenario(seed=42)
-    engine = QueryEngine(result.dsts)
-    primary_occ = result.handoff.occupant_id
-    last_time = result.events[-1].sim_time
-    return engine, primary_occ, last_time, result
-
-
-def test_query_engine_self_query(sim_engine):
-    """Self-query on Q6 always resolves to EXACT precision."""
-    engine, primary_occ, last_time, _ = sim_engine
-
-    # Occupant queries themselves
-    res = engine.Q6(occupant_id=primary_occ, at_time=last_time, caller_id=primary_occ)
-    assert res.success is True
-    assert res.precision == "EXACT"
-    assert "zone_label" in res.answer
-
-
-def test_query_engine_student_peer_denial(sim_engine):
-    """Student querying peer student is DENIED."""
-    engine, primary_occ, last_time, _ = sim_engine
-
-    # Register primary occupant as student, caller as another student
-    register_occupant_role(primary_occ, CampusRole.STUDENT)
-    register_occupant_role("peer_student", CampusRole.STUDENT)
-
-    res = engine.Q6(occupant_id=primary_occ, at_time=last_time, caller_id="peer_student")
-    assert res.success is False
-    assert res.answer is None
-    assert res.precision == "DENIED"
-    assert "Access DENIED by campus privacy policy" in res.evidence[0]
-
-
-def test_query_engine_student_querying_teacher(sim_engine):
-    """Student querying teacher on Q6 gets L1 PRESENCE (cabin availability record)."""
-    engine, primary_occ, last_time, _ = sim_engine
-
-    register_occupant_role(primary_occ, CampusRole.TEACHER)
-    register_occupant_role("inquiring_student", CampusRole.STUDENT)
-
-    res = engine.Q6(occupant_id=primary_occ, at_time=last_time, caller_id="inquiring_student")
-    assert res.success is True
-    assert res.precision == "PRESENCE"
-    assert "availability" in res.answer
-    assert "is_present" in res.answer
-    assert "designated_location" in res.answer
-
-
-def test_query_engine_trajectory_denial_on_current_access(sim_engine):
-    """Caller with 'current' access is blocked from full_track queries like Q5."""
-    engine, primary_occ, _, _ = sim_engine
-
-    register_occupant_role(primary_occ, CampusRole.TEACHER)
-    register_occupant_role("inquiring_student", CampusRole.STUDENT)
-
-    # Student has 'current' access to teacher, so Q5 (visited all zones trajectory) must be DENIED
-    res = engine.Q5(occupant_id=primary_occ, building_id="B1", caller_id="inquiring_student")
-    assert res.success is False
-    assert res.precision == "DENIED"
-    assert "requires 'full_track' trajectory access" in res.evidence[0]
-
-
-def test_query_engine_dean_full_trajectory_granted(sim_engine):
-    """Dean has 'full_track' access and gets EXACT precision on student trajectory (Q5)."""
-    engine, primary_occ, _, _ = sim_engine
-
-    register_occupant_role(primary_occ, CampusRole.STUDENT)
-    register_occupant_role("campus_dean", CampusRole.DEAN)
-
-    res = engine.Q5(occupant_id=primary_occ, building_id="B1", caller_id="campus_dean")
-    assert res.success is True
-    assert res.precision == "EXACT"
-    assert "Internal zones:" in "\n".join(res.evidence)
-
-
-def test_query_engine_teacher_roster_access(sim_engine):
-    """Teacher gets current/zone on student during campus hours, but denied on trajectory (Q5)."""
-    engine, primary_occ, last_time, _ = sim_engine
-
-    register_occupant_role(primary_occ, CampusRole.STUDENT)
-    register_occupant_role("prof_adams", CampusRole.TEACHER)
-
-    # 1. Point-in-time location (Q6): PERMITTED with COARSE precision (Current / Zone)
-    res_q6 = engine.Q6(occupant_id=primary_occ, at_time=last_time, caller_id="prof_adams")
-    assert res_q6.success is True
-    assert res_q6.precision == "COARSE"
-    assert "sector" in res_q6.answer
-
-    # 2. Trajectory query (Q5): DENIED (Teacher is limited to L2_CURRENT_ZONE, requires L4)
-    res_q5 = engine.Q5(occupant_id=primary_occ, building_id="B1", caller_id="prof_adams")
-    assert res_q5.success is False
-    assert res_q5.precision == "DENIED"
-
-
-def test_presence_access_and_designated_office(sim_engine):
+def test_presence_access_and_designated_office():
     """Verify AccessScope.PRESENCE checks designated office/cabin without leaking coordinates."""
-    engine, primary_occ, last_time, _ = sim_engine
-
     # Register designated office for dean
     register_designated_location("dean_01", "z3", label="Dean's Executive Office")
     
