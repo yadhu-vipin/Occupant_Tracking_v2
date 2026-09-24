@@ -1,6 +1,7 @@
 # python
 __pycache__/
 *.py[cod]
+.venv/
 
 # the shared corpus -- large, drop-in by whoever runs this
 corpus/*.npy
