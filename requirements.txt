@@ -1,3 +1,4 @@
 # Self-contained -- no face model, no GPU, no torch. Pure NumPy / pandas.
 numpy==2.5.2
 pandas==3.0.5
+cryptography==50.0.1
