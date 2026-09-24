@@ -17,7 +17,7 @@ root itself. The ~15 loose top-level scripts that used to exist here
 `dsts/evaluate.py`) have been consolidated into six single-purpose files
 under `pipeline/`. Unused WIP (`sim/`, the synthetic `dsts/queries.py`
 engine, `identify/`, `monitoring/`, the old demo/RBAC scripts) was dropped
-entirely. See `FILE_CATALOG.md` for the full before/after inventory.
+entirely.
 
 ## 0. Prerequisites
 
