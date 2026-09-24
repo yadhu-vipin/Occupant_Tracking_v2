@@ -15,6 +15,9 @@ nodes/**/*.db-shm
 recognition/output/*.json
 retrieval/output/*.json
 centralized/output/*.json
+events/output/*.json
+dsts/output/*.json
+evaluate_pipeline/output/*.json
 
 # scratch topology-scaling experiments (2/5-building regroupings for comparison)
 variants/

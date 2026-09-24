@@ -17,8 +17,8 @@
     "building_9",
     "building_10"
   ],
-  "generated_at": "2026-09-11",
-  "generator": "generate_nodes.py",
+  "generated_at": "2026-09-24",
+  "generator": "pipeline/enroll_and_broadcast.py",
   "n_occupants": 50,
   "occupant_ids": [
     "0000144",
@@ -74,6 +74,7 @@
   ],
   "params_hash": "27dbe4084f0b5c67d132298ef693e52e856fad4b12fa354a68d75a75d369f074",
   "state": {
+    "pointers_db": "state/pointers.db",
     "registered_db": "state/registered.db",
     "visitor_db": "state/visitor.db"
   },
