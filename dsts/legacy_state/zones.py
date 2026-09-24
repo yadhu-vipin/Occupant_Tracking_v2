@@ -63,6 +63,43 @@ def zone_hops(start: str, target: str) -> int:
     raise ValueError(f"No path between {start} and {target}")
 
 
+# Human-readable labels + functional sectors (ex ``dsts/zones.py``, ported
+# here -- keyed on this module's own "zT" spelling rather than "z_T").
+ZONE_LABELS = {
+    "z1": "Entrance",
+    "z2": "Mail Room",
+    "z3": "Office",
+    "z4": "Lounge",
+    "z5": "Conference Room",
+    "z6": "Class Room",
+    "z7": "Cafeteria",
+    "z8": "Exit",
+    "zT": "Transition Zone",
+}
+
+ZONE_SECTORS = {
+    "z1": "Circulation & Access Hub",
+    "z2": "Common Amenities Wing",
+    "z3": "Work & Study Wing",
+    "z4": "Common Amenities Wing",
+    "z5": "Work & Study Wing",
+    "z6": "Work & Study Wing",
+    "z7": "Common Amenities Wing",
+    "z8": "Circulation & Access Hub",
+    "zT": "Campus Grounds & Transit",
+}
+
+
+def zone_label(zone: str) -> str:
+    """Human-readable label for a zone (from paper diagram)."""
+    return ZONE_LABELS.get(zone, zone)
+
+
+def zone_sector(zone: str) -> str:
+    """Return the functional single-floor sector for a given zone."""
+    return ZONE_SECTORS.get(zone, "Building Interior")
+
+
 def validate() -> None:
     """Validate the configured zone graph."""
     if len(ZONES) != 9:
