@@ -9,8 +9,8 @@ Two files, distributed out-of-band (they are git-ignored, not in the repo):
 
 Once both are here, every CLI in `buildings/` finds them automatically:
 
-    python build_building.py --building-id building_3
-    python query_node.py --capture-row 16020 --at building_1
+    python pipeline/enroll_and_broadcast.py --building-id building_3
+    python -m nodelib.deploy
 
 Either shipped copy of `meta.csv` works (`artifacts/meta.csv` has occupant_id as
 an int, `embeddings_arcface/meta.csv` as a zero-padded string — the code
