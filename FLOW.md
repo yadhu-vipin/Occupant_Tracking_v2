@@ -1,7 +1,18 @@
-# FLOW — `buildings_prototype/`
+# FLOW — this repo (test_5)
 
 What this folder is, what every file in it does, what running it produces, and
 what is deliberately not built yet.
+
+> **test_5 restructuring note:** this file predates the full 7-step
+> event/recognition/retrieval/state/query pipeline described in `README.md`
+> and `RUNBOOK.md` — it originally documented only the enrollment + low-level
+> routing/deployment machinery (`buildinglib/`, `nodelib/`). That machinery
+> is still exactly what's described below, just consolidated behind
+> `pipeline/enroll_and_broadcast.py` and `pipeline/route_and_recognize.py`
+> instead of the standalone `build_building.py`/`generate_nodes.py`/
+> `query_node.py`/`respond_node.py` scripts this file originally named. For
+> the full pipeline (events, recognition, retrieval, RBAC-gated querying,
+> evaluation) see `README.md`; for the exact run order see `RUNBOOK.md`.
 
 ---
 
@@ -12,11 +23,12 @@ A self-contained, 10-building prototype of the federated identification system:
     occupant embeddings -> Bloom filter (per building)  -> published, one-way
     a captured face      -> local vote -> visitor pool -> route -> handoff -> identified
     an identification    -> written into the RIGHT building's own state database
+    a visitor confirmed elsewhere -> a visit-pointer sent to their home building (new)
 
 It needs nothing outside this folder except `corpus/emb_arcface.npy` +
 `corpus/meta.csv` (the shared embedding corpus, dropped in separately — see
-`corpus/README.md` if present, or just: 20,000 x 512 ArcFace embeddings + the
-row labels). Everything else — the library, the contract, the CLIs — is here.
+`corpus/README.md`: 20,000 x 512 ArcFace embeddings + the row labels).
+Everything else — the library, the contract, the CLIs — is here.
 
 ---
 
@@ -24,14 +36,19 @@ row labels). Everything else — the library, the contract, the CLIs — is here
 
 | piece | status |
 |---|---|
-| Enrollment (embeddings -> Bloom filter) | **done**, bit-identical to the original pipeline |
-| Routing cascade (capture -> identification) | **done**, verified against the original pipeline (40/40 shortlists + winners match) |
-| Per-building deployment folders (`nodes/`) | **done** — each building is a real folder: own embeddings, one shared config, the other 9 filters, two state DBs |
-| send() / receive() | **done** — `send()` runs the full cascade and records the result into the sender's own state DB |
+| Enrollment (embeddings -> Bloom filter) | **done** — `pipeline/enroll_and_broadcast.py` |
+| Routing cascade (capture -> identification) | **done** — `pipeline/route_and_recognize.py` |
+| Per-building deployment folders (`nodes/`) | **done** — each building is a real folder: own embeddings, one shared config, the other 9 filters, three state DBs (incl. `pointers.db`) |
+| send() / receive() | **done** — `nodelib.deploy.DeployedBuilding.send()` runs the full cascade (via `pipeline.recognize.confirm_at_candidate`) and records the result into the sender's own state DB |
 | State layer wiring (BSTS -> SQLite) | **done** — a match lands a real probability row in `registered.db` or `visitor.db` |
-| Standalone packaging | **done** — this folder, copy-anywhere, no path outside it |
+| Full event/recognition/retrieval/state pipeline (Phases 1-4) | **done** — see `README.md`, run via `pipeline/generate_events.py` -> `pipeline/route_and_recognize.py` -> `pipeline/phase4_state.py` |
+| Visit-pointer cross-building location index | **done**, new in test_5 — `nodelib.deploy.PointerStore`, minted on a confirmed non-home match at `zT`, cleared on departure |
+| Q1-Q7 + TRACK query engine, two-layer RBAC | **done** — `pipeline/query.py` |
+| Unified end-to-end evaluation | **done** — `pipeline/evaluate_pipeline.py` |
+| Automated test suite | **done** — 93 tests, `python -m pytest -q` |
+| Standalone packaging | **done** — this repo root, copy-anywhere, no path outside it |
 
-See §5 for what is **not** done.
+See §5 for what is genuinely **not** done.
 
 ---
 
@@ -41,14 +58,14 @@ See §5 for what is **not** done.
 
 | file | what it does |
 |---|---|
-| `build_building.py` | CLI. `--building-id X` or `--all`. Reads the full corpus, slices out one building, enrolls its occupants into a Bloom filter, writes `out/<building>.npz` + a manifest. This is the enrollment deliverable. |
-| `generate_nodes.py` | CLI. `--building-id X` or `--all`. Builds a `nodes/<building>/` folder: that building's own raw embeddings, its cached voting tensor, one merged config (byte-identical everywhere), the other 9 buildings' filters copied in from `out/`, and two empty state DBs. Requires `out/*.npz` to already exist. |
-| `query_node.py` | The querying side of the cascade. `identify(capture, at_node, filters, nodes, contract)`: vote against own occupants -> visitor pool -> route against the 9 filters -> hand off to the shortlisted buildings -> aggregate the best reply -> abstain if nobody matched. Also a standalone CLI (`--capture-row N --at building_X`) for testing against the raw corpus directly. |
-| `respond_node.py` | The receiving side. `respond(capture, from_building, node, contract)`: votes the capture against *that* building's own occupants; on a match, replies with the occupant id, vote count, and their 20 reference vectors. Also a standalone CLI. |
+| `pipeline/enroll_and_broadcast.py` | CLI. `--building-id X` or `--all`. Reads the full corpus, slices out one building, enrolls its occupants into a Bloom filter, writes `out/<building>.npz` + a manifest, **and** builds that building's `nodes/<building>/` deployment folder (own raw embeddings, cached voting tensor, merged config, the other 9 buildings' filters copied in, three empty state DBs) in the same step. Merges what used to be two separate scripts (`build_building.py` then `generate_nodes.py`). |
+| `pipeline/route_and_recognize.py` | The querying side of the cascade, as a two-phase CLI. `--phase 2`: vote against `current_building`'s own occupants (own-gallery check). `--phase 3`, for local rejections only: route against the 9 peer filters (`buildinglib.route.route`) -> query shortlisted buildings in rank order via `pipeline.recognize.confirm_at_candidate` -> stop at first confirmed match, or exhaust the shortlist unresolved. Mints a visit-pointer to the home building on a confirmed non-home match at zone `zT`. Supersedes the old standalone `query_node.py`. |
+| `pipeline/recognize.py` | Library (no CLI) — the actual vote-based recognition logic (`buildinglib.verify.vote_evidence`-driven), shared by both Phase 2's own-gallery check and Phase 3's `confirm_at_candidate` candidate check. On a match, `confirm_at_candidate` returns the occupant id, vote count, per-candidate distance evidence, and their 20 reference vectors. Supersedes the old standalone `respond_node.py`. |
 | `verify_building.py` | CLI. Reloads a published `out/*.npz`, re-derives it from source, asserts the bits are bit-identical. The "is this artifact really what the data produces" check. |
 | `merge_check.py` | CLI. Given a set of `out/*.npz`, asserts they all share one `params_hash` (so they're actually compatible) and prints a size/fill-ratio summary table. |
-| `requirements.txt` | `numpy` + `pandas`. Nothing else — no face model, no GPU. |
-| `README.md`, `PIPELINE.md` | The full narrative docs: the federation contract, the cascade step by step, the deployment-folder layout, worked examples. |
+| `build_campus_roles.py` | CLI. (Re)generates the RBAC role registry (`variants/rbac10/*.json`) `pipeline/query.py` needs — 1 dean + 10 teachers + 39 students per building, deterministic given `seed=42`. Gitignored output; run once before using `pipeline.query`. |
+| `requirements.txt` | `numpy`, `pandas`, `cryptography`. No face model, no GPU. |
+| `README.md`, `FLOW.md`, `PIPELINE.md`, `RUNBOOK.md` | The full narrative docs: the federation contract, the cascade step by step, the deployment-folder layout, worked examples, and the copy-paste run checklist. |
 
 ### `buildinglib/` — enrollment + routing library
 
@@ -64,21 +81,23 @@ See §5 for what is **not** done.
 | `route.py` | `probe_items()` + `route()` — encodes a capture's LSH codes, multi-probes them against a set of Bloom filters, returns the top-`shortlist_k` buildings by match score. |
 | `node.py` | The routing runtime types: `RoutingContract` (+ `load_routing_contract()`), `BuildingNode`, `Visitor`, `VisitorPool`, `Reply`, `Identification`. |
 
-### `nodelib/` — the deployment-folder glue (new)
+### `nodelib/` — the deployment-folder glue
 
 | file | what it does |
 |---|---|
-| `deploy.py` | Everything needed to turn a folder into a running building: `write_node_config()` / `load_node_contract()` (the merged `config.json`), `SplitSqliteStore` (two SQLite files instead of one, routed by `registry.is_registered()`), and `DeployedBuilding` — `.load(folder)`, `.send(capture, peers)`, `.receive(capture, from_building)`, `._record(...)`. Run directly (`python -m nodelib.deploy`) for an end-to-end demo. |
+| `deploy.py` | Everything needed to turn a folder into a running building: `write_node_config()` / `load_node_contract()` (the merged `config.json`), `SplitSqliteStore` (two SQLite files instead of one, routed by `registry.is_registered()`), `PointerStore` (new — `mint()`/`clear()`/`lookup_open()`/`lookup_history()` over `pointers.db`), and `DeployedBuilding` — `.load(folder)`, `.send(capture, peers)`, `.receive(capture, from_building)`, `._record(...)`. `send()` now calls into `pipeline.recognize.confirm_at_candidate` for the vote instead of the dropped standalone `respond_node.py`. Run directly (`python -m nodelib.deploy`) for an end-to-end demo. |
 
-### `dsts/state/` — the building's probabilistic state layer (untouched, reused as-is)
+### `dsts/legacy_state/` — the building's probabilistic state layer (untouched, reused as-is)
 
 | file | what it does |
 |---|---|
 | `zones.py` | The 9 zones (`z1`..`z8`, `zT`) and their adjacency graph. |
 | `bsts.py` | `StateTable` — keeps every occupant's probability distribution over zones (always summing to 1) and updates it when a recognition event comes in (`.apply()`). |
-| `store.py` | Storage abstractions: `StateRow`, the `StateStore` protocol, `FakeOccupantRegistry`, `InMemoryStore`, `SqliteStore` (single-file version — `nodelib` uses its own two-file variant, `SplitSqliteStore`, instead). |
-| `schema.sql` | The two table definitions (`registered_state`, `visitor_state`) — the single source of DDL truth for `nodelib.deploy.SplitSqliteStore` too. |
-| `queries.py` | `point_probability()`, `was_present()`, `known_occupant()` — read helpers over a `StateStore`. |
+| `store.py` | Storage abstractions: `StateRow`, the `StateStore` protocol, `FakeOccupantRegistry`, `InMemoryStore`, `SqliteStore` (single-file version — `nodelib` uses its own multi-file variant, `SplitSqliteStore`, instead). |
+| `schema.sql` | The table definitions (`registered_state`, `visitor_state`, and — new in test_5 — `visitor_pointers`) — the single source of DDL truth for `nodelib.deploy.SplitSqliteStore`/`PointerStore` too. |
+| `probability.py` | Definition 3.3: `occupant_probabilities(distances)`, the Gaussian/RBF formula turning biometric distance evidence into an identity probability distribution. |
+
+(A duplicate `dsts/zones.py`/`dsts/queries.py` pair and a synthetic, non-corpus-backed `dsts.DSTS`/`dsts.BSTS` engine used only by dropped demo/test scaffolding existed pre-test_5 and were removed — `dsts/legacy_state/` above is the one real state layer now.)
 
 ### `shared/` — the federation contract
 
@@ -99,7 +118,7 @@ See §5 for what is **not** done.
 
 ## 4. What the output is
 
-### `out/building_N.npz` + `out/building_N.manifest.json` (from `build_building.py`)
+### `out/building_N.npz` + `out/building_N.manifest.json` (from `pipeline/enroll_and_broadcast.py`)
 
 The **enrollment deliverable** — one per building, ~10 KB each:
 
@@ -110,7 +129,7 @@ The **enrollment deliverable** — one per building, ~10 KB each:
 
 The manifest is the same scalars in readable JSON, so a re-push shows up in a diff as *what* changed.
 
-### `nodes/building_N/` (from `generate_nodes.py`)
+### `nodes/building_N/` (from `pipeline/enroll_and_broadcast.py`, same step as above)
 
 The **deployment folder** — a building as an actual, runnable thing:
 
@@ -128,10 +147,12 @@ filters/                    the OTHER 9 buildings' Bloom filters (copied from ou
 state/
   registered.db               table registered_state -- starts EMPTY
   visitor.db                   table visitor_state -- starts EMPTY
+  pointers.db                  table visitor_pointers -- starts EMPTY (new)
 ```
 
-The two `.db` files are empty until something is actually identified at that
-building — they fill in as you run `send()`.
+The three `.db` files are empty until something is actually identified at that
+building — they fill in as you run `send()` or the full `pipeline/route_and_recognize.py`
+-> `pipeline/phase4_state.py` sequence.
 
 ### A `send()` call, at runtime
 
@@ -159,27 +180,30 @@ in the building that actually saw the person.
 
 ## 5. What is not done / not created
 
-- **No real network.** `send()` calling a peer's `receive()` is a direct
-  in-process Python call, not RPC/HTTP/sockets. The code is structured along
-  that seam (`query_node` / `respond_node`) so it can be split later, but
-  nothing currently crosses a process boundary.
-- **No "visitor left the building" logic.** `VisitorPool.depart()` exists and
-  works, but nothing decides *when* to call it — a pooled visitor stays until
-  you evict them yourself.
-- **No zone/movement simulation.** Each `send()` records one event at one
-  zone you pass in (`zone="z1"` by default). There is no synthesis of a
-  visitor moving between zones over time, and `zone_hops()`/adjacency is not
-  used by anything here.
-- **`dsts/building/` and `dsts/simulation/` are not included.** The original
-  interactive demo and its name-colliding `BuildingNode` were left out of this
-  prototype on purpose — `nodelib` composes `FakeOccupantRegistry` + a state
-  store + `StateTable` directly instead.
-- **No automated test suite for the new code.** Verification so far is manual
-  smoke runs (`python -m nodelib.deploy`, the CLIs' own checks) — no `pytest`
-  file covers `nodelib` or the deployment folders.
-- **No concurrent-visitor comparison exercised.** `VisitorPool.match()`
-  already votes a new capture against *every* pooled visitor at once, but this
-  has not been run with more than one visitor in a pool at the same time.
+Most of the gaps this section originally listed (zone/movement simulation, an
+automated test suite, exercised concurrent-visitor re-matching, "visitor left"
+logic) are now done — see §2 above and `README.md`. What's genuinely still
+not built, as of test_5:
+
+- **No real network.** `route_and_recognize.py --phase 3` calling a peer's
+  `pipeline.recognize.confirm_at_candidate` is a direct in-process Python
+  call, not RPC/HTTP/sockets. Nothing currently crosses a process boundary —
+  this remains true throughout the whole restructuring, by design (see
+  `PIPELINE.md` §9.3 on the privacy tradeoff this enables).
 - **No real face capture.** "A capture" is always a row already sitting in
   `corpus/emb_arcface.npy` — there is no camera, no face detector, no live
-  embedding extraction anywhere in this folder.
+  embedding extraction anywhere in this repo.
+- **No real-world scale validation.** Every measured number is on the
+  synthetic 500-occupant/10-building corpus; whether accuracy/routing/pointer
+  numbers hold at real deployment scale (thousands of occupants, dozens+ of
+  buildings) is unmeasured.
+- **RBAC/DSTS formalism integration with the base paper is only partial.**
+  The routing/identification/query work is measured in depth; explicitly
+  mapping the routing mechanism onto the base paper's own state-table/event
+  notation (replacing its Section 3.2 example) is not done.
+- **`nodelib.deploy`'s own `send()`/`receive()` demo path is a separate,
+  earlier mechanism from the main pipeline**, not a gap exactly, but worth
+  knowing: it's a standalone way to exercise one identification end-to-end
+  without running the full 7-step pipeline, and it stays deliberately
+  unmodified apart from calling into the shared `pipeline.recognize` vote
+  logic.

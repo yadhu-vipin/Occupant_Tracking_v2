@@ -1,10 +1,19 @@
-# `buildings_prototype/` — the complete pipeline
+# This repo (test_5) — the complete pipeline
+
+> **test_5 restructuring note:** this describes the enrollment/routing/
+> deployment mechanisms, which are unchanged in behavior — only the CLI
+> entry points moved. `build_building.py` + `generate_nodes.py` merged into
+> `pipeline/enroll_and_broadcast.py`; `query_node.py`/`respond_node.py`
+> merged into `pipeline/route_and_recognize.py` + `pipeline/recognize.py`.
+> This file predates the events/recognition/retrieval/query layers entirely
+> — see `README.md` for those, and `RUNBOOK.md` for the current run order.
 
 Everything a teammate needs: what they pull, what they run, what comes out, how
 every file works, and why each guardrail exists.
 
-This folder is fully standalone — it does not import from or run inside the
-original research repo (`Occupant_Tracking_v2/lane_a/`) it was extracted from.
+This repo is fully standalone — it does not import from or run inside a
+larger multi-lane project it was originally extracted from and later
+promoted out of (`buildings_prototype/` became the repo root in test_5).
 A few `__main__` blocks noted below are the exception: they cross-check this
 package's output against that original pipeline and only run from inside it —
 harmless to skip, and called out where they appear.
@@ -12,14 +21,15 @@ harmless to skip, and called out where they appear.
 The package has three parts:
 
 - **§0–§8 — Enrollment.** Your building's occupant embeddings → one publishable
-  Bloom filter.
+  Bloom filter. Now `pipeline/enroll_and_broadcast.py`.
 - **§9 — Routing.** A captured face → an identification (local, cached, or routed
-  to another building).
+  to another building). Now `pipeline/route_and_recognize.py` + `pipeline/recognize.py`.
 - **§10 — Deployment folders.** Turning each building into an actual folder on
   disk — its own embeddings, a shared config, the other 9 filters, and state
-  databases that fill in as people get identified.
+  databases (including the new `pointers.db`) that fill in as people get
+  identified. Built by the same `pipeline/enroll_and_broadcast.py` as §0–§8.
 
-For a plain status report — what's built, what isn't — see `Flow.md`.
+For a plain status report — what's built, what isn't — see `FLOW.md`.
 
 ---
 
@@ -48,10 +58,8 @@ into a face, and it stores no names or paths.
 ## 1. What you pull from git
 
 ```
-buildings_prototype/
-├── README.md                  quickstart
-├── PIPELINE.md                this file
-├── requirements.txt           -r ../requirements.txt   (numpy + pandas only)
+├── README.md, FLOW.md, PIPELINE.md, RUNBOOK.md   docs
+├── requirements.txt           numpy + pandas + cryptography
 ├── .gitignore
 │
 ├── corpus/                    ← YOU drop the shared data here (git-ignored)
@@ -63,7 +71,7 @@ buildings_prototype/
 │   ├── mean_face.npy          (1, 512) float32 — the centering vector
 │   └── README.md              "do not edit these"
 │
-├── buildinglib/               the implementation
+├── buildinglib/               the implementation (unchanged)
 │   ├── __init__.py
 │   ├── params.py              load + verify the contract; guard the vendored copies
 │   ├── split.py               carve the corpus down to one building
@@ -77,15 +85,19 @@ buildings_prototype/
 │       ├── lsh.py             the LSH primitives — vendored, self-contained
 │       └── bloom.py           the Bloom filter — vendored, self-contained
 │
-├── build_building.py          ← enrollment CLI
+├── pipeline/
+│   ├── enroll_and_broadcast.py  ← enrollment CLI (§0-8) + deployment-folder build (§10),
+│   │                              merging what used to be build_building.py + generate_nodes.py
+│   ├── route_and_recognize.py   ← routing: --phase 2/3 identify a captured face   (§9)
+│   ├── recognize.py             ← routing: the vote-and-reply logic itself        (§9)
+│   ├── generate_events.py, phase4_state.py, query.py, evaluate_pipeline.py    the rest of the pipeline, see README.md
+│
 ├── verify_building.py         re-derive from source, assert identical
 ├── merge_check.py             the merge gate
-├── query_node.py              ← routing: identify a captured face               (§9)
-├── respond_node.py            ← routing: one building's vote-and-reply           (§9)
-├── generate_nodes.py          ← build a nodes/building_N/ deployment folder      (§10)
+├── build_campus_roles.py      (re)generate the RBAC role registry
 ├── nodelib/
-│   └── deploy.py              DeployedBuilding: send() / receive() / state       (§10)
-├── dsts/state/                zones, the BSTS probability table, SQLite storage (§10)
+│   └── deploy.py              DeployedBuilding: send() / receive() / state, PointerStore  (§10)
+├── dsts/legacy_state/          zones, the BSTS probability table, SQLite storage (§10)
 │
 ├── out/                       ← the deliverables. COMMITTED.
 │   ├── building_1.npz         …plus building_2 … building_10, already built
@@ -115,18 +127,17 @@ team sends it over whatever channel you use for large files.
 **Drop both into `corpus/`:**
 
 ```
-buildings_prototype/
 ├── corpus/
 │   ├── emb_arcface.npy    ← here
 │   └── meta.csv           ← and here
-├── build_building.py
-├── query_node.py
+├── pipeline/
 └── ...
 ```
 
-Every CLI (`build_building.py`, `verify_building.py`, `query_node.py`,
-`respond_node.py`, `generate_nodes.py`) then finds them there with no flags.
-Override with `--emb PATH --meta PATH` if you keep them elsewhere.
+Every CLI (`pipeline/enroll_and_broadcast.py`, `verify_building.py`,
+`pipeline/route_and_recognize.py`, `pipeline/generate_events.py`) then finds
+them there with no flags. Override with `--emb PATH --meta PATH` if you keep
+them elsewhere.
 
 `meta.csv`'s `occupant_id` column may be an int (`147`) or a zero-padded string
 (`"0000147"`) — `split.py` normalises it either way, so it doesn't matter which
@@ -145,21 +156,22 @@ convention the file you're given uses.
 ### Setup (once)
 
 ```bash
-cd buildings_prototype
+cd Occupant_Tracking_v2      # the repo root (test_5)
 python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-`requirements.txt` is just `numpy==2.5.2` + `pandas==3.0.5`. No face model, no
-torch, no GPU. Install takes seconds.
+`requirements.txt` is `numpy==2.5.2` + `pandas==3.0.5` + `cryptography`. No
+face model, no torch, no GPU. Install takes seconds.
 
 ### Build your building
 
 ```bash
-python build_building.py --building-id building_3
+python -m pipeline.enroll_and_broadcast --building-id building_3
 ```
 
-Real output:
+Real output (now also builds the `nodes/building_3/` deployment folder in the
+same step, since this merges the old `build_building.py` + `generate_nodes.py`):
 
 ```
 contract  k=11 L=122 dim=512 seed=42 target_fpr=0.01 refs=20 sized_for=50 occ params_hash=27dbe4084f0b...
@@ -169,7 +181,7 @@ building  building_3
   building_3: 50 occupants, 6100 items, m=58469, hashes=7, fill=0.5126
   -> building_3.npz (10456 bytes), bits_sha256 3912392cd9da4465...
 
-wrote 1 artifact(s) to .../buildings/out
+wrote 1 artifact(s) to .../out
 Next: python merge_check.py out/*.npz
 ```
 
@@ -211,7 +223,7 @@ Two files, ~11 KB total.
 ### (Regenerate all ten)
 
 ```bash
-python build_building.py --all
+python -m pipeline.enroll_and_broadcast --all
 ```
 
 Loads the corpus once, loops every building in the meta. This is how the
@@ -404,7 +416,7 @@ forces both to a zero-padded string so they group occupants in the same order
 regardless of which file you point `--meta` at.
 
 `list_buildings(meta)` returns the building ids naturally sorted (`building_2`
-before `building_10`); `build_building.py --all` loops over it.
+before `building_10`); `pipeline/enroll_and_broadcast.py --all` loops over it.
 
 ### `buildinglib/enroll.py` — the actual pipeline
 
@@ -475,25 +487,31 @@ is `sha256(packed_bits)` — stored in the npz and the manifest.
   catches a single flipped bit
 - rebuilds a working `BloomFilter` with the stored geometry
 
-### `build_building.py` — the CLI
+### `pipeline/enroll_and_broadcast.py` — the CLI (was `build_building.py` + `generate_nodes.py`)
 
 ```
---building-id ID    build one building
---all               build every building in the meta
---emb PATH          full embeddings   (default ../embeddings_arcface/emb_arcface.npy)
---meta PATH         full meta         (default ../artifacts/meta.csv)
+--building-id ID    build (+ broadcast) one building
+--all               build (+ broadcast) every building in the meta
+--emb PATH          full embeddings   (default corpus/emb_arcface.npy)
+--meta PATH         full meta         (default corpus/meta.csv)
 --shared DIR        contract dir      (default ./shared)
---out DIR           artifacts         (default ./out)
+--filters-out DIR   artifacts         (default ./out)
+--nodes-out DIR     deployment folders (default ./nodes)
 --force             overwrite an artifact built against a different contract
 ```
 
-Flow: `check_vendored()` → `load_params()` → load corpus once → for each target:
-`split_building` → `enroll_building` → `save_building`. Refuses to overwrite an
-existing artifact whose `params_hash` differs unless `--force` (so you can't
-silently replace a published deliverable).
+Flow, per building: `check_vendored()` → `load_params()` → load corpus once →
+`split_building` → `enroll_building` → `save_building` (§0-8, the enrollment
+half), **then** build that building's `nodes/<building>/` deployment folder
+and copy in every other already-enrolled building's filter (§10, the old
+`generate_nodes.py` half) — one command, two passes internally (enroll
+everyone first, then broadcast, since a building can't receive peer filters
+that don't exist yet). Refuses to overwrite an existing artifact whose
+`params_hash` differs unless `--force` (so you can't silently replace a
+published deliverable).
 
-Exit codes: `0` ok, `2` contract mismatch, `3` enrollment failed, `4` refused
-overwrite.
+Exit codes: `0` ok, `2` contract mismatch, `3` missing input/enrollment
+failed, `4` refused overwrite.
 
 ### `verify_building.py` — "is this artifact really what the data produces?"
 
@@ -686,9 +704,11 @@ one-wayness is meant to avoid. Packed bits and integer metadata only.
 them locally from the corpus every run and never writes them, so this
 guarantee on the published `.npz` is untouched.)
 
-**No automated test framework.** Verification lives in
-`if __name__ == "__main__":` blocks, following the source pipeline's own
-convention. Most self-test cleanly from inside this folder:
+**test_5 note: there is now a real automated test suite** (`python -m pytest -q`,
+93 tests) covering the pipeline end to end, in addition to the
+`if __name__ == "__main__":` smoke blocks below (kept, following the source
+pipeline's own original convention). Most self-test cleanly from inside this
+folder:
 
 ```bash
 python -m buildinglib.params      # contract + vendored-file drift
@@ -698,12 +718,12 @@ python -m nodelib.deploy          # end-to-end send/receive + state landing (§1
 
 A few (`buildinglib.split`, `.enroll`, `.refs`, `.node`) additionally
 cross-check their output against `core.verification.reference_matrix` from the
-**original research repo** — that import only resolves from inside
-`Occupant_Tracking_v2/lane_a/`, so those specific smoke blocks will raise
-`ModuleNotFoundError` when run from this standalone folder. That's expected —
-the actual CLIs (`build_building.py`, `generate_nodes.py`, `query_node.py`,
-etc.) don't import `core` at all and run fine here; only that one dev-only
-cross-check needs the source repo alongside it.
+**original research repo** — that import only resolves from inside the
+original multi-lane project this repo was extracted from and later promoted
+out of, so those specific smoke blocks will raise `ModuleNotFoundError` when
+run from here. That's expected — the actual CLIs (`pipeline/enroll_and_broadcast.py`,
+`pipeline/route_and_recognize.py`, etc.) don't import `core` at all and run
+fine here; only that one dev-only cross-check needs the source repo alongside it.
 
 **Don't name the deliverables folder `results/` or `artifacts/`.** If this
 repo is ever nested inside the original `lane_a/` tree again, that tree's
@@ -718,14 +738,18 @@ depth and silently untrack the deliverable. `out/` and `nodes/` are safe names.
 Enrollment (§0–§8) produced the filters. Routing consumes them.
 
 All 10 buildings run **locally as function calls** — there is no network. But the
-code is split along the line it would be cut on later:
+code is split along the line it would be cut on later. **test_5**: this used to
+be two standalone scripts (`query_node.py`/`respond_node.py`); the same split
+now lives inside `pipeline/route_and_recognize.py` (the orchestrator, CLI:
+`--phase 3`) calling into `pipeline/recognize.py` (the vote logic itself, used
+by both roles below):
 
-| script | role | gets | returns |
+| what (was a script, now a function) | role | gets | returns |
 |---|---|---|---|
-| `query_node.py` | the building that captured the face | the capture + all 10 filters + all 10 nodes | an `Identification` |
-| `respond_node.py` | a shortlisted building answering a handoff | the capture + which building is asking | a `Reply` (`+ 20 refs` on a match) |
+| `pipeline/route_and_recognize.py`'s cascade | the building that captured the face | the capture + all 10 filters + all 10 nodes | an `Identification` |
+| `pipeline/recognize.py`'s `confirm_at_candidate` | a shortlisted building answering a handoff | the capture + which building is asking | a `Reply` (`+ 20 refs` on a match) |
 
-### 9.1 The cascade (`query_node.identify`)
+### 9.1 The cascade (`pipeline/route_and_recognize.py`'s `--phase 3` orchestration, was `query_node.identify`)
 
 Each step votes the capture against a set of 20-vector-per-person references and
 stops at the first that clears **`min_votes` = 12 of 20**:
@@ -738,14 +762,21 @@ stops at the first that clears **`min_votes` = 12 of 20**:
 3. **Route** — `encode_with_margins(q)` → `route(codes, margins, filters, ...)`
    scores the capture's `L` codes (plus `n_probes` weak-bit flips per slot)
    against the other 9 filters; take the top `shortlist_k = 5`.
-4. **Handoff** — for each shortlisted building, `respond_node.respond(q, ...)`
-   votes the capture against *that building's* own occupants. On a match it
-   returns `Reply(matched=True, occupant_id, votes, home_building, refs=(20,512))`.
+4. **Handoff** — for each shortlisted building, `pipeline.recognize.confirm_at_candidate(q, ...)`
+   (was `respond_node.respond(q, ...)`) votes the capture against *that building's*
+   own occupants. On a match it returns `Reply(matched=True, occupant_id, votes, home_building, refs=(20,512))`.
+   **test_5**: if this event's zone is the transition zone `zT` (a visitor's
+   first observation at a non-home building), this is also the exact point a
+   visit-pointer gets minted to the confirmed occupant's home building — see
+   §10 below.
 5. **Aggregate** — among matched replies, take the highest `votes` (15/20 beats
    14/20). `at_node.pool.admit(Visitor(..., refs=best.refs))`. `source="routed"`.
 6. **Abstain** — no reply reached 12/20 → `source="abstain"`, person unknown.
 
-Real run (`--capture-row 16020 --at building_1`, a building_9 visitor):
+Real run (illustrating the mechanism — the standalone `--capture-row`/`--at`
+CLI flags below were `query_node.py`'s; the same cascade is now driven through
+`pipeline/route_and_recognize.py --phase 3` over a full event batch rather
+than one capture at a time):
 
 ```
 [1] local vote (50 own occupants): best 6/20  -> no match
@@ -829,8 +860,8 @@ the filters, so they are **not** folded into `params_hash`; they get their own
 | `buildinglib/verify.py` | `vote()` (verbatim from `core/verification.py`) + `identify()` wrapper |
 | `buildinglib/route.py` | `probe_items()` + `route()` (verbatim from `pipeline/07`) |
 | `buildinglib/node.py` | `RoutingContract` + `load_routing_contract()`; `Visitor`, `VisitorPool`, `BuildingNode`, `Reply`, `Identification` |
-| `query_node.py` | the 6-step cascade + a single-capture CLI |
-| `respond_node.py` | one building's vote-and-reply + a single-capture CLI |
+| `pipeline/route_and_recognize.py` | the 6-step cascade (Phase 3), Phase 2's own-gallery pass, and the pointer-mint hook; batch CLI (was `query_node.py`'s single-capture CLI) |
+| `pipeline/recognize.py` | one building's vote-and-reply, shared by both Phase 2 and Phase 3 (was `respond_node.py`) |
 
 ### 9.6 Checks
 
@@ -853,10 +884,10 @@ reimplementation.
 
 Everything above is driven from function calls and a CLI that reads the shared
 corpus each time. This turns each building into an actual folder: its own raw
-embeddings, one merged config, the other 9 buildings' filters, and two SQLite
-state databases. Adapts `dsts/state/` (zones, the BSTS probability table,
-`SqliteStore`'s registered/visitor split) — zero edits to `dsts/` or
-`buildinglib/`.
+embeddings, one merged config, the other 9 buildings' filters, and (as of
+test_5) **three** SQLite state databases. Adapts `dsts/legacy_state/` (zones,
+the BSTS probability table, `SqliteStore`'s registered/visitor split) — zero
+edits to `dsts/` or `buildinglib/`.
 
 ### 10.1 Folder layout
 
@@ -873,34 +904,38 @@ nodes/building_1/
     occupant_ids.json          the 50 occupant ids, in refs.npy order
   filters/                  the OTHER 9 buildings' Bloom filters (copied from out/)
   state/
-    registered.db             table registered_state (dsts/state/schema.sql)
+    registered.db             table registered_state (dsts/legacy_state/schema.sql)
     visitor.db                 table visitor_state
+    pointers.db                table visitor_pointers -- new in test_5
 ```
 
 `embeddings/` holds only this building's **own** raw data — never another
 building's. `filters/` is what lets it route without ever seeing anyone else's
 raw embeddings. `config.json` replaces reading `shared/params.json` +
 `shared/routing_params.json` separately at query time: `shared/` is only the
-generator's master source now: `generate_nodes.py` merges the two files once and
-copies the identical bytes, plus `mean_face.npy`, into every folder, so a
-building's own folder is self-sufficient to build a `RoutingContract`.
+generator's master source now: `pipeline/enroll_and_broadcast.py` merges the
+two files once and copies the identical bytes, plus `mean_face.npy`, into
+every folder, so a building's own folder is self-sufficient to build a
+`RoutingContract`.
 
-### 10.2 `generate_nodes.py`
+### 10.2 `pipeline/enroll_and_broadcast.py` (deployment-folder half; was `generate_nodes.py`)
 
 ```bash
-python generate_nodes.py --building-id building_3
-python generate_nodes.py --all
+python -m pipeline.enroll_and_broadcast --building-id building_3
+python -m pipeline.enroll_and_broadcast --all
 ```
 
 Per building: `split_building` → `embeddings/{emb_raw.npy, meta.csv}`;
 `reference_tensor` → `embeddings/{refs.npy, occupant_ids.json}`;
 `nodelib.deploy.write_node_config` → `config.json` + `mean_face.npy`; copies
-the other 9 `out/*.npz` (+ manifests) into `filters/`; creates the two empty
-state DBs; writes `building.json`; then round-trips
+the other 9 `out/*.npz` (+ manifests) into `filters/`; creates the three empty
+state DBs (including `pointers.db`); writes `building.json`; then round-trips
 `nodelib.deploy.DeployedBuilding.load()` on what it just wrote. `--all` also
 asserts `config.json`/`mean_face.npy` hash identically across every folder.
-Requires `out/*.npz` (run `build_building.py --all` first) and the shared
-corpus. Refuses to overwrite an existing folder without `--force`.
+This is now the *second half* of the same command that does enrollment (§0-8)
+— no separate `out/*.npz` prerequisite step to remember, since one `--all`
+invocation does both passes (enroll every building, then broadcast). Refuses
+to overwrite an existing folder without `--force`.
 
 ### 10.3 `nodelib.deploy.DeployedBuilding` — send / receive
 
@@ -913,18 +948,19 @@ b = DeployedBuilding.load("nodes/building_1")
 
 - **`send(capture, peers)`** — a face was captured here. `peers` is
   `{building_id: DeployedBuilding}` for the buildings this one can hand off to.
-  Runs `query_node.identify` **unchanged**: own occupants → visitor pool →
-  route against `filters/` → handoff to the shortlisted peers' `receive()` →
-  aggregate → abstain. Whenever it resolves to someone, `send()` calls
-  `self._record(...)` — the BSTS `StateTable.apply()` — which lands the row in
-  **this building's own** state DB: `registered.db` when `source == "local"`
-  (one of its own occupants), `visitor.db` when `source` is `"routed"` or
-  `"pool"`. This is the "when the building that sent the request gets the
-  embeddings back, it updates the visitor state" behaviour — no separate
-  orchestration step, `send()` does it itself.
+  Runs the same cascade as §9.1 (own occupants → visitor pool → route against
+  `filters/` → handoff to the shortlisted peers' `receive()` → aggregate →
+  abstain), now calling `pipeline.recognize.confirm_at_candidate` for the vote
+  instead of a standalone `respond_node.respond`. Whenever it resolves to
+  someone, `send()` calls `self._record(...)` — the BSTS `StateTable.apply()`
+  — which lands the row in **this building's own** state DB: `registered.db`
+  when `source == "local"` (one of its own occupants), `visitor.db` when
+  `source` is `"routed"` or `"pool"`. This is the "when the building that sent
+  the request gets the embeddings back, it updates the visitor state"
+  behaviour — no separate orchestration step, `send()` does it itself.
 - **`receive(capture, from_building)`** — another building's handoff, asking
-  "is this one of yours?". Wraps `respond_node.respond` against this folder's
-  own occupants.
+  "is this one of yours?". Wraps `pipeline.recognize.confirm_at_candidate`
+  against this folder's own occupants.
 
 Try it:
 
@@ -938,18 +974,23 @@ that landed in the sender's own state DB.
 ### 10.4 Checks
 
 ```bash
-python generate_nodes.py --all
+python -m pipeline.enroll_and_broadcast --all
 sqlite3 nodes/building_1/state/registered.db '.tables'   # registered_state only
 sqlite3 nodes/building_1/state/visitor.db '.tables'       # visitor_state only
+sqlite3 nodes/building_1/state/pointers.db '.tables'      # visitor_pointers only -- new
 python -m nodelib.deploy                                  # end-to-end send/receive + state landing
-python generate_nodes.py --all --force                    # byte-stable regen
+python -m pipeline.enroll_and_broadcast --all --force      # byte-stable regen
 ```
 
 ### 10.5 What's deliberately out of scope
 
-`dsts/simulation/` (the interactive terminal demo with fake `"O001"` ids) is
-not used here — `nodelib` composes `FakeOccupantRegistry` + the split SQLite
-store + `StateTable` directly, the same pieces that module wires together, just
-against real per-building data. Zone/time synthesis (a visitor moving between
-zones over a session) is out of scope too: `send()` records one event, at one
-zone, at one time — whatever `--zone`/`--time` the caller passes.
+The synthetic terminal-demo DSTS/BSTS engine (fake `"O001"`-style ids, a
+different implementation from `dsts/legacy_state/`) that predated this repo's
+real corpus-backed pipeline is not used here and was dropped entirely from
+test_5 — `nodelib` composes `FakeOccupantRegistry` + the split SQLite store +
+`StateTable` directly, against real per-building data. At the `send()`/
+`receive()` level, zone/time synthesis (a visitor moving between zones over a
+session) is still out of scope: `send()` records one event, at one zone, at
+one time — whatever `--zone`/`--time` the caller passes. (The full pipeline
+above `nodelib`, via `pipeline/generate_events.py`, *does* synthesize
+realistic zone/time movement across a whole simulated day — see `README.md`.)
