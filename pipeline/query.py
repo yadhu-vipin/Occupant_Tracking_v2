@@ -1,6 +1,14 @@
-"""Querying over the real Phase 4 event log: Q1, Q2, Q3, Q5, Q6, TRACK --
+"""Querying over the real Phase 4 event log: Q1, Q2, Q3, Q4, Q5, Q6, Q7, TRACK --
 plus the two-layer RBAC/ReBAC wiring (infra + persona) that used to be a
 separate wrapper script.
+
+Q4 ("did o enter b between t1/t2?") and Q7 ("how many zones did o visit
+during [t1, t2]?") are new -- neither existed in the original query_engine.py.
+Both are implemented as plain filter/aggregate passes over the exact same
+already-loaded event log every other query already uses (see QueryEngine.Q4/
+Q7 below); no DB schema or storage change was needed for either. Both are
+gated the same all-or-nothing way as Q3/Q5 (TRAJECTORY_QUERIES, L4 required
+outright) -- RBAC itself is unchanged in this addition.
 
     python pipeline/query.py demo
     python pipeline/query.py --caller <id> --target <id> --query Q6 [--purpose ...] [--at-time HH:MM:SS]
@@ -77,7 +85,7 @@ INTERNAL_ZONES = frozenset(ZONES) - {"zT"}
 TRANSITION_ZONE = "zT"
 ROLES_DIR = ROOT_DIR / "variants" / "rbac10"
 DEFAULT_AT_TIME = "23:59:59"   # "as of end of day" -> most recent known detection
-TRAJECTORY_QUERIES = {"Q3", "Q5", "TRACK"}   # require L4 outright, no partial redaction
+TRAJECTORY_QUERIES = {"Q3", "Q4", "Q5", "Q7", "TRACK"}   # require L4 outright, no partial redaction
 
 
 # --------------------------------------------------------------------------
@@ -148,8 +156,10 @@ class QueryType(Enum):
     Q1_STAYED_AFTER_TIME = "Q1"
     Q2_VISITOR_ANOMALY = "Q2"
     Q3_LEFT_BEFORE_TIME = "Q3"
+    Q4_ENTERED_BETWEEN_TIMES = "Q4"
     Q5_VISITED_ALL_ZONES = "Q5"
     Q6_LOCATION_AT_TIME = "Q6"
+    Q7_ZONE_COUNT_BETWEEN_TIMES = "Q7"
 
 
 @dataclass
@@ -295,6 +305,34 @@ class QueryEngine:
 
         return QueryResult(query_id="Q3", query_text=query_text, parameters=parameters, answer=left, evidence=evidence)
 
+    # ─── Q4: Did occupant o enter building b between t1 and t2? ───────────
+    def Q4(self, occupant_id: str, building_id: str, t1: str, t2: str) -> QueryResult:
+        query_text = f"Did {occupant_id} enter {building_id} between t1={t1} and t2={t2}?"
+        parameters = {"occupant_id": occupant_id, "building_id": building_id, "t1": t1, "t2": t2}
+        self._authorize("Q4", f"occupant:{occupant_id}@{building_id}")
+        if building_id not in self.registered:
+            return self._unknown_building("Q4", query_text, parameters, building_id)
+
+        # An "entry" is the occupant's first observation at this building for a
+        # given visit -- the same transition-zone convention already enforced
+        # by events/generator.py (a building transfer always arrives via zT)
+        # and consulted by phase4_state.py/PointerStore. Reusing it here means
+        # Q4 needs no new zone logic, just a filter over the same event log.
+        entries = [e for e in self.events
+                  if e.occupant_id == occupant_id and e.building == building_id
+                  and e.zone == TRANSITION_ZONE and t1 <= e.timestamp <= t2]
+        answer = bool(entries)
+
+        evidence = []
+        if entries:
+            evidence.append(f"  YES — {occupant_id} entered {building_id} {len(entries)} time(s) in [{t1}, {t2}]")
+            for e in entries:
+                evidence.append(f"  Entry at t={e.timestamp} (via {TRANSITION_ZONE}, source={e.source})")
+        else:
+            evidence.append(f"  NO — no entry into {building_id} by {occupant_id} detected in [{t1}, {t2}]")
+
+        return QueryResult(query_id="Q4", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+
     # ─── Q5: Did occupant o visit all zones in building b? ────────────────
     def Q5(self, occupant_id: str, building_id: str) -> QueryResult:
         query_text = f"Did {occupant_id} visit all zones in {building_id}?"
@@ -312,6 +350,28 @@ class QueryEngine:
         evidence.append(f"  Missing zones:  {sorted(missing)}" if missing else f"  ALL {len(INTERNAL_ZONES)} internal zones visited")
 
         return QueryResult(query_id="Q5", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+
+    # ─── Q7: How many zones did occupant o visit during [t1, t2]? ─────────
+    def Q7(self, occupant_id: str, t1: str, t2: str) -> QueryResult:
+        query_text = f"How many zones did {occupant_id} visit during [{t1}, {t2}]?"
+        parameters = {"occupant_id": occupant_id, "t1": t1, "t2": t2}
+        self._authorize("Q7", f"occupant:{occupant_id}")
+
+        # A time-windowed version of what track() already computes unwindowed
+        # (distinct_zones_visited/zone_visit_counts) -- same aggregation over
+        # the same event log, just scoped to an interval instead of the whole
+        # history. No new data source, no schema change.
+        window = [e for e in self.events if e.occupant_id == occupant_id and t1 <= e.timestamp <= t2]
+        zones_visited = sorted({e.zone for e in window})
+        answer = len(zones_visited)
+
+        evidence = [f"  {answer} distinct zone(s) visited in [{t1}, {t2}]: {zones_visited}"]
+        if window:
+            evidence.append(f"  {len(window)} detection(s) total in that window")
+        else:
+            evidence.append(f"  No detections of {occupant_id} in that window")
+
+        return QueryResult(query_id="Q7", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
 
     # ─── Q6: Where was occupant o at time t? ──────────────────────────────
     def _q6_from_pointer(self, occupant_id: str, at_time: str) -> QueryResult | None:
@@ -414,10 +474,14 @@ class QueryEngine:
             return self.Q2(kwargs["building_id"], kwargs.get("at_time", kwargs.get("time_t", "23:59:59")))
         if q in ("Q3", "Q3_LEFT_BEFORE_TIME"):
             return self.Q3(kwargs["occupant_id"], kwargs["building_id"], kwargs.get("before_time", kwargs.get("time_t", "23:59:59")))
+        if q in ("Q4", "Q4_ENTERED_BETWEEN_TIMES"):
+            return self.Q4(kwargs["occupant_id"], kwargs["building_id"], kwargs["t1"], kwargs["t2"])
         if q in ("Q5", "Q5_VISITED_ALL_ZONES"):
             return self.Q5(kwargs["occupant_id"], kwargs["building_id"])
         if q in ("Q6", "Q6_LOCATION_AT_TIME"):
             return self.Q6(kwargs["occupant_id"], kwargs.get("at_time", kwargs.get("time_t", "23:59:59")))
+        if q in ("Q7", "Q7_ZONE_COUNT_BETWEEN_TIMES"):
+            return self.Q7(kwargs["occupant_id"], kwargs["t1"], kwargs["t2"])
         raise ValueError(f"Unknown or unsupported query type: {query_type}")
 
 
@@ -514,8 +578,9 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
 
 def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_type: str, *, purpose: str,
                        is_office_hours: bool, authorized_investigation: bool, at_time: str,
-                       building_id: str | None = None, before_time: str | None = None) -> None:
-    """Q3/Q5/Q6/TRACK -- queries about ONE target occupant. Both RBAC layers apply."""
+                       building_id: str | None = None, before_time: str | None = None,
+                       t1: str | None = None, t2: str | None = None) -> None:
+    """Q3/Q4/Q5/Q6/Q7/TRACK -- queries about ONE target occupant. Both RBAC layers apply."""
     print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {target_id}  "
          f"(purpose={purpose}, office_hours={is_office_hours}, authorized={authorized_investigation})")
 
@@ -553,8 +618,16 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=before_time)
         print(f"  Query:  {res.query_text}")
         print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+    elif q_type == "Q4":
+        res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
+        print(f"  Query:  {res.query_text}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
     elif q_type == "Q5":
         res = engine.Q5(occupant_id=target_id, building_id=building_id)
+        print(f"  Query:  {res.query_text}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+    elif q_type == "Q7":
+        res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
         print(f"  Query:  {res.query_text}")
         print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
     elif q_type == "TRACK":
@@ -676,7 +749,7 @@ def parse_args(argv=None):
     ap.add_argument("--caller", help="real occupant id of the caller")
     ap.add_argument("--target", help="real occupant id of the target (Q3/Q5/Q6/TRACK)")
     ap.add_argument("--building", help="real building id (Q1/Q2, or building_id for Q3/Q5)")
-    ap.add_argument("--query", default="Q6", choices=["Q1", "Q2", "Q3", "Q5", "Q6", "TRACK"])
+    ap.add_argument("--query", default="Q6", choices=["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "TRACK"])
     ap.add_argument("--purpose", default="general_lookup", choices=[p.value for p in QueryPurpose])
     ap.add_argument("--outside-office-hours", action="store_true")
     ap.add_argument("--authorized-investigation", action="store_true")
@@ -712,7 +785,8 @@ def main(argv=None) -> None:
                 run_occupant_query(engine, args.caller, args.target, args.query, purpose=args.purpose,
                                    is_office_hours=not args.outside_office_hours,
                                    authorized_investigation=args.authorized_investigation, at_time=args.at_time,
-                                   building_id=args.building, before_time=args.before_time)
+                                   building_id=args.building, before_time=args.before_time,
+                                   t1=args.after_time, t2=args.before_time)
     finally:
         set_enforce_policy(False)
         clear_registry(); clear_audit_log(); clear_campus_registry()
