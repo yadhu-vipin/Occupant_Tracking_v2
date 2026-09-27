@@ -74,12 +74,17 @@ from security.authorize import (                                            # no
     register_node, set_enforce_policy,
 )
 from security.campus_policy import (                                        # noqa: E402
-    CampusRole, DisclosureLevel, QueryContext, QueryPurpose,
+    CampusRole, DisclosureLevel, PolicyDecision, QueryContext, QueryPurpose,
     check_office_presence, clear_campus_registry, evaluate_campus_query_policy,
     get_occupant_role, register_class_roster, register_occupant_building, register_occupant_role,
+    register_occupant_current_building, get_occupant_current_building, is_visitor,
 )
 
 DEFAULT_PHASE4_RESULTS = ROOT_DIR / "dsts" / "output" / "phase4_results.json"
+if not DEFAULT_PHASE4_RESULTS.exists():
+    _fallback_phase4 = ROOT_DIR / "buildings_prototype" / "dsts" / "output" / "phase4_results.json"
+    if _fallback_phase4.exists():
+        DEFAULT_PHASE4_RESULTS = _fallback_phase4
 DEFAULT_NODES_DIR = ROOT_DIR / "nodes"
 INTERNAL_ZONES = frozenset(ZONES) - {"zT"}
 TRANSITION_ZONE = "zT"
@@ -532,8 +537,9 @@ def track_answer(engine: QueryEngine, target_id: str) -> dict:
     return engine.track(target_id)
 
 
-def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: DisclosureLevel, at_time: str) -> dict:
-    """Real Q6 (point-in-time location), redacted to match `level`."""
+def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: DisclosureLevel, at_time: str,
+                             decision: PolicyDecision | None = None) -> dict:
+    """Real Q6 (point-in-time location), redacted to match `level` and policy rule."""
     current = engine.Q6(occupant_id=target_id, at_time=at_time)
     if not current.success:
         return {"error": f"no real detection of {target_id} at or before t={at_time}"}
@@ -541,6 +547,25 @@ def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: Disclos
                                current.answer["time"], current.answer["identity_probability"])
     if level == DisclosureLevel.L1_PRESENCE:
         return check_office_presence(target_id, zone)
+    if decision and decision.policy_rule == "RULE_A_PEER_DEAN_COARSE":
+        return {
+            "occupant_id": target_id,
+            "role": "dean",
+            "home_building": current.answer.get("home_building"),
+            "current_building": building,
+            "status": f"In {building}",
+            "approx_time": ts[:2] + ":00:00" if len(ts) == 8 else ts,
+        }
+    if decision and decision.policy_rule in ("RULE_A_VISITOR_IN_OWN_BUILDING", "RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION"):
+        return {
+            "occupant_id": target_id,
+            "visitor_status": "VISITOR_IN_BUILDING",
+            "home_building": current.answer.get("home_building"),
+            "current_building": building,
+            "sector": zone_sector(zone) if zone else "Unknown",
+            "arrival_time": ts,
+            "confidence": _confidence_band(prob),
+        }
     if level == DisclosureLevel.L2_CURRENT_ZONE:
         return {"building": building, "sector": zone_sector(zone) if zone else "Unknown",
                 "approx_time": ts[:2] + ":00:00" if len(ts) == 8 else ts, "confidence": _confidence_band(prob)}
@@ -576,13 +601,33 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
         print(f"   {line}")
 
 
+def resolve_target_current_building(engine: QueryEngine, target_id: str, at_time: str) -> Optional[str]:
+    """Determine the target occupant's current building location at or before at_time."""
+    home = engine._home_building(target_id)
+    if engine.nodes_dir and home and (engine.nodes_dir / home).exists():
+        with PointerStore(engine.nodes_dir / home / "state") as store:
+            pointer = store.lookup_open(target_id)
+            if pointer and pointer["entry_time"] <= at_time:
+                return pointer["current_building"]
+    candidates = [e for e in engine.events if e.occupant_id == target_id and e.timestamp <= at_time]
+    if candidates:
+        last = max(candidates, key=lambda e: e.timestamp)
+        return last.building
+    return home
+
+
 def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_type: str, *, purpose: str,
                        is_office_hours: bool, authorized_investigation: bool, at_time: str,
                        building_id: str | None = None, before_time: str | None = None,
-                       t1: str | None = None, t2: str | None = None) -> None:
+                       t1: str | None = None, t2: str | None = None, explain: bool = False) -> None:
     """Q3/Q4/Q5/Q6/Q7/TRACK -- queries about ONE target occupant. Both RBAC layers apply."""
     print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {target_id}  "
          f"(purpose={purpose}, office_hours={is_office_hours}, authorized={authorized_investigation})")
+
+    # Resolve target's ground-truth current building at this query timestamp
+    target_current_b = resolve_target_current_building(engine, target_id, at_time)
+    if target_current_b:
+        register_occupant_current_building(target_id, target_current_b)
 
     target_resource = f"occupant:{target_id}"
     permitted = authorize(caller_id, "QUERY", target_resource)
@@ -600,9 +645,24 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
 
     context = QueryContext(purpose=QueryPurpose.from_str(purpose), is_office_hours=is_office_hours,
                            authorized_investigation=authorized_investigation)
-    decision = evaluate_campus_query_policy(caller_id, target_id, context=context, purpose=context.purpose)
+    decision = evaluate_campus_query_policy(
+        caller_id, target_id,
+        context=context,
+        purpose=context.purpose,
+        target_current_building=target_current_b,
+    )
     print(f"  Layer 2 (persona ReBAC): {'PERMIT' if decision.permitted else 'DENY'}  level={decision.level.name}")
-    print(f"  Reason: {decision.reason}")
+    print(f"  Policy Rule:    {decision.policy_rule or 'N/A'}")
+    print(f"  Reason:         {decision.reason}")
+    if decision.visitor_status:
+        print(f"  Visitor Status: {decision.visitor_status}")
+    if decision.exposed_fields:
+        print(f"  Exposed Fields: {', '.join(decision.exposed_fields)}")
+    if decision.redacted_fields:
+        print(f"  Redacted Fields: {', '.join(decision.redacted_fields)}")
+
+    if explain:
+        print(f"  Explainability Metadata:\n{json.dumps(decision.to_dict(), indent=4)}")
 
     if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
         return
@@ -613,7 +673,7 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
 
     if q_type == "Q6":
         print(f"  Query:  Where was {target_id} at t={at_time}?")
-        print(f"  Disclosed ({decision.level.name}): {q6_answer_for_disclosure(engine, target_id, decision.level, at_time)}")
+        print(f"  Disclosed ({decision.level.name}): {q6_answer_for_disclosure(engine, target_id, decision.level, at_time, decision)}")
     elif q_type == "Q3":
         res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=before_time)
         print(f"  Query:  {res.query_text}")
@@ -636,33 +696,25 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
 
 
 def print_role_capabilities() -> None:
-    print(f"\n{'=' * 78}\nROLE CAPABILITIES (from security/campus_policy.py's actual matrix + rules)\n")
-    print("DEAN")
-    print("  CAN:  query ANY occupant in ANY building -- the only role exempt from the")
-    print("        home-building restriction (Rule 2b in campus_policy.py).")
-    print("  CAN:  get L4 (full historical track) on a Teacher/Student when purpose=")
-    print("        security_investigation/audit with authorized_investigation=True.")
-    print("  CAN:  get L2 (coarse current zone) on anyone for routine/general lookups.")
-    print("  CANNOT: get L4 detail on a *routine* lookup -- capped to L2 without an")
-    print("        explicit investigation/audit purpose (minimum-necessary-disclosure).")
-    print("\nTEACHER")
-    print("  CAN:  query Students, peer Teachers, and their Dean -- but ONLY within")
-    print("        their OWN building (home-building restriction applies).")
-    print("  CAN:  get L2 (coarse current zone) on any student in their building --")
-    print("        roster membership only changes the audit-log wording, not the tier.")
-    print("  CANNOT: query an occupant of a DIFFERENT building (Dean-only).")
-    print("  CANNOT: get L4/historical (Q3, Q5, TRACK) on any student -- ceiling tops")
-    print("        out at L2, and trajectory queries require L4 outright.")
-    print("\nSTUDENT")
-    print("  CAN:  get L1 (presence-only, e.g. 'Away from Cabin') on their own Teacher")
-    print("        or Dean, during office hours, within their own building.")
-    print("  CAN:  get full L4 on themselves (self-query exemption).")
-    print("  CANNOT: query a peer Student at all -- hard L0 regardless of purpose")
-    print("        (anti-stalking; the matrix ceiling for student->student is L0).")
-    print("  CANNOT: query anyone once office hours end -- drops to L0.")
-    print("  CANNOT: get anything beyond presence on Teacher/Dean -- never coarse zone")
-    print("        or exact room, and never Q3/Q5/TRACK on anyone but themselves.")
-    print("  CANNOT: query an occupant of a different building (same as Teacher).")
+    print(f"\n{'=' * 78}\nROLE CAPABILITIES: BUILDING-SCOPED HIERARCHICAL RBAC (A > B > C)\n")
+    print("ROLE A: DEAN (Building Administrator / Senior Executive registered to Br)")
+    print("  CAN:  query local Teachers and Students registered to Br (L4 for investigation, L2 routine).")
+    print("  CAN:  query Visitors (B/C/guest) currently detected visiting Br (L2 or L4 within Br;")
+    print("        external history outside Br is strictly redacted).")
+    print("  CAN:  query peer Deans in other buildings at coarse status (L2 name, home, current building).")
+    print("  CANNOT: query Teachers or Students in other buildings who are not currently visiting Br (L0 hard deny).")
+    print("\nROLE B: TEACHER (Faculty registered to Br)")
+    print("  CAN:  query assigned Students in course roster currently in Br (L2 current zone during campus hours).")
+    print("  CAN:  query Dean in Br at coarse availability (L2).")
+    print("  CAN:  query peer Teachers in Br (L2).")
+    print("  CANNOT: query Students or Teachers in other buildings (L0).")
+    print("  CANNOT: query Students outside office/campus hours (drops to L0).")
+    print("\nROLE C: STUDENT (Registered to Br)")
+    print("  CAN:  query self with full historical track (L4 self-query exemption).")
+    print("  CAN:  check Teacher/Dean availability in Br during office hours (L1 cabin presence).")
+    print("  CANNOT: query peer Students under any circumstances (L0 anti-stalking isolation).")
+    print("  CANNOT: query Staff or Students in other buildings (L0).")
+    print("  CANNOT: query Staff outside office hours (drops to L0).")
 
 
 def run_demo(nodes_dir: Path | None = None) -> None:
@@ -690,11 +742,16 @@ def run_demo(nodes_dir: Path | None = None) -> None:
     other_dean = deans_by_building[other_building]
     cross_building_student = next(students_in(other_building))
 
+    # Detect a real visitor who visited building_5
+    b5_visitors = [e for e in engine.events if e.building == home_building and e.occupant_id not in engine.registered[home_building]]
+    visiting_student = b5_visitors[0].occupant_id if b5_visitors else None
+    visiting_time = b5_visitors[0].timestamp if b5_visitors else "08:30:05"
+
     print("Registry: 10 deans + 100 teachers + 390 students (1+10+39 per building x 10 buildings)")
     print(f"Demo building: {home_building}  dean={dean_id}  teacher_a={teacher_a}  teacher_b={teacher_b}")
     print(f"Scenario actors: roster_student={roster_student}  non_roster_student={non_roster_student}  "
          f"peer_student={peer_student}  other_building={other_building}  other_dean={other_dean}  "
-         f"cross_building_student={cross_building_student}")
+         f"cross_building_student={cross_building_student}  visiting_student={visiting_student}")
 
     print_role_capabilities()
 
@@ -717,16 +774,30 @@ def run_demo(nodes_dir: Path | None = None) -> None:
     run_occupant_query(engine, teacher_a, roster_student, "TRACK", purpose="academic_roster",
                        is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
 
-    print(f"\n{'=' * 78}\nHOME-BUILDING vs. CROSS-BUILDING (Dean-only Rule 2b)\n")
+    print(f"\n{'=' * 78}\nBUILDING-SCOPED HIERARCHICAL RBAC (A > B > C & Visitor Predicate)\n")
 
+    # Local student in own building -> PERMITTED
     run_occupant_query(engine, teacher_a, roster_student, "Q6", purpose="academic_roster",
                        is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
+
+    # Dean querying external student in other building -> DENIED under scoped RBAC
     run_occupant_query(engine, dean_id, cross_building_student, "Q6", purpose="general_lookup",
                        is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
+
+    # Dean querying visitor currently detected in Dean's building -> PERMITTED under Visitor Predicate
+    if visiting_student:
+        run_occupant_query(engine, dean_id, visiting_student, "Q6", purpose="general_lookup",
+                           is_office_hours=True, authorized_investigation=False, at_time=visiting_time)
+
+    # Teacher querying student in another building -> DENIED
     run_occupant_query(engine, teacher_a, cross_building_student, "Q6", purpose="general_lookup",
                        is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
+
+    # Student querying student in another building -> DENIED
     run_occupant_query(engine, roster_student, cross_building_student, "Q6", purpose="general_lookup",
                        is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
+
+    # Dean querying peer Dean in other building -> PERMITTED at coarse L2 status
     run_occupant_query(engine, dean_id, other_dean, "Q6", purpose="admin_consultation",
                        is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
 
@@ -753,6 +824,7 @@ def parse_args(argv=None):
     ap.add_argument("--purpose", default="general_lookup", choices=[p.value for p in QueryPurpose])
     ap.add_argument("--outside-office-hours", action="store_true")
     ap.add_argument("--authorized-investigation", action="store_true")
+    ap.add_argument("--explain", action="store_true", help="output detailed explainability metadata for policy decision")
     ap.add_argument("--at-time", default=DEFAULT_AT_TIME)
     ap.add_argument("--after-time", default="09:00:00")
     ap.add_argument("--before-time", default="23:59:59")
@@ -786,7 +858,7 @@ def main(argv=None) -> None:
                                    is_office_hours=not args.outside_office_hours,
                                    authorized_investigation=args.authorized_investigation, at_time=args.at_time,
                                    building_id=args.building, before_time=args.before_time,
-                                   t1=args.after_time, t2=args.before_time)
+                                   t1=args.after_time, t2=args.before_time, explain=args.explain)
     finally:
         set_enforce_policy(False)
         clear_registry(); clear_audit_log(); clear_campus_registry()
