@@ -263,31 +263,50 @@ def parse_args(argv=None):
     return ap.parse_args(argv)
 
 
-def main(argv=None):
-    args = parse_args(argv)
+def run_evaluation(
+    ground_truth_path: Path | None = None,
+    recognition_results_path: Path | None = None,
+    retrieval_attempts_path: Path | None = None,
+    phase4_results_path: Path | None = None,
+    nodes_dir: Path | None = None,
+    output_dir: Path | None = None,
+) -> dict:
+    gt_path = ground_truth_path or (ROOT / "events" / "output" / "ground_truth.json")
+    rec_path = recognition_results_path or (ROOT / "recognition" / "output" / "recognition_results.json")
+    ret_path = retrieval_attempts_path or (ROOT / "retrieval" / "output" / "retrieval_attempts.json")
+    n_dir = nodes_dir or (ROOT / "nodes")
+    out_dir = output_dir or (ROOT / "evaluate_pipeline" / "output")
 
-    ground_truth = json.loads(args.ground_truth.read_text(encoding="utf-8"))
-    recognition_results = json.loads(args.recognition_results.read_text(encoding="utf-8"))
-    retrieval_attempts = json.loads(args.retrieval_attempts.read_text(encoding="utf-8"))
-    # phase4_results.json is read for completeness / future invariant checks;
-    # today's six-bucket taxonomy is fully derivable from ground truth +
-    # Phase 2 + Phase 3 outputs alone.
-    if args.phase4_results.exists():
-        json.loads(args.phase4_results.read_text(encoding="utf-8"))
+    ground_truth = json.loads(gt_path.read_text(encoding="utf-8"))
+    recognition_results = json.loads(rec_path.read_text(encoding="utf-8"))
+    retrieval_attempts = json.loads(ret_path.read_text(encoding="utf-8"))
 
     recognition_by_id = {r["event_id"]: r for r in recognition_results}
     retrieval_by_id = {a["event_id"]: a for a in retrieval_attempts}
 
     rows = build_event_rows(ground_truth, recognition_by_id, retrieval_by_id)
-    pointer_report = pointer_precision(args.nodes_dir, ground_truth)
+    pointer_report = pointer_precision(n_dir, ground_truth)
     summary = summarize(rows, pointer_report)
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    (args.output_dir / "end_to_end_results.json").write_text(
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "end_to_end_results.json").write_text(
         json.dumps(rows, indent=2) + "\n", encoding="utf-8")
-    (args.output_dir / "end_to_end_summary.json").write_text(
+    (out_dir / "end_to_end_summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
+    return summary
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    summary = run_evaluation(
+        ground_truth_path=args.ground_truth,
+        recognition_results_path=args.recognition_results,
+        retrieval_attempts_path=args.retrieval_attempts,
+        phase4_results_path=args.phase4_results,
+        nodes_dir=args.nodes_dir,
+        output_dir=args.output_dir,
+    )
     print(json.dumps(summary, indent=2))
     return 0
 
