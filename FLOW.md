@@ -64,6 +64,7 @@ See §5 for what is genuinely **not** done.
 | `verify_building.py` | CLI. Reloads a published `out/*.npz`, re-derives it from source, asserts the bits are bit-identical. The "is this artifact really what the data produces" check. |
 | `merge_check.py` | CLI. Given a set of `out/*.npz`, asserts they all share one `params_hash` (so they're actually compatible) and prints a size/fill-ratio summary table. |
 | `build_campus_roles.py` | CLI. (Re)generates the RBAC role registry (`variants/rbac10/*.json`) `pipeline/query.py` needs — 1 dean + 10 teachers + 39 students per building, deterministic given `seed=42`. Gitignored output; run once before using `pipeline.query`. |
+| `run_project.py` | CLI. Full end-to-end operational pipeline runner & multi-run reliability certifier (`--repeat N`). Executes cryptographic key exchanges (X25519), authenticated encryption (AES-128-GCM), anti-replay, 10,000-event pipeline evaluation, tracking, and Building-Scoped Hierarchical RBAC ($A > B > C$) without running unit tests. |
 | `requirements.txt` | `numpy`, `pandas`, `cryptography`. No face model, no GPU. |
 | `README.md`, `FLOW.md`, `PIPELINE.md`, `RUNBOOK.md` | The full narrative docs: the federation contract, the cascade step by step, the deployment-folder layout, worked examples, and the copy-paste run checklist. |
 

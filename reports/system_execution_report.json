@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-02 20:20:47",
+  "timestamp": "2026-10-02 20:33:59",
   "security_verification": {
     "status": "PASS",
     "nodes_provisioned": [
@@ -141,7 +141,7 @@
           "permitted": false,
           "disclosure_level": "L0_NONE",
           "policy_rule": "RULE_A_CROSS_BUILDING_B_C_DENIED",
-          "reason": "Policy denied: Dean of building_5 may not track occupant '0000460' of building_3 who is not currently visiting building_5",
+          "reason": "Policy denied: Dean of building_5 may not track occupant '0000157' of building_3 who is not currently visiting building_5",
           "purpose": "general_lookup",
           "exposed_fields": [],
           "redacted_fields": [

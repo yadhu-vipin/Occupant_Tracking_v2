@@ -331,24 +331,37 @@ The system incorporates zero-trust cryptographic security (`security/` and `node
    - **Public Key Infrastructure (PKI)**: Internal Campus CA issues X.509 certificates for node provisioning, mTLS session establishment, and certificate pinning.
    - **Anti-Replay Protection**: `ReplayGuard` uses a sliding time window (300s) and unique nonces to reject replayed envelopes.
 
-2. **Role-Based Access Control (RBAC)**:
-   - **Pre-Execution Gating**: RBAC checks (`security/authorize.py`) are applied **before** querying or executing actions, not as post-execution filters. If a principal is unauthorized or unregistered, requests are blocked prior to accessing state tables.
-   - **Roles**:
-     - `ADMIN`: Full access (`ADMIN`, `CONFIGURE`, `AUDIT_READ`, plus all node operations).
-     - `BUILDING_NODE`: Node operations (`DETECT`, `SEEK`, `RESOLVE`, `GOSSIP`, `SYNC`, `QUERY`, `HANDOFF`, `VISITOR_ADD`).
-     - `QUERY_CLIENT`: Restricted solely to `QUERY` operations.
-   - **Audit Trail**: Every authorization decision (`PERMIT` or `DENY`) is logged with timestamps, requesting principal, verb, target, and outcome.
+2. **Two-Layer Zero-Trust Access Control (RBAC & ReBAC)**:
+   - **Layer 1: Infrastructure Pre-Execution Gating** (`security/authorize.py`): Applied **before** querying or executing actions, not as post-execution filters. Roles include `ADMIN`, `BUILDING_NODE`, and `QUERY_CLIENT`.
+   - **Layer 2: Building-Scoped Hierarchical Persona ReBAC** (`security/campus_policy.py`):
+     - **Strict Hierarchy ($A > B > C$)**: Dean (Role $A$) > Teacher (Role $B$) > Student (Role $C$).
+     - **Scope Constraint**: Senior roles inherit general permissions of junior roles, but visibility is strictly bounded by the requester's registered home building $B_r$. Deans and teachers cannot track occupants residing in other buildings who are not currently visiting their building.
+     - **Formal Visitor Predicate**:
+       $$\text{Visitor}(p, b, t) \iff \text{current\_building}(p, t) == b \land \text{registered\_building}(p) \neq b$$
+       When an occupant from $B_2$ is detected inside $B_1$, Dean $A$ in $B_1$ is permitted to view their current presence and arrival in $B_1$ ($L_2$), but external movement outside $B_1$ is strictly redacted.
+     - **Zero Database Changes**: The underlying database schemas (`registered.db`, `visitor.db`, `pointers.db`) remain 100% unmodified; RBAC acts as a disclosure-filtering middleware between storage and client.
+     - **Explainable Queries**: Returns structured policy decisions (`policy_rule`, `reason`, `visitor_status`, `exposed_fields`, `redacted_fields`). Append `--explain` to query commands for full rationale inspection.
+
+3. **Full System Operational Execution & Multi-Run Reliability**:
+   - Run the complete project end-to-end without isolated unit tests:
+     ```powershell
+     python run_project.py
+     ```
+   - Multi-run stress & reliability certification (verifying 100% deterministic metrics, zero flaws):
+     ```powershell
+     python run_project.py --repeat 5
+     ```
 
 ## Querying: Q1-Q7, TRACK, and disclosure precision
 
-**test_5 correction**: the `EXACT`/`COARSE`/`ABSTRACT` precision-by-infra-Role table this section previously described (`security/authorize.py`'s `PrecisionLevel`) was never actually wired into `authorize()`'s decision logic even before this restructuring — it's unused/vestigial code, not a functioning mechanism. The real, functioning disclosure system is `security/campus_policy.py`'s persona-based `DisclosureLevel` (L0-L4), applied per caller/target *role pair* (Dean/Teacher/Student/Visitor), not per infra-Role:
+The real, functioning disclosure system is `security/campus_policy.py`'s persona-based `DisclosureLevel` (L0-L4), applied per caller/target *role pair* under the Principle of Minimum Necessary Disclosure:
 
 | Level | Meaning | Example (Q6) |
 | :--- | :--- | :--- |
-| **L0_NONE** | Refused entirely | — |
-| **L1_PRESENCE** | Boolean presence/availability at a designated location only | "Away from Cabin" |
+| **L0_NONE** | Refused entirely (hard deny / anti-stalking isolation) | — |
+| **L1_PRESENCE** | Boolean presence/availability at a designated location only | "Available in Cabin" / "Away from Cabin" |
 | **L2_CURRENT_ZONE** | Building + functional sector + hour-truncated time + banded confidence | `building_5`, "Work & Study Wing", ~10:00, "High (p>=0.8)" |
-| **L3_PRECISE_CURRENT** | Defined but never actually reachable by any current rule (dead tier) | — |
+| **L3_PRECISE_CURRENT** | Defined but capped under minimum necessary disclosure | — |
 | **L4_HISTORICAL_TRACK** | Full trajectory: exact zone, exact time, raw probability | `z3` (Office), 10:42:17, p=0.950 |
 
 `pipeline/query.py` (merging what used to be `query_engine.py` + `query_campus_real.py`) is the real, RBAC-gated engine, run over `dsts/output/phase4_results.json` + `nodes/<building>/building.json`. **New in test_5**: Q4 and Q7, plus visit-pointer consultation for Q6/TRACK.

@@ -36,6 +36,13 @@ class SecureBuildingNodeHandler:
     _shared_replay_guard = ReplayGuard(window_seconds=300.0)
     _shared_identities: Dict[str, NodeIdentity] = {}
 
+    @classmethod
+    def reset_shared_state(cls) -> None:
+        """Reset shared identities, transport manager, and replay guard for clean re-runs."""
+        cls._shared_identities.clear()
+        cls._shared_replay_guard.reset()
+        cls._shared_transport_manager = TransportSecurityManager(ca_name="DSTS-Campus-CA")
+
     def __init__(self, ca_name: str = "DSTS-Campus-CA", enforce_rbac: bool = True):
         self.transport_manager = self._shared_transport_manager
         self.replay_guard = self._shared_replay_guard

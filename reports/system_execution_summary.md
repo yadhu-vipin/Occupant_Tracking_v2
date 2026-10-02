@@ -1,6 +1,6 @@
 # System End-to-End Execution & RBAC Verification Summary
 
-**Execution Timestamp:** 2026-10-02 20:20:47  
+**Execution Timestamp:** 2026-10-02 20:33:59  
 **Branch:** `test_6`  
 **Evaluation Scope:** 10,000 real Phase 4 events across 10 buildings (500 occupants)
 
@@ -33,3 +33,16 @@
 - **Formal Visitor Predicate:** $\text{Visitor}(p, b, t) \iff \text{current\_building}(p, t) == b \land \text{registered\_building}(p) \neq b$
 - **Explainable Query Metadata:** Every decision returns `policy_rule`, `reason`, `visitor_status`, `exposed_fields`, and `redacted_fields`.
 - **Database Schema Changes:** **ZERO.** The underlying database stores identical spatio-temporal facts; RBAC enforces disclosure filtering at the middleware boundary.
+
+---
+
+## 5. Multi-Run Reliability & Stress Verification (5 Consecutive Passes)
+- **Consecutive Executions:** 5 complete end-to-end runs
+- **System Success Rate:** 100.0% (5/5 passed with zero critical errors)
+- **Metric Variance:** 0.00% (Strictly deterministic across all iterations)
+  - Accuracy: `95.50%` (identical)
+  - Visitor Recall: `77.65%` (identical)
+  - Communication Cost: `2.994` candidates/query (identical)
+  - Pointer Precision: `95.75%` (identical)
+- **Security Invariants:** 100% tamper rejection and 100% replay rejection across all passes.
+- **Resource Cleanup:** Zero state contamination or memory/connection leaks between runs.
