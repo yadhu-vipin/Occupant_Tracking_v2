@@ -98,16 +98,13 @@ _cached_occupancy: Optional[Dict[str, List[dict]]] = None
 _cached_heatmap: Optional[Dict[str, Dict[str, int]]] = None
 _last_cache_time: float = 0.0
 
-# Query Templates according to system specification
+# Query Templates according to system specification: Q1, Q2, Q3, Q5, Q6
 TEMPLATE_QUERIES = {
     "Q1": "Did any occupant stay in building {building_id} after time {time_t}?",
     "Q2": "Was the number of visitors in building {building_id} more than the number of registered occupants at time {time_t}?",
     "Q3": "Did occupant {target_id} leave building {building_id} before time {time_t}?",
-    "Q4": "Did occupant {target_id} enter the building between times {t1} and {t2}?",
     "Q5": "Did occupant {target_id} visit all the zones in building {building_id}?",
     "Q6": "Where was occupant {target_id} at time {time_t}?",
-    "Q7": "How many distinct zones did occupant {target_id} visit during [{t1}, {t2}]?",
-    "TRACK": "Full cross-building trajectory with pointer dereferencing for occupant {target_id}",
 }
 
 
@@ -249,22 +246,20 @@ def get_security_log() -> list[dict]:
 
 
 # ================================================================
-# QUERY API (Q1 - Q7 & TRACK with Hierarchical RBAC)
+# QUERY API (Q1, Q2, Q3, Q5, Q6 with Hierarchical RBAC)
 # ================================================================
 
 class QueryRequestBody(BaseModel):
-    query_type: str = Field(default="Q6", description="Q1, Q2, Q3, Q4, Q5, Q6, Q7, TRACK")
+    query_type: str = Field(default="Q6", description="Q1, Q2, Q3, Q5, Q6")
     caller_id: Optional[str] = Field(default=None, description="Caller occupant ID (e.g. Dean, Teacher, Student)")
     role: Optional[str] = Field(default=None, description="Role shorthand: A, B, C, dean, teacher, student")
-    target_id: Optional[str] = Field(default=None, description="Target occupant ID for Q3-Q7/TRACK")
+    target_id: Optional[str] = Field(default=None, description="Target occupant ID for Q3, Q5, Q6")
     occupant_id: Optional[str] = Field(default=None, description="Alias for target_id")
     building_id: Optional[str] = Field(default="building_5", description="Building ID (building_1 .. building_10)")
     time_t: Optional[Any] = Field(default=None, description="Query timestamp HH:MM:SS or seconds")
     at_time: Optional[Any] = Field(default=None, description="Alias for time_t")
     after_time: Optional[Any] = Field(default=None, description="Alias for time_t (Q1)")
     before_time: Optional[Any] = Field(default=None, description="Alias for time_t (Q3)")
-    t1: Optional[Any] = Field(default="08:00:00", description="Start time for interval queries (Q4, Q7)")
-    t2: Optional[Any] = Field(default="18:00:00", description="End time for interval queries (Q4, Q7)")
     purpose: str = Field(default="general_lookup", description="Query purpose")
     is_office_hours: bool = Field(default=True, description="Whether query occurs during campus/office hours")
     authorized_investigation: bool = Field(default=False, description="Whether query has authorized security mandate")
@@ -305,22 +300,18 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
         caller_id = "0001738"  # Default to Dean A
 
     target_id = (body.target_id or body.occupant_id or "").strip()
-    if not target_id and q_type in ("Q3", "Q4", "Q5", "Q6", "Q7", "TRACK"):
+    if not target_id and q_type in ("Q3", "Q5", "Q6"):
         target_id = "0000102"  # Default target student
 
     building_id = body.building_id.strip() if body.building_id else "building_5"
     raw_time = body.time_t if body.time_t is not None else (body.at_time if body.at_time is not None else (body.after_time if body.after_time is not None else body.before_time))
     at_time = _to_hms(raw_time, DEFAULT_AT_TIME)
-    t1_str = _to_hms(body.t1, "08:00:00")
-    t2_str = _to_hms(body.t2, "18:00:00")
 
     # Format human-readable template question
     template_fmt = TEMPLATE_QUERIES[q_type].format(
         building_id=building_id,
         target_id=target_id or "<target>",
         time_t=at_time,
-        t1=t1_str,
-        t2=t2_str,
     )
 
     # ────────────────────────────────────────────────────────────
@@ -472,20 +463,10 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
         res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=at_time)
         answer = res.answer
         evidence = res.evidence
-    elif q_type == "Q4":
-        res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1_str, t2=t2_str)
-        answer = res.answer
-        evidence = res.evidence
     elif q_type == "Q5":
         res = engine.Q5(occupant_id=target_id, building_id=building_id)
         answer = res.answer
         evidence = res.evidence
-    elif q_type == "Q7":
-        res = engine.Q7(occupant_id=target_id, t1=t1_str, t2=t2_str)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "TRACK":
-        answer = track_answer(engine, target_id)
 
     return {
         "success": True,

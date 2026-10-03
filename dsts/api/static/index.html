@@ -568,7 +568,7 @@
               <div class="eyebrow">DSTS RETRIEVAL &amp; RBAC ENGINE</div>
               <h1>Spatio-Temporal Queries &amp; ReBAC</h1>
               <p>
-                Execute privacy-preserving queries (Q1–Q7, TRACK) enforced by Building-Scoped Hierarchical RBAC (A &gt; B &gt; C).
+                Execute privacy-preserving queries (Q1, Q2, Q3, Q5, Q6) enforced by Building-Scoped Hierarchical RBAC (A &gt; B &gt; C).
               </p>
             </div>
           </div>
@@ -579,14 +579,11 @@
               <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 280px;">
                 <label for="q-type" style="font-weight: 700; color: var(--accent); white-space: nowrap;">QUERY TYPE:</label>
                 <select id="q-type" class="query-select" style="background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-weight: 600; width: 100%;">
-                  <option value="Q6" selected>Q6 — Where was occupant o at time t? (Point-in-Time Location)</option>
                   <option value="Q1">Q1 — Did any occupant stay in building b after time t?</option>
                   <option value="Q2">Q2 — Was number of visitors &gt; registered occupants in building b at time t?</option>
                   <option value="Q3">Q3 — Did occupant o leave building b before time t?</option>
-                  <option value="Q4">Q4 — Did occupant o enter building b between times t1 and t2?</option>
                   <option value="Q5">Q5 — Did occupant o visit all zones in building b?</option>
-                  <option value="Q7">Q7 — How many distinct zones did occupant o visit during [t1, t2]?</option>
-                  <option value="TRACK">TRACK — Full cross-building trajectory with pointer dereferencing</option>
+                  <option value="Q6" selected>Q6 — Where was occupant o at time t? (Point-in-Time Location)</option>
                 </select>
               </div>
               <div id="q-template-badge" style="background: rgba(67, 224, 208, 0.1); border: 1px solid var(--accent-dark); color: var(--accent); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-family: var(--mono);">
@@ -648,18 +645,6 @@
                   <span>TIMESTAMP (t)</span>
                   <input id="q-time" placeholder="HH:MM:SS" value="23:59:59" />
                 </label>
-
-                <!-- Range Fields for Q4/Q7 -->
-                <div id="field-range-container" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <label class="form-field">
-                    <span>START TIME (t1)</span>
-                    <input id="q-t1" placeholder="HH:MM:SS" value="08:00:00" />
-                  </label>
-                  <label class="form-field">
-                    <span>END TIME (t2)</span>
-                    <input id="q-t2" placeholder="HH:MM:SS" value="18:00:00" />
-                  </label>
-                </div>
 
                 <!-- Caller Context -->
                 <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 6px;">

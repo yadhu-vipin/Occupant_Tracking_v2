@@ -1237,18 +1237,15 @@ $("#btn-reset").addEventListener(
 
 
 /* ================================================================
-   SPATIO-TEMPORAL QUERIES & BUILDING-SCOPED RBAC
+   SPATIO-TEMPORAL QUERIES & BUILDING-SCOPED RBAC (Q1, Q2, Q3, Q5, Q6)
    ================================================================ */
 
 const queryTemplates = {
   Q1: "Did any occupant stay in building {b} after time {t}?",
   Q2: "Was the number of visitors in building {b} more than the number of registered occupants at time {t}?",
   Q3: "Did occupant {o} leave building {b} before time {t}?",
-  Q4: "Did occupant {o} enter the building between times {t1} and {t2}?",
   Q5: "Did occupant {o} visit all the zones in building {b}?",
-  Q6: "Where was occupant {o} at time {t}?",
-  Q7: "How many distinct zones did occupant {o} visit during [{t1}, {t2}]?",
-  TRACK: "Full cross-building trajectory with pointer dereferencing for occupant {o}"
+  Q6: "Where was occupant {o} at time {t}?"
 };
 
 function updateQueryTypeUI() {
@@ -1261,39 +1258,20 @@ function updateQueryTypeUI() {
   const targetBox = $("#field-target-container");
   const bldBox = $("#field-building-container");
   const timeBox = $("#field-time-container");
-  const rangeBox = $("#field-range-container");
 
   if (qType === "Q1" || qType === "Q2") {
     if (targetBox) targetBox.style.display = "none";
     if (bldBox) bldBox.style.display = "block";
     if (timeBox) timeBox.style.display = "block";
-    if (rangeBox) rangeBox.style.display = "none";
-  } else if (qType === "Q4") {
-    if (targetBox) targetBox.style.display = "block";
-    if (bldBox) bldBox.style.display = "block";
-    if (timeBox) timeBox.style.display = "none";
-    if (rangeBox) rangeBox.style.display = "grid";
-  } else if (qType === "Q7") {
-    if (targetBox) targetBox.style.display = "block";
-    if (bldBox) bldBox.style.display = "none";
-    if (timeBox) timeBox.style.display = "none";
-    if (rangeBox) rangeBox.style.display = "grid";
-  } else if (qType === "TRACK") {
-    if (targetBox) targetBox.style.display = "block";
-    if (bldBox) bldBox.style.display = "none";
-    if (timeBox) timeBox.style.display = "none";
-    if (rangeBox) rangeBox.style.display = "none";
   } else if (qType === "Q6") {
     if (targetBox) targetBox.style.display = "block";
     if (bldBox) bldBox.style.display = "none";
     if (timeBox) timeBox.style.display = "block";
-    if (rangeBox) rangeBox.style.display = "none";
   } else {
     // Q3, Q5
     if (targetBox) targetBox.style.display = "block";
     if (bldBox) bldBox.style.display = "block";
     if (timeBox) timeBox.style.display = (qType === "Q3") ? "block" : "none";
-    if (rangeBox) rangeBox.style.display = "none";
   }
 }
 
@@ -1333,7 +1311,7 @@ if ($("#btn-query")) {
   $("#btn-query").addEventListener("click", executeCurrentQuery);
 }
 
-["q-occupant", "q-caller", "q-time", "q-t1", "q-t2"].forEach((id) => {
+["q-occupant", "q-caller", "q-time"].forEach((id) => {
   const input = $(`#${id}`);
   if (input) {
     input.addEventListener("keydown", (event) => {
@@ -1350,8 +1328,6 @@ function executeCurrentQuery() {
   const targetId = $("#q-occupant") ? $("#q-occupant").value.trim() : "";
   const buildingId = $("#q-building") ? $("#q-building").value : "building_5";
   const timeT = $("#q-time") ? $("#q-time").value.trim() : "23:59:59";
-  const t1 = $("#q-t1") ? $("#q-t1").value.trim() : "08:00:00";
-  const t2 = $("#q-t2") ? $("#q-t2").value.trim() : "18:00:00";
   const purpose = $("#q-purpose") ? $("#q-purpose").value : "general_lookup";
   const isOfficeHours = $("#q-office-hours") ? $("#q-office-hours").checked : true;
   const authorizedInvestigation = $("#q-authorized") ? $("#q-authorized").checked : false;
@@ -1362,8 +1338,6 @@ function executeCurrentQuery() {
     target_id: targetId,
     building_id: buildingId,
     time_t: timeT,
-    t1: t1,
-    t2: t2,
     purpose: purpose,
     is_office_hours: isOfficeHours,
     authorized_investigation: authorizedInvestigation,
