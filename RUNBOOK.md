@@ -106,10 +106,38 @@ The access control model strictly enforces the three-tier hierarchy:
   $$\text{Visitor}(p, b, t) \iff \text{current\_building}(p, t) == b \land \text{registered\_building}(p) \neq b$$
   Deans can view visitors from other buildings currently inside their building ($L_2$ arrival status); history outside their building is strictly redacted. Deans cannot track occupants in other buildings who are not currently visiting them ($L_0$ hard deny).
 - **Explainable Queries**: Append `--explain` to query executions to view structured policy metadata:
-  ```powershell
-  python pipeline/query.py --caller 0001738 --target 0000477 --query Q6 --purpose general_lookup --explain
-  ```
   Returns `policy_rule`, `reason`, `visitor_status`, `exposed_fields`, and `redacted_fields`.
+
+## 1.3. Lane D Command Center Web Dashboard & Spatio-Temporal Queries
+
+The system includes a live Command Center web interface ([dsts/api/server.py](dsts/api/server.py)) backed by FastAPI and Prometheus observability.
+
+### Launching the Web Server
+```powershell
+uvicorn dsts.api.server:app --host 0.0.0.0 --port 8000 --reload
+```
+Navigate to `http://localhost:8000` to access the Command Center dashboard.
+
+### Scoped Spatio-Temporal Query Suite
+The query engine and API endpoints are strictly restricted to the 5 paper query templates:
+- **Q1**: `POST /api/query` with `query_type: "Q1"`, `building_id`, `after_time`
+  *Template*: *Did any occupant stay in building $b$ after time $t$?*
+- **Q2**: `POST /api/query` with `query_type: "Q2"`, `building_id`, `time_t`
+  *Template*: *Was the number of visitors in building $b$ more than the number of registered occupants at time $t$?*
+- **Q3**: `POST /api/query` with `query_type: "Q3"`, `occupant_id`, `building_id`, `before_time`
+  *Template*: *Did occupant $o$ leave building $b$ before time $t$?*
+- **Q5**: `POST /api/query` with `query_type: "Q5"`, `occupant_id`, `building_id`
+  *Template*: *Did occupant $o$ visit all the zones in building $b$?*
+- **Q6**: `POST /api/query` with `query_type: "Q6"`, `occupant_id`, `time_t`
+  *Template*: *Where was occupant $o$ at time $t$?*
+
+Any request specifying unsupported query types is rejected with `400 Bad Request`.
+
+### Observability & Metrics
+- Prometheus metrics endpoint: `GET /metrics`
+- Live WebSocket stream: `/ws/live`
+- Grafana dashboard: Available in `monitoring/grafana/dashboards/dsts_dashboard.json`
+- Docker Compose stack: `monitoring/docker-compose.yml`
 
 ## 2. Run the tests
 

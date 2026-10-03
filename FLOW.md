@@ -43,7 +43,7 @@ Everything else — the library, the contract, the CLIs — is here.
 | State layer wiring (BSTS -> SQLite) | **done** — a match lands a real probability row in `registered.db` or `visitor.db` |
 | Full event/recognition/retrieval/state pipeline (Phases 1-4) | **done** — see `README.md`, run via `pipeline/generate_events.py` -> `pipeline/route_and_recognize.py` -> `pipeline/phase4_state.py` |
 | Visit-pointer cross-building location index | **done**, new in test_5 — `nodelib.deploy.PointerStore`, minted on a confirmed non-home match at `zT`, cleared on departure |
-| Q1-Q7 + TRACK query engine, two-layer RBAC | **done** — `pipeline/query.py` |
+| Q1, Q2, Q3, Q5, Q6 query engine, two-layer RBAC | **done** — `pipeline/query.py` |
 | Unified end-to-end evaluation | **done** — `pipeline/evaluate_pipeline.py` |
 | Automated test suite | **done** — 93 tests, `python -m pytest -q` |
 | Standalone packaging | **done** — this repo root, copy-anywhere, no path outside it |

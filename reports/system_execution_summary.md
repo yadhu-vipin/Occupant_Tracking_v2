@@ -1,6 +1,6 @@
 # System End-to-End Execution & RBAC Verification Summary
 
-**Execution Timestamp:** 2026-10-02 20:33:59  
+**Execution Timestamp:** 2026-10-04 01:07:00  
 **Branch:** `test_6`  
 **Evaluation Scope:** 10,000 real Phase 4 events across 10 buildings (500 occupants)
 
@@ -36,9 +36,9 @@
 
 ---
 
-## 5. Multi-Run Reliability & Stress Verification (5 Consecutive Passes)
-- **Consecutive Executions:** 5 complete end-to-end runs
-- **System Success Rate:** 100.0% (5/5 passed with zero critical errors)
+## 5. Multi-Run Reliability & Stress Verification (3 Consecutive Passes)
+- **Consecutive Executions:** 3 complete end-to-end runs
+- **System Success Rate:** 100.0% (3/3 passed with zero critical errors)
 - **Metric Variance:** 0.00% (Strictly deterministic across all iterations)
   - Accuracy: `95.50%` (identical)
   - Visitor Recall: `77.65%` (identical)
@@ -46,3 +46,9 @@
   - Pointer Precision: `95.75%` (identical)
 - **Security Invariants:** 100% tamper rejection and 100% replay rejection across all passes.
 - **Resource Cleanup:** Zero state contamination or memory/connection leaks between runs.
+
+## 6. Scoped Query Suite & Lane D Command Center Integration
+- **Supported Query Templates:** Strictly restricted to Q1, Q2, Q3, Q5, and Q6 (unsupported queries rejected with `400 Bad Request`).
+- **FastAPI Command Center:** Serves REST endpoints (`/api/query`, `/api/occupancy`, `/api/heatmap`, `/api/health`, `/metrics`) and live WebSocket stream (`/ws/live`).
+- **Web UI & Observability:** Real-time occupant tracking, heatmap density, persona quick-pick chips, and Grafana dashboard (`monitoring/grafana/dashboards/dsts_dashboard.json`).
+- **Multi-Pass Reliability Certification:** 100% test pass rate with zero critical flaws across repeated full-system executions.
