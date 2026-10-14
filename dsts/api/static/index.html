@@ -582,8 +582,16 @@
                   <option value="Q1">Q1 — Did any occupant stay in building b after time t?</option>
                   <option value="Q2">Q2 — Was number of visitors &gt; registered occupants in building b at time t?</option>
                   <option value="Q3">Q3 — Did occupant o leave building b before time t?</option>
-                  <option value="Q5">Q5 — Did occupant o visit all zones in building b?</option>
+                  <option value="Q4">Q4 — Did occupant o enter the building between times t1 and t2?</option>
+                  <option value="Q5">Q5 — Did occupant o visit all the zones in building b?</option>
                   <option value="Q6" selected>Q6 — Where was occupant o at time t? (Point-in-Time Location)</option>
+                  <option value="Q7">Q7 — How many zones did occupant o visit during interval t1 to t2?</option>
+                  <option value="Q8">Q8 — At what time did occupant o visit zone z for first time?</option>
+                  <option value="Q9">Q9 — How long did occupant o spend at zone z during first visit?</option>
+                  <option value="Q10">Q10 — Who was there in zone z at time t?</option>
+                  <option value="Q11">Q11 — Where was occupant o during time interval from t1 to t2?</option>
+                  <option value="Q12">Q12 — Who was there in zone z from time t1 to t2?</option>
+                  <option value="Q13">Q13 — Who all visited zone z?</option>
                 </select>
               </div>
               <div id="q-template-badge" style="background: rgba(67, 224, 208, 0.1); border: 1px solid var(--accent-dark); color: var(--accent); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-family: var(--mono);">
@@ -640,11 +648,41 @@
                   </select>
                 </label>
 
-                <!-- Time Field -->
+                <!-- Zone Field -->
+                <label class="form-field" id="field-zone-container" style="display: none;">
+                  <span>ZONE ID</span>
+                  <select id="q-zone">
+                    <option value="z1" selected>z1 — Lobby / Reception</option>
+                    <option value="z2">z2 — Conference Room</option>
+                    <option value="z3">z3 — Executive / Faculty Office</option>
+                    <option value="z4">z4 — Main Research Lab</option>
+                    <option value="z5">z5 — Break Room / Lounge</option>
+                    <option value="z6">z6 — Study Area / Library</option>
+                    <option value="z7">z7 — Classroom / Seminar Room</option>
+                    <option value="z8">z8 — Server / Storage Room</option>
+                    <option value="zT">zT — Building Transition / Hallway</option>
+                  </select>
+                </label>
+
+                <!-- Time Field (Single Timestamp t) -->
                 <label class="form-field" id="field-time-container">
                   <span>TIMESTAMP (t)</span>
                   <input id="q-time" placeholder="HH:MM:SS" value="23:59:59" />
                 </label>
+
+                <!-- Time Range Field (Interval [t1, t2]) -->
+                <div id="field-range-container" style="display: none; margin-bottom: 12px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <label class="form-field" style="margin-bottom: 0;">
+                      <span>START TIME (t1)</span>
+                      <input id="q-t1" placeholder="HH:MM:SS" value="08:00:00" />
+                    </label>
+                    <label class="form-field" style="margin-bottom: 0;">
+                      <span>END TIME (t2)</span>
+                      <input id="q-t2" placeholder="HH:MM:SS" value="18:00:00" />
+                    </label>
+                  </div>
+                </div>
 
                 <!-- Caller Context -->
                 <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 6px;">

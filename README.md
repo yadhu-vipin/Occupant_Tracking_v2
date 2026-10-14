@@ -68,7 +68,7 @@ The older interactive/deployment path in `nodelib/deploy.py`'s `DeployedBuilding
 | `recognize.py` | `recognition/local.py` + `respond_node.py` | Library: vote-based recognition, shared by a building's own gallery check and a routed candidate's check |
 | `route_and_recognize.py` | `recognition/run.py` + `retrieval/pipeline.py` + `query_node.py` | Phase 2 (`--phase 2`, own-gallery pass) and Phase 3 (`--phase 3`, routing + candidate verification); mints visit-pointers on confirmed non-home matches |
 | `phase4_state.py` | `dsts/pipeline.py` | Definition 3.3 probability + BSTS state integration; clears visit-pointers on departure |
-| `query.py` | `query_engine.py` + `query_campus_real.py` | Q1, Q2, Q3, Q5, Q6, two-layer RBAC, visit-pointer consultation |
+| `query.py` | `query_engine.py` + `query_campus_real.py` | Complete spatio-temporal query suite (Q1-Q13, TRACK), two-layer Hierarchical RBAC (A > B > C), visit-pointer consultation |
 | `evaluate_pipeline.py` | `recognition/evaluate.py` + `retrieval/evaluate.py` + `dsts/evaluate.py` | One unified end-to-end evaluator (accuracy, routing recall, communication cost, pointer precision) |
 
 The checked-in `out/` artifacts and manifests are routing artifacts. `nodes/` is generated deployment material; each node has its own embeddings, copied peer filters, configuration, and SQLite databases. The embedding corpus itself is intentionally not included here: defaults look for `corpus/emb_arcface.npy` and `corpus/meta.csv`, then compatible parent-pipeline locations. The expected corpus is a row-aligned `(N, 512)` `float32` ArcFace embedding array plus `meta.csv` with `building`, `occupant_id`, and `split` columns.
@@ -111,7 +111,7 @@ The commands create these artifacts:
 | `pipeline.route_and_recognize --phase 3` | `retrieval/output/retrieval_attempts.json`; mints visit-pointers on confirmed non-home matches |
 | `pipeline.phase4_state` | `dsts/output/phase4_results.json`, `dsts/output/phase4_summary.json`, plus updated `nodes/<building>/state/{registered,visitor}.db`; clears visit-pointers on departure |
 | `build_campus_roles.py` | `variants/rbac10/{occupant_roles,class_rosters,deans_by_building}.json` -- required once before `pipeline.query`'s RBAC layer works |
-| `pipeline.query` | answers Q1-Q7/TRACK against `dsts/output/phase4_results.json`, gated by both RBAC layers |
+| `pipeline.query` | answers Q1-Q13 and TRACK against `dsts/output/phase4_results.json`, gated by both RBAC layers |
 | `pipeline.evaluate_pipeline` | `evaluate_pipeline/output/end_to_end_results.json`, `evaluate_pipeline/output/end_to_end_summary.json` -- the single unified accuracy/routing-recall/communication-cost/pointer-precision report |
 
 `centralized.evaluate` (unchanged, still a standalone benchmark, see below) is run separately when you want the privacy/accuracy-tradeoff comparison, not as part of this main sequence. All CLIs support explicit input/output paths; use `--help` to see their actual arguments.

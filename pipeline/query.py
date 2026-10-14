@@ -90,7 +90,7 @@ INTERNAL_ZONES = frozenset(ZONES) - {"zT"}
 TRANSITION_ZONE = "zT"
 ROLES_DIR = ROOT_DIR / "variants" / "rbac10"
 DEFAULT_AT_TIME = "23:59:59"   # "as of end of day" -> most recent known detection
-TRAJECTORY_QUERIES = {"Q3", "Q4", "Q5", "Q7", "TRACK"}   # require L4 outright, no partial redaction
+TRAJECTORY_QUERIES = {"Q3", "Q4", "Q5", "Q7", "Q8", "Q9", "Q11", "TRACK"}   # require L4 outright, no partial redaction
 
 
 # --------------------------------------------------------------------------
@@ -165,6 +165,35 @@ class QueryType(Enum):
     Q5_VISITED_ALL_ZONES = "Q5"
     Q6_LOCATION_AT_TIME = "Q6"
     Q7_ZONE_COUNT_BETWEEN_TIMES = "Q7"
+    Q8_FIRST_ZONE_VISIT_TIME = "Q8"
+    Q9_FIRST_VISIT_DURATION = "Q9"
+    Q10_ZONE_OCCUPANTS_AT_TIME = "Q10"
+    Q11_OCCUPANT_TRAJECTORY_WINDOW = "Q11"
+    Q12_ZONE_OCCUPANTS_BETWEEN_TIMES = "Q12"
+    Q13_ALL_ZONE_VISITORS = "Q13"
+
+
+def _parse_time_seconds(t: str) -> int:
+    """Convert 'HH:MM:SS' string to seconds past midnight."""
+    parts = str(t).strip().split(":")
+    if len(parts) == 3:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    if len(parts) == 2:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60
+    return int(t) if str(t).isdigit() else 0
+
+
+def _format_duration(seconds: int) -> str:
+    """Format seconds into clean human-readable duration."""
+    if seconds < 60:
+        return f"{seconds}s"
+    mins = seconds // 60
+    rem_sec = seconds % 60
+    if mins < 60:
+        return f"{mins}m {rem_sec:02d}s" if rem_sec else f"{mins}m"
+    hours = mins // 60
+    rem_min = mins % 60
+    return f"{hours}h {rem_min:02d}m"
 
 
 @dataclass
@@ -470,6 +499,256 @@ class QueryEngine:
                     result["pointer_history"] = store.lookup_history(occupant_id)
         return result
 
+    # ─── Q8: At what time did occupant o visit zone z for the first time? ─
+    def Q8(self, occupant_id: str, zone: str, building_id: str | None = None) -> QueryResult:
+        query_text = f"At what time did {occupant_id} visit zone {zone} for the first time?"
+        parameters = {"occupant_id": occupant_id, "zone": zone, "building_id": building_id}
+        self._authorize("Q8", f"occupant:{occupant_id}")
+
+        matches = [e for e in self.events if e.occupant_id == occupant_id and e.zone == zone]
+        if building_id:
+            matches = [e for e in matches if e.building == building_id]
+
+        if not matches:
+            return QueryResult(
+                query_id="Q8", query_text=query_text, parameters=parameters,
+                answer=None,
+                evidence=[f"  Occupant {occupant_id} has never visited zone {zone} ({zone_label(zone)})"],
+                success=True
+            )
+
+        first_event = min(matches, key=lambda e: e.timestamp)
+        prob = f"{first_event.identity_probability:.3f}" if first_event.identity_probability is not None else "n/a"
+        evidence = [
+            f"  First detection in zone {zone} ({zone_label(zone)}): t={first_event.timestamp} at {first_event.building}",
+            f"  Confidence: p={prob} (via {first_event.source})",
+            f"  Total detections in this zone: {len(matches)}",
+        ]
+        return QueryResult(query_id="Q8", query_text=query_text, parameters=parameters,
+                           answer=first_event.timestamp, evidence=evidence, success=True)
+
+    # ─── Q9: How long did occupant o spend at zone z during his first visit?
+    def Q9(self, occupant_id: str, zone: str, building_id: str | None = None) -> QueryResult:
+        query_text = f"How long did {occupant_id} spend at zone {zone} during his first visit?"
+        parameters = {"occupant_id": occupant_id, "zone": zone, "building_id": building_id}
+        self._authorize("Q9", f"occupant:{occupant_id}")
+
+        history = sorted((e for e in self.events if e.occupant_id == occupant_id), key=lambda e: e.timestamp)
+        first_idx = None
+        for i, e in enumerate(history):
+            if e.zone == zone and (building_id is None or e.building == building_id):
+                first_idx = i
+                break
+
+        if first_idx is None:
+            return QueryResult(
+                query_id="Q9", query_text=query_text, parameters=parameters,
+                answer=None,
+                evidence=[f"  Occupant {occupant_id} has never visited zone {zone} ({zone_label(zone)})"],
+                success=True
+            )
+
+        start_event = history[first_idx]
+        t_start = start_event.timestamp
+
+        next_event = None
+        for j in range(first_idx + 1, len(history)):
+            curr = history[j]
+            if curr.zone != zone or curr.building != start_event.building:
+                next_event = curr
+                break
+
+        if next_event:
+            t_end = next_event.timestamp
+            sec = max(1, _parse_time_seconds(t_end) - _parse_time_seconds(t_start))
+            status_desc = f"Departed to {next_event.zone} ({zone_label(next_event.zone)}) at {t_end}"
+        else:
+            t_end = history[-1].timestamp
+            sec = max(30, _parse_time_seconds(t_end) - _parse_time_seconds(t_start))
+            status_desc = f"Last observation at {t_end}"
+
+        duration_fmt = _format_duration(sec)
+        answer = {
+            "duration_seconds": sec,
+            "duration_formatted": duration_fmt,
+            "entry_time": t_start,
+            "exit_time": t_end,
+            "zone": zone,
+            "zone_label": zone_label(zone),
+            "building": start_event.building,
+        }
+        evidence = [
+            f"  First visit to {zone} ({zone_label(zone)}) in {start_event.building} began at t={t_start}",
+            f"  {status_desc}",
+            f"  Total time spent: {duration_fmt} ({sec} seconds)",
+        ]
+        return QueryResult(query_id="Q9", query_text=query_text, parameters=parameters,
+                           answer=answer, evidence=evidence, success=True)
+
+    # ─── Q10: Who was there in zone z at time t? ──────────────────────────
+    def Q10(self, zone: str, at_time: str, building_id: str | None = None) -> QueryResult:
+        query_text = f"Who was there in zone {zone} at t={at_time}?"
+        parameters = {"zone": zone, "at_time": at_time, "building_id": building_id}
+        target_auth = f"building:{building_id}" if building_id else f"zone:{zone}"
+        self._authorize("Q10", target_auth)
+
+        occupants_events: dict[str, list[IdentifiedEvent]] = {}
+        for e in self.events:
+            if e.timestamp <= at_time:
+                occupants_events.setdefault(e.occupant_id, []).append(e)
+
+        present: list[dict[str, Any]] = []
+        for occ_id, evs in occupants_events.items():
+            last_ev = max(evs, key=lambda x: x.timestamp)
+            if last_ev.zone == zone:
+                if building_id is None or last_ev.building == building_id:
+                    present.append({
+                        "occupant_id": occ_id,
+                        "building": last_ev.building,
+                        "timestamp": last_ev.timestamp,
+                        "probability": last_ev.identity_probability,
+                        "source": last_ev.source,
+                    })
+
+        present = sorted(present, key=lambda x: x["occupant_id"])
+        occupant_ids = [p["occupant_id"] for p in present]
+
+        evidence = [
+            f"  {len(occupant_ids)} occupant(s) detected in zone {zone} ({zone_label(zone)}) at t={at_time}:",
+        ]
+        for p in present[:15]:
+            prob_str = f"{p['probability']:.2f}" if p['probability'] is not None else "n/a"
+            evidence.append(f"    - {p['occupant_id']} (last observed {p['timestamp']} in {p['building']}, p={prob_str})")
+        if len(present) > 15:
+            evidence.append(f"    ... and {len(present) - 15} more")
+
+        return QueryResult(query_id="Q10", query_text=query_text, parameters=parameters,
+                           answer=occupant_ids, evidence=evidence, success=True)
+
+    # ─── Q11: Where was the occupant o during [t1, t2]? ───────────────────
+    def Q11(self, occupant_id: str, t1: str, t2: str) -> QueryResult:
+        query_text = f"Where was {occupant_id} during [{t1}, {t2}]?"
+        parameters = {"occupant_id": occupant_id, "t1": t1, "t2": t2}
+        self._authorize("Q11", f"occupant:{occupant_id}")
+
+        window = sorted([e for e in self.events if e.occupant_id == occupant_id and t1 <= e.timestamp <= t2],
+                        key=lambda e: e.timestamp)
+
+        if not window:
+            prior = [e for e in self.events if e.occupant_id == occupant_id and e.timestamp < t1]
+            if prior:
+                last_prior = max(prior, key=lambda e: e.timestamp)
+                msg = f"No transitions in [{t1}, {t2}]; last observed at {last_prior.building}:{last_prior.zone} ({zone_label(last_prior.zone)}) at t={last_prior.timestamp}"
+            else:
+                msg = f"No observations of occupant {occupant_id} prior to or during [{t1}, {t2}]"
+            return QueryResult(
+                query_id="Q11", query_text=query_text, parameters=parameters,
+                answer={"total_observations": 0, "status": msg, "trajectory": []},
+                evidence=[f"  {msg}"], success=True
+            )
+
+        trajectory = [
+            {
+                "time": e.timestamp,
+                "building": e.building,
+                "zone": e.zone,
+                "zone_label": zone_label(e.zone),
+                "probability": e.identity_probability,
+            }
+            for e in window
+        ]
+        distinct_zones = sorted({e.zone for e in window})
+        distinct_buildings = sorted({e.building for e in window})
+
+        answer = {
+            "total_observations": len(window),
+            "buildings_visited": distinct_buildings,
+            "zones_visited": distinct_zones,
+            "trajectory": trajectory,
+        }
+        evidence = [
+            f"  {len(window)} detection(s) during [{t1}, {t2}] across {distinct_buildings}:",
+            f"  Distinct zones visited: {distinct_zones}",
+        ]
+        for wp in trajectory[:10]:
+            prob_s = f"{wp['probability']:.2f}" if wp['probability'] is not None else "n/a"
+            evidence.append(f"    - {wp['time']} | {wp['building']}:{wp['zone']} ({wp['zone_label']}) p={prob_s}")
+        if len(trajectory) > 10:
+            evidence.append(f"    ... and {len(trajectory) - 10} more detections")
+
+        return QueryResult(query_id="Q11", query_text=query_text, parameters=parameters,
+                           answer=answer, evidence=evidence, success=True)
+
+    # ─── Q12: Who was there in zone z from t1 to t2? ──────────────────────
+    def Q12(self, zone: str, t1: str, t2: str, building_id: str | None = None) -> QueryResult:
+        query_text = f"Who was there in zone {zone} from t1={t1} to t2={t2}?"
+        parameters = {"zone": zone, "t1": t1, "t2": t2, "building_id": building_id}
+        target_auth = f"building:{building_id}" if building_id else f"zone:{zone}"
+        self._authorize("Q12", target_auth)
+
+        window_events = [e for e in self.events if e.zone == zone and t1 <= e.timestamp <= t2]
+        if building_id:
+            window_events = [e for e in window_events if e.building == building_id]
+
+        detected_occupants = {e.occupant_id for e in window_events}
+
+        all_prior = {}
+        for e in self.events:
+            if e.timestamp < t1:
+                all_prior.setdefault(e.occupant_id, []).append(e)
+
+        for occ_id, p_events in all_prior.items():
+            if occ_id in detected_occupants:
+                continue
+            last_p = max(p_events, key=lambda x: x.timestamp)
+            if last_p.zone == zone and (building_id is None or last_p.building == building_id):
+                future = [e for e in self.events if e.occupant_id == occ_id and e.timestamp > t1]
+                if not future or future[0].timestamp > t1:
+                    detected_occupants.add(occ_id)
+
+        occupant_ids = sorted(detected_occupants)
+        evidence = [
+            f"  {len(occupant_ids)} distinct occupant(s) in zone {zone} ({zone_label(zone)}) during [{t1}, {t2}]",
+            f"  Occupant list: {occupant_ids[:20]}" if occupant_ids else "  None detected",
+        ]
+        if len(occupant_ids) > 20:
+            evidence.append(f"  ... and {len(occupant_ids) - 20} more occupants")
+
+        return QueryResult(query_id="Q12", query_text=query_text, parameters=parameters,
+                           answer=occupant_ids, evidence=evidence, success=True)
+
+    # ─── Q13: Who all visited zone z? ─────────────────────────────────────
+    def Q13(self, zone: str, building_id: str | None = None) -> QueryResult:
+        query_text = f"Who all visited zone {zone}?"
+        parameters = {"zone": zone, "building_id": building_id}
+        target_auth = f"building:{building_id}" if building_id else f"zone:{zone}"
+        self._authorize("Q13", target_auth)
+
+        matching = [e for e in self.events if e.zone == zone]
+        if building_id:
+            matching = [e for e in matching if e.building == building_id]
+
+        occ_counts = Counter(e.occupant_id for e in matching)
+        sorted_occupants = sorted(occ_counts.keys())
+
+        answer = {
+            "total_visitors": len(sorted_occupants),
+            "occupants": sorted_occupants,
+            "top_visitors": [
+                {"occupant_id": occ, "visit_count": cnt}
+                for occ, cnt in occ_counts.most_common(10)
+            ],
+        }
+        evidence = [
+            f"  Total unique occupants who visited zone {zone} ({zone_label(zone)}): {len(sorted_occupants)}",
+            f"  Total observation events in zone: {len(matching)}",
+        ]
+        for occ, cnt in occ_counts.most_common(5):
+            evidence.append(f"    - {occ}: {cnt} visit detections")
+
+        return QueryResult(query_id="Q13", query_text=query_text, parameters=parameters,
+                           answer=answer, evidence=evidence, success=True)
+
     # ─── generic dispatcher ────────────────────────────────────────────────
     def execute_query(self, query_type: QueryType | str, **kwargs) -> QueryResult:
         q = str(query_type.value if isinstance(query_type, Enum) else query_type).upper()
@@ -480,13 +759,25 @@ class QueryEngine:
         if q in ("Q3", "Q3_LEFT_BEFORE_TIME"):
             return self.Q3(kwargs["occupant_id"], kwargs["building_id"], kwargs.get("before_time", kwargs.get("time_t", "23:59:59")))
         if q in ("Q4", "Q4_ENTERED_BETWEEN_TIMES"):
-            return self.Q4(kwargs["occupant_id"], kwargs["building_id"], kwargs["t1"], kwargs["t2"])
+            return self.Q4(kwargs["occupant_id"], kwargs.get("building_id", "building_5"), kwargs["t1"], kwargs["t2"])
         if q in ("Q5", "Q5_VISITED_ALL_ZONES"):
             return self.Q5(kwargs["occupant_id"], kwargs["building_id"])
         if q in ("Q6", "Q6_LOCATION_AT_TIME"):
             return self.Q6(kwargs["occupant_id"], kwargs.get("at_time", kwargs.get("time_t", "23:59:59")))
         if q in ("Q7", "Q7_ZONE_COUNT_BETWEEN_TIMES"):
             return self.Q7(kwargs["occupant_id"], kwargs["t1"], kwargs["t2"])
+        if q in ("Q8", "Q8_FIRST_ZONE_VISIT_TIME"):
+            return self.Q8(kwargs["occupant_id"], kwargs["zone"], kwargs.get("building_id"))
+        if q in ("Q9", "Q9_FIRST_VISIT_DURATION"):
+            return self.Q9(kwargs["occupant_id"], kwargs["zone"], kwargs.get("building_id"))
+        if q in ("Q10", "Q10_ZONE_OCCUPANTS_AT_TIME"):
+            return self.Q10(kwargs["zone"], kwargs.get("at_time", kwargs.get("time_t", "23:59:59")), kwargs.get("building_id"))
+        if q in ("Q11", "Q11_OCCUPANT_TRAJECTORY_WINDOW"):
+            return self.Q11(kwargs["occupant_id"], kwargs["t1"], kwargs["t2"])
+        if q in ("Q12", "Q12_ZONE_OCCUPANTS_BETWEEN_TIMES"):
+            return self.Q12(kwargs["zone"], kwargs["t1"], kwargs["t2"], kwargs.get("building_id"))
+        if q in ("Q13", "Q13_ALL_ZONE_VISITORS"):
+            return self.Q13(kwargs["zone"], kwargs.get("building_id"))
         raise ValueError(f"Unknown or unsupported query type: {query_type}")
 
 
@@ -619,8 +910,9 @@ def resolve_target_current_building(engine: QueryEngine, target_id: str, at_time
 def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_type: str, *, purpose: str,
                        is_office_hours: bool, authorized_investigation: bool, at_time: str,
                        building_id: str | None = None, before_time: str | None = None,
-                       t1: str | None = None, t2: str | None = None, explain: bool = False) -> None:
-    """Q3/Q4/Q5/Q6/Q7/TRACK -- queries about ONE target occupant. Both RBAC layers apply."""
+                       t1: str | None = None, t2: str | None = None, zone: str | None = None,
+                       explain: bool = False) -> None:
+    """Q3/Q4/Q5/Q6/Q7/Q8/Q9/Q11/TRACK -- queries about ONE target occupant. Both RBAC layers apply."""
     print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {target_id}  "
          f"(purpose={purpose}, office_hours={is_office_hours}, authorized={authorized_investigation})")
 
@@ -630,7 +922,7 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         register_occupant_current_building(target_id, target_current_b)
 
     target_resource = f"occupant:{target_id}"
-    permitted = authorize(caller_id, "QUERY", target_resource)
+    permitted =  authorize(caller_id, "QUERY", target_resource)
     last_reason = get_audit_log()[-1]["reason"]
     if not permitted:
         print(f"  Layer 1 (infra RBAC) DENIED: {last_reason}")
@@ -690,9 +982,60 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
         print(f"  Query:  {res.query_text}")
         print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+    elif q_type == "Q8":
+        target_zone = zone or "z1"
+        res = engine.Q8(occupant_id=target_id, zone=target_zone, building_id=building_id)
+        print(f"  Query:  {res.query_text}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+    elif q_type == "Q9":
+        target_zone = zone or "z1"
+        res = engine.Q9(occupant_id=target_id, zone=target_zone, building_id=building_id)
+        print(f"  Query:  {res.query_text}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+    elif q_type == "Q11":
+        res = engine.Q11(occupant_id=target_id, t1=t1 or "08:00:00", t2=t2 or "18:00:00")
+        print(f"  Query:  {res.query_text}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
     elif q_type == "TRACK":
         print(f"  Query:  Full historical trajectory for {target_id}")
         print(f"  Disclosed (L4_HISTORICAL_TRACK): {track_answer(engine, target_id)}")
+
+
+def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
+                   building_id: str | None = None, at_time: str = DEFAULT_AT_TIME,
+                   t1: str = "08:00:00", t2: str = "18:00:00", explain: bool = False) -> None:
+    """Q10/Q12/Q13 -- zone queries. Gated on building/zone infra RBAC + anti-stalking policy."""
+    target_resource = f"building:{building_id}" if building_id else f"zone:{zone}"
+    print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {zone} (building={building_id})")
+
+    caller_role = get_real_role(caller_id)
+    if caller_role == "student":
+        print(f"  Layer 1 (infra RBAC): PERMIT (registered QUERY_CLIENT)")
+        print(f"  Layer 2 (persona ReBAC): DENY (RULE_C_PEER_ZONE_SURVEILLANCE_DENIED)")
+        print(f"  Reason: Students are prohibited from performing zone-level occupant surveillance (anti-stalking isolation)")
+        return
+
+    permitted = authorize(caller_id, "QUERY", target_resource)
+    last_reason = get_audit_log()[-1]["reason"] if get_audit_log() else ""
+    if not permitted:
+        print(f"  Layer 1 (infra RBAC) DENIED: {last_reason}")
+        return
+    print(f"  Layer 1 (infra RBAC): PERMIT (reason={last_reason or 'registered QUERY_CLIENT'})")
+    print(f"  Layer 2 (persona ReBAC): PERMIT (role={caller_role} in building={building_id or 'all'})")
+
+    if q_type == "Q10":
+        res = engine.Q10(zone=zone, at_time=at_time, building_id=building_id)
+    elif q_type == "Q12":
+        res = engine.Q12(zone=zone, t1=t1, t2=t2, building_id=building_id)
+    else:  # Q13
+        res = engine.Q13(zone=zone, building_id=building_id)
+
+    print(f"  Query:  {res.query_text}")
+    print(f"  Answer: {res.answer}")
+    for line in res.evidence[:5]:
+        print(f"   {line}")
+    if len(res.evidence) > 5:
+        print(f"   ... and {len(res.evidence) - 5} more evidence rows")
 
 
 def print_role_capabilities() -> None:
@@ -774,6 +1117,34 @@ def run_demo(nodes_dir: Path | None = None) -> None:
     run_occupant_query(engine, teacher_a, roster_student, "TRACK", purpose="academic_roster",
                        is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
 
+    print(f"\n{'=' * 78}\nCOMPLETE SUITE OF 13 SPATIO-TEMPORAL QUERIES (Q1 - Q13)\n")
+    # Q4: Did occupant o enter building b between t1 and t2?
+    run_occupant_query(engine, dean_id, roster_student, "Q4", purpose="security_investigation",
+                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
+                       building_id=home_building, t1="08:00:00", t2="18:00:00")
+    # Q7: How many zones did occupant o visit during interval t1 to t2?
+    run_occupant_query(engine, dean_id, roster_student, "Q7", purpose="security_investigation",
+                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
+                       t1="08:00:00", t2="18:00:00")
+    # Q8: At what time did occupant o visit zone z for the first time?
+    run_occupant_query(engine, dean_id, roster_student, "Q8", purpose="security_investigation",
+                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
+                       zone="z1", building_id=home_building)
+    # Q9: How long did occupant o spend at zone z during his first visit?
+    run_occupant_query(engine, dean_id, roster_student, "Q9", purpose="security_investigation",
+                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
+                       zone="z1", building_id=home_building)
+    # Q10: Who was there in zone z at time t?
+    run_zone_query(engine, dean_id, "Q10", zone="z1", building_id=home_building, at_time="12:00:00")
+    # Q11: Where was occupant o during time interval from t1 to t2?
+    run_occupant_query(engine, dean_id, roster_student, "Q11", purpose="security_investigation",
+                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
+                       t1="08:00:00", t2="18:00:00")
+    # Q12: Who was there in zone z from time t1 to t2?
+    run_zone_query(engine, dean_id, "Q12", zone="z1", building_id=home_building, t1="08:00:00", t2="18:00:00")
+    # Q13: Who all visited zone z?
+    run_zone_query(engine, dean_id, "Q13", zone="z1", building_id=home_building)
+
     print(f"\n{'=' * 78}\nBUILDING-SCOPED HIERARCHICAL RBAC (A > B > C & Visitor Predicate)\n")
 
     # Local student in own building -> PERMITTED
@@ -818,9 +1189,10 @@ def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--demo", action="store_true", help="run the full real-registry scenario battery")
     ap.add_argument("--caller", help="real occupant id of the caller")
-    ap.add_argument("--target", help="real occupant id of the target (Q3/Q5/Q6/TRACK)")
-    ap.add_argument("--building", help="real building id (Q1/Q2, or building_id for Q3/Q5)")
-    ap.add_argument("--query", default="Q6", choices=["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "TRACK"])
+    ap.add_argument("--target", help="real occupant id of the target (Q3/Q4/Q5/Q6/Q7/Q8/Q9/Q11/TRACK)")
+    ap.add_argument("--building", help="real building id (Q1/Q2, or building_id for Q3/Q4/Q5/Q8..Q13)")
+    ap.add_argument("--zone", default="z1", help="zone id (z1..z8, zT) for Q8/Q9/Q10/Q12/Q13")
+    ap.add_argument("--query", default="Q6", choices=["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "TRACK"])
     ap.add_argument("--purpose", default="general_lookup", choices=[p.value for p in QueryPurpose])
     ap.add_argument("--outside-office-hours", action="store_true")
     ap.add_argument("--authorized-investigation", action="store_true")
@@ -828,6 +1200,8 @@ def parse_args(argv=None):
     ap.add_argument("--at-time", default=DEFAULT_AT_TIME)
     ap.add_argument("--after-time", default="09:00:00")
     ap.add_argument("--before-time", default="23:59:59")
+    ap.add_argument("--t1", default="08:00:00", help="start time t1 for interval queries (Q4, Q7, Q11, Q12)")
+    ap.add_argument("--t2", default="18:00:00", help="end time t2 for interval queries (Q4, Q7, Q11, Q12)")
     ap.add_argument("--nodes-dir", type=Path, default=DEFAULT_NODES_DIR)
     return ap.parse_args(argv)
 
@@ -851,6 +1225,10 @@ def main(argv=None) -> None:
                     raise SystemExit(f"{args.query} needs --building")
                 kwargs = {"after_time": args.at_time} if args.query == "Q1" else {"at_time": args.at_time}
                 run_building_query(engine, args.caller, args.query, args.building, **kwargs)
+            elif args.query in ("Q10", "Q12", "Q13"):
+                run_zone_query(engine, args.caller, args.query, zone=args.zone, building_id=args.building,
+                               at_time=args.at_time, t1=args.t1 or args.after_time, t2=args.t2 or args.before_time,
+                               explain=args.explain)
             else:
                 if not args.target:
                     raise SystemExit(f"{args.query} needs --target")
@@ -858,7 +1236,8 @@ def main(argv=None) -> None:
                                    is_office_hours=not args.outside_office_hours,
                                    authorized_investigation=args.authorized_investigation, at_time=args.at_time,
                                    building_id=args.building, before_time=args.before_time,
-                                   t1=args.after_time, t2=args.before_time, explain=args.explain)
+                                   t1=args.t1 or args.after_time, t2=args.t2 or args.before_time,
+                                   zone=args.zone, explain=args.explain)
     finally:
         set_enforce_policy(False)
         clear_registry(); clear_audit_log(); clear_campus_registry()

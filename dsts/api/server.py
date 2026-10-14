@@ -98,13 +98,22 @@ _cached_occupancy: Optional[Dict[str, List[dict]]] = None
 _cached_heatmap: Optional[Dict[str, Dict[str, int]]] = None
 _last_cache_time: float = 0.0
 
-# Query Templates according to system specification: Q1, Q2, Q3, Q5, Q6
+# Query Templates according to system specification: Q1 through Q13 and TRACK
 TEMPLATE_QUERIES = {
     "Q1": "Did any occupant stay in building {building_id} after time {time_t}?",
     "Q2": "Was the number of visitors in building {building_id} more than the number of registered occupants at time {time_t}?",
     "Q3": "Did occupant {target_id} leave building {building_id} before time {time_t}?",
+    "Q4": "Did occupant {target_id} enter the building between times {t1} and {t2}?",
     "Q5": "Did occupant {target_id} visit all the zones in building {building_id}?",
     "Q6": "Where was occupant {target_id} at time {time_t}?",
+    "Q7": "How many zones did occupant {target_id} visit during the time interval {t1} to {t2}?",
+    "Q8": "At what time did occupant {target_id} visit zone {zone} for the first time?",
+    "Q9": "How long did occupant {target_id} spend at zone {zone} during his first visit?",
+    "Q10": "Who was there in zone {zone} at time {time_t}?",
+    "Q11": "Where was the occupant {target_id} during the time interval from {t1} to {t2}?",
+    "Q12": "Who was there in zone {zone} from time {t1} to {t2}?",
+    "Q13": "Who all visited zone {zone}?",
+    "TRACK": "Full historical trajectory for occupant {target_id}",
 }
 
 
@@ -250,16 +259,19 @@ def get_security_log() -> list[dict]:
 # ================================================================
 
 class QueryRequestBody(BaseModel):
-    query_type: str = Field(default="Q6", description="Q1, Q2, Q3, Q5, Q6")
+    query_type: str = Field(default="Q6", description="Q1..Q13 or TRACK")
     caller_id: Optional[str] = Field(default=None, description="Caller occupant ID (e.g. Dean, Teacher, Student)")
     role: Optional[str] = Field(default=None, description="Role shorthand: A, B, C, dean, teacher, student")
-    target_id: Optional[str] = Field(default=None, description="Target occupant ID for Q3, Q5, Q6")
+    target_id: Optional[str] = Field(default=None, description="Target occupant ID for Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11, TRACK")
     occupant_id: Optional[str] = Field(default=None, description="Alias for target_id")
     building_id: Optional[str] = Field(default="building_5", description="Building ID (building_1 .. building_10)")
+    zone: Optional[str] = Field(default="z1", description="Zone ID (z1..z8, zT)")
     time_t: Optional[Any] = Field(default=None, description="Query timestamp HH:MM:SS or seconds")
     at_time: Optional[Any] = Field(default=None, description="Alias for time_t")
     after_time: Optional[Any] = Field(default=None, description="Alias for time_t (Q1)")
     before_time: Optional[Any] = Field(default=None, description="Alias for time_t (Q3)")
+    t1: Optional[Any] = Field(default=None, description="Start time t1 for interval queries")
+    t2: Optional[Any] = Field(default=None, description="End time t2 for interval queries")
     purpose: str = Field(default="general_lookup", description="Query purpose")
     is_office_hours: bool = Field(default=True, description="Whether query occurs during campus/office hours")
     authorized_investigation: bool = Field(default=False, description="Whether query has authorized security mandate")
@@ -300,18 +312,24 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
         caller_id = "0001738"  # Default to Dean A
 
     target_id = (body.target_id or body.occupant_id or "").strip()
-    if not target_id and q_type in ("Q3", "Q5", "Q6"):
+    if not target_id and q_type in ("Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q11", "TRACK"):
         target_id = "0000102"  # Default target student
 
     building_id = body.building_id.strip() if body.building_id else "building_5"
+    zone = (body.zone or "z1").strip()
     raw_time = body.time_t if body.time_t is not None else (body.at_time if body.at_time is not None else (body.after_time if body.after_time is not None else body.before_time))
     at_time = _to_hms(raw_time, DEFAULT_AT_TIME)
+    t1 = _to_hms(body.t1, "08:00:00")
+    t2 = _to_hms(body.t2, "18:00:00")
 
     # Format human-readable template question
     template_fmt = TEMPLATE_QUERIES[q_type].format(
         building_id=building_id,
         target_id=target_id or "<target>",
         time_t=at_time,
+        zone=zone,
+        t1=t1,
+        t2=t2,
     )
 
     # ────────────────────────────────────────────────────────────
@@ -366,7 +384,110 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
         }
 
     # ────────────────────────────────────────────────────────────
-    # Case 2: Occupant Queries (Q3, Q4, Q5, Q6, Q7, TRACK)
+    # Case 2: Zone-Centric Queries (Q10, Q12, Q13)
+    # ────────────────────────────────────────────────────────────
+    if q_type in ("Q10", "Q12", "Q13"):
+        caller_role = get_real_role(caller_id)
+        caller_bld = get_occupant_building(caller_id)
+        caller_meta = {"id": caller_id, "role": caller_role, "building": caller_bld}
+
+        # Role C (Students) cannot perform zone-level surveillance (anti-stalking peer isolation)
+        if caller_role == "student":
+            m.security_verification_failures_total.labels(kind="rebac_persona").inc()
+            return {
+                "success": False,
+                "query_type": q_type,
+                "template_query": template_fmt,
+                "caller": caller_meta,
+                "decision": {
+                    "permitted": False,
+                    "disclosure_level": "L0_NONE",
+                    "policy_rule": "RULE_C_PEER_ZONE_SURVEILLANCE_DENIED",
+                    "reason": "Student role cannot perform zone-level occupant surveillance (anti-stalking peer isolation)",
+                    "visitor_status": None,
+                    "exposed_fields": [],
+                    "redacted_fields": ["occupants", "trajectories"],
+                },
+                "answer": None,
+                "evidence": [],
+                "error": "Zone-level occupant queries are restricted to administrative and faculty roles.",
+            }
+
+        # Cross-building check for teachers unless authorized investigation
+        auth_inv = body.authorized_investigation or body.emergency or body.purpose in ("audit", "security_investigation")
+        if caller_role == "teacher" and caller_bld and caller_bld != building_id and not auth_inv:
+            m.security_verification_failures_total.labels(kind="rebac_persona").inc()
+            return {
+                "success": False,
+                "query_type": q_type,
+                "template_query": template_fmt,
+                "caller": caller_meta,
+                "decision": {
+                    "permitted": False,
+                    "disclosure_level": "L0_NONE",
+                    "policy_rule": "RULE_B_CROSS_BUILDING_ZONE_DENIED",
+                    "reason": f"Teacher in {caller_bld} cannot perform zone surveillance in external building {building_id} without authorized security mandate.",
+                    "visitor_status": None,
+                    "exposed_fields": [],
+                    "redacted_fields": ["occupants"],
+                },
+                "answer": None,
+                "evidence": [],
+                "error": f"Teacher in {caller_bld} cannot perform zone surveillance in external building {building_id}.",
+            }
+
+        target_resource = f"building:{building_id}" if building_id else f"zone:{zone}"
+        permitted = authorize(caller_id, "QUERY", target_resource)
+        last_reason = get_audit_log()[-1]["reason"] if get_audit_log() else ""
+        if not permitted:
+            m.security_verification_failures_total.labels(kind="rbac_infra").inc()
+            return {
+                "success": False,
+                "query_type": q_type,
+                "template_query": template_fmt,
+                "caller": caller_meta,
+                "decision": {
+                    "permitted": False,
+                    "disclosure_level": "L0_NONE",
+                    "policy_rule": "RULE_INFRA_RBAC_DENIED",
+                    "reason": f"Infrastructure authorization denied: {last_reason}",
+                    "visitor_status": None,
+                    "exposed_fields": [],
+                    "redacted_fields": ["all_data"],
+                },
+                "answer": None,
+                "evidence": [],
+                "error": f"Infrastructure authorization denied: {last_reason}",
+            }
+
+        if q_type == "Q10":
+            res = engine.Q10(zone=zone, at_time=at_time, building_id=building_id)
+        elif q_type == "Q12":
+            res = engine.Q12(zone=zone, t1=t1, t2=t2, building_id=building_id)
+        else:  # Q13
+            res = engine.Q13(zone=zone, building_id=building_id)
+
+        m.events_processed_total.labels(building_id=building_id).inc()
+        return {
+            "success": True,
+            "query_type": q_type,
+            "template_query": template_fmt,
+            "caller": caller_meta,
+            "decision": {
+                "permitted": True,
+                "disclosure_level": "L3_PRECISE_CURRENT",
+                "policy_rule": "RULE_ADMIN_ZONE_OCCUPANCY",
+                "reason": f"Authorized zone surveillance permitted for {caller_role} in {building_id}",
+                "visitor_status": "ZONE_MONITORING",
+                "exposed_fields": ["occupants", "visit_counts", "zone_id", "building_id"],
+                "redacted_fields": ["biometric_raw_gallery"],
+            },
+            "answer": res.answer,
+            "evidence": res.evidence,
+        }
+
+    # ────────────────────────────────────────────────────────────
+    # Case 3: Occupant Queries (Q3..Q9, Q11, TRACK)
     # ────────────────────────────────────────────────────────────
     if not target_id:
         raise HTTPException(status_code=400, detail=f"{q_type} requires target_id.")
@@ -463,10 +584,32 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
         res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=at_time)
         answer = res.answer
         evidence = res.evidence
+    elif q_type == "Q4":
+        res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
+        answer = res.answer
+        evidence = res.evidence
     elif q_type == "Q5":
         res = engine.Q5(occupant_id=target_id, building_id=building_id)
         answer = res.answer
         evidence = res.evidence
+    elif q_type == "Q7":
+        res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
+        answer = res.answer
+        evidence = res.evidence
+    elif q_type == "Q8":
+        res = engine.Q8(occupant_id=target_id, zone=zone, building_id=building_id)
+        answer = res.answer
+        evidence = res.evidence
+    elif q_type == "Q9":
+        res = engine.Q9(occupant_id=target_id, zone=zone, building_id=building_id)
+        answer = res.answer
+        evidence = res.evidence
+    elif q_type == "Q11":
+        res = engine.Q11(occupant_id=target_id, t1=t1, t2=t2)
+        answer = res.answer
+        evidence = res.evidence
+    elif q_type == "TRACK":
+        answer = track_answer(engine, target_id)
 
     return {
         "success": True,

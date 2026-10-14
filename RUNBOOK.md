@@ -118,20 +118,26 @@ uvicorn dsts.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 Navigate to `http://localhost:8000` to access the Command Center dashboard.
 
-### Scoped Spatio-Temporal Query Suite
-The query engine and API endpoints are strictly restricted to the 5 paper query templates:
-- **Q1**: `POST /api/query` with `query_type: "Q1"`, `building_id`, `after_time`
-  *Template*: *Did any occupant stay in building $b$ after time $t$?*
-- **Q2**: `POST /api/query` with `query_type: "Q2"`, `building_id`, `time_t`
-  *Template*: *Was the number of visitors in building $b$ more than the number of registered occupants at time $t$?*
-- **Q3**: `POST /api/query` with `query_type: "Q3"`, `occupant_id`, `building_id`, `before_time`
-  *Template*: *Did occupant $o$ leave building $b$ before time $t$?*
-- **Q5**: `POST /api/query` with `query_type: "Q5"`, `occupant_id`, `building_id`
-  *Template*: *Did occupant $o$ visit all the zones in building $b$?*
-- **Q6**: `POST /api/query` with `query_type: "Q6"`, `occupant_id`, `time_t`
-  *Template*: *Where was occupant $o$ at time $t$?*
+### Complete Spatio-Temporal Query Suite (Q1 – Q13)
+The query engine and API endpoints implement the full suite of 13 spatio-temporal query templates:
 
-Any request specifying unsupported query types is rejected with `400 Bad Request`.
+| Query ID | Template Query | Scope & Permissions |
+|---|---|---|
+| **Q1** | *Did any occupant stay in building $b$ after time $t$?* | Building Aggregate (`building_id`, `after_time`) |
+| **Q2** | *Was the number of visitors in building $b$ more than the number of registered occupants at time $t$?* | Building Aggregate (`building_id`, `time_t`) |
+| **Q3** | *Did occupant $o$ leave building $b$ before time $t$?* | Occupant Trajectory (`target_id`, `building_id`, `before_time`) — requires $L_4$ |
+| **Q4** | *Did occupant $o$ enter the building between times $t_1$ and $t_2$?* | Occupant Trajectory (`target_id`, `building_id`, `t1`, `t2`) — requires $L_4$ |
+| **Q5** | *Did occupant $o$ visit all the zones in building $b$?* | Occupant Trajectory (`target_id`, `building_id`) — requires $L_4$ |
+| **Q6** | *Where was occupant $o$ at time $t$?* | Occupant Point-in-Time Location (`target_id`, `time_t`) — $L_1$ to $L_4$ |
+| **Q7** | *How many zones did occupant $o$ visit during the time interval $t_1$ to $t_2$?* | Occupant Trajectory (`target_id`, `t1`, `t2`) — requires $L_4$ |
+| **Q8** | *At what time did occupant $o$ visit zone $z$ for the first time?* | Occupant Trajectory (`target_id`, `zone`, `building_id`) — requires $L_4$ |
+| **Q9** | *How long did occupant $o$ spend at zone $z$ during his first visit?* | Occupant Trajectory (`target_id`, `zone`, `building_id`) — requires $L_4$ |
+| **Q10** | *Who was there in zone $z$ at time $t$?* | Zone Surveillance (`zone`, `time_t`, `building_id`) — Admin/Faculty only |
+| **Q11** | *Where was the occupant $o$ during the time interval from $t_1$ to $t_2$?* | Occupant Trajectory (`target_id`, `t1`, `t2`) — requires $L_4$ |
+| **Q12** | *Who was there in zone $z$ from time $t_1$ to $t_2$?* | Zone Surveillance (`zone`, `t1`, `t2`, `building_id`) — Admin/Faculty only |
+| **Q13** | *Who all visited zone $z$?* | Zone Aggregate (`zone`, `building_id`) — Admin/Faculty only |
+
+Students (Role C) are strictly prohibited from performing zone-level occupant queries (Q10, Q12, Q13) under Anti-Stalking Peer Isolation (`RULE_C_PEER_ZONE_SURVEILLANCE_DENIED`). Requests specifying unsupported query types are rejected with `400 Bad Request`.
 
 ### Observability & Metrics
 - Prometheus metrics endpoint: `GET /metrics`

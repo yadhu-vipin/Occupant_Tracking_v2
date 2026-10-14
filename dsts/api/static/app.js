@@ -1244,8 +1244,16 @@ const queryTemplates = {
   Q1: "Did any occupant stay in building {b} after time {t}?",
   Q2: "Was the number of visitors in building {b} more than the number of registered occupants at time {t}?",
   Q3: "Did occupant {o} leave building {b} before time {t}?",
+  Q4: "Did occupant {o} enter the building between times {t1} and {t2}?",
   Q5: "Did occupant {o} visit all the zones in building {b}?",
-  Q6: "Where was occupant {o} at time {t}?"
+  Q6: "Where was occupant {o} at time {t}?",
+  Q7: "How many zones did occupant {o} visit during the time interval {t1} to {t2}?",
+  Q8: "At what time did occupant {o} visit zone {z} for the first time?",
+  Q9: "How long did occupant {o} spend at zone {z} during his first visit?",
+  Q10: "Who was there in zone {z} at time {t}?",
+  Q11: "Where was the occupant {o} during the time interval from {t1} to {t2}?",
+  Q12: "Who was there in zone {z} from time {t1} to {t2}?",
+  Q13: "Who all visited zone {z}?",
 };
 
 function updateQueryTypeUI() {
@@ -1257,22 +1265,25 @@ function updateQueryTypeUI() {
 
   const targetBox = $("#field-target-container");
   const bldBox = $("#field-building-container");
+  const zoneBox = $("#field-zone-container");
   const timeBox = $("#field-time-container");
+  const rangeBox = $("#field-range-container");
 
-  if (qType === "Q1" || qType === "Q2") {
-    if (targetBox) targetBox.style.display = "none";
-    if (bldBox) bldBox.style.display = "block";
-    if (timeBox) timeBox.style.display = "block";
-  } else if (qType === "Q6") {
-    if (targetBox) targetBox.style.display = "block";
-    if (bldBox) bldBox.style.display = "none";
-    if (timeBox) timeBox.style.display = "block";
-  } else {
-    // Q3, Q5
-    if (targetBox) targetBox.style.display = "block";
-    if (bldBox) bldBox.style.display = "block";
-    if (timeBox) timeBox.style.display = (qType === "Q3") ? "block" : "none";
-  }
+  // Determine visibility per query type
+  const needsTarget = ["Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q11", "TRACK"].includes(qType);
+  if (targetBox) targetBox.style.display = needsTarget ? "block" : "none";
+
+  const needsBuilding = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q8", "Q9", "Q10", "Q12", "Q13"].includes(qType);
+  if (bldBox) bldBox.style.display = needsBuilding ? "block" : "none";
+
+  const needsZone = ["Q8", "Q9", "Q10", "Q12", "Q13"].includes(qType);
+  if (zoneBox) zoneBox.style.display = needsZone ? "block" : "none";
+
+  const needsSingleTime = ["Q1", "Q2", "Q3", "Q6", "Q10"].includes(qType);
+  if (timeBox) timeBox.style.display = needsSingleTime ? "block" : "none";
+
+  const needsRange = ["Q4", "Q7", "Q11", "Q12"].includes(qType);
+  if (rangeBox) rangeBox.style.display = needsRange ? "block" : "none";
 }
 
 // Bind query type change
@@ -1311,7 +1322,7 @@ if ($("#btn-query")) {
   $("#btn-query").addEventListener("click", executeCurrentQuery);
 }
 
-["q-occupant", "q-caller", "q-time"].forEach((id) => {
+["q-occupant", "q-caller", "q-time", "q-t1", "q-t2"].forEach((id) => {
   const input = $(`#${id}`);
   if (input) {
     input.addEventListener("keydown", (event) => {
@@ -1327,7 +1338,10 @@ function executeCurrentQuery() {
   const callerId = $("#q-caller") ? $("#q-caller").value.trim() : "0001738";
   const targetId = $("#q-occupant") ? $("#q-occupant").value.trim() : "";
   const buildingId = $("#q-building") ? $("#q-building").value : "building_5";
+  const zone = $("#q-zone") ? $("#q-zone").value : "z1";
   const timeT = $("#q-time") ? $("#q-time").value.trim() : "23:59:59";
+  const t1 = $("#q-t1") ? $("#q-t1").value.trim() : "08:00:00";
+  const t2 = $("#q-t2") ? $("#q-t2").value.trim() : "18:00:00";
   const purpose = $("#q-purpose") ? $("#q-purpose").value : "general_lookup";
   const isOfficeHours = $("#q-office-hours") ? $("#q-office-hours").checked : true;
   const authorizedInvestigation = $("#q-authorized") ? $("#q-authorized").checked : false;
@@ -1337,7 +1351,10 @@ function executeCurrentQuery() {
     caller_id: callerId,
     target_id: targetId,
     building_id: buildingId,
+    zone: zone,
     time_t: timeT,
+    t1: t1,
+    t2: t2,
     purpose: purpose,
     is_office_hours: isOfficeHours,
     authorized_investigation: authorizedInvestigation,
@@ -1390,6 +1407,12 @@ async function runQuery(body) {
         if (typeof data.answer === "boolean") {
           mainText.textContent = data.answer ? "YES" : "NO";
           if (subText) subText.textContent = `Result returned from Phase 4 event log. Evidence count: ${data.evidence?.length || 0}`;
+        } else if (Array.isArray(data.answer)) {
+          mainText.textContent = `${data.answer.length} occupant(s) detected: ${data.answer.slice(0, 8).join(', ')}${data.answer.length > 8 ? ' ...' : ''}`;
+          if (subText) subText.textContent = `Total distinct occupants: ${data.answer.length} · Evidence rows: ${data.evidence?.length || 0}`;
+        } else if (typeof data.answer === "number") {
+          mainText.textContent = `${data.answer} zones visited`;
+          if (subText) subText.textContent = `Evidence rows: ${data.evidence?.length || 0}`;
         } else if (typeof data.answer === "object" && data.answer !== null) {
           if (data.query_type === "TRACK") {
             mainText.textContent = `Trajectory: ${data.answer.total_detections || 0} waypoints across ${data.answer.buildings_visited?.join(', ') || 'campus'}`;
@@ -1397,12 +1420,21 @@ async function runQuery(body) {
           } else if (data.query_type === "Q6") {
             mainText.textContent = data.answer.status || (data.answer.sector ? `${data.answer.building} (${data.answer.sector})` : JSON.stringify(data.answer));
             if (subText) subText.textContent = `Approx Time: ${data.answer.approx_time || data.answer.time || data.answer.arrival_time || 'N/A'} · Confidence: ${data.answer.confidence || 'High'}`;
+          } else if (data.query_type === "Q9") {
+            mainText.textContent = `Duration: ${data.answer.duration_formatted} (${data.answer.duration_seconds}s)`;
+            if (subText) subText.textContent = `Entry: ${data.answer.entry_time} · Exit: ${data.answer.exit_time} at ${data.answer.building}:${data.answer.zone} (${data.answer.zone_label})`;
+          } else if (data.query_type === "Q11") {
+            mainText.textContent = `${data.answer.total_observations || 0} observation(s) across ${(data.answer.buildings_visited || []).join(', ') || 'building'}`;
+            if (subText) subText.textContent = `Zones visited: ${(data.answer.zones_visited || []).join(', ') || 'None'}`;
+          } else if (data.query_type === "Q13") {
+            mainText.textContent = `${data.answer.total_visitors || 0} unique visitor(s) detected`;
+            if (subText) subText.textContent = `Top visitor: ${data.answer.top_visitors?.[0]?.occupant_id || 'N/A'} (${data.answer.top_visitors?.[0]?.visit_count || 0} detections)`;
           } else {
             mainText.textContent = JSON.stringify(data.answer);
             if (subText) subText.textContent = `Evidence rows: ${data.evidence?.length || 0}`;
           }
         } else {
-          mainText.textContent = String(data.answer);
+          mainText.textContent = data.answer != null ? String(data.answer) : "None / Not Observed";
           if (subText) subText.textContent = `Evidence rows: ${data.evidence?.length || 0}`;
         }
       }
@@ -1452,11 +1484,12 @@ async function runQuery(body) {
     const tbody = $("#query-body");
     if (tbody) {
       tbody.innerHTML = "";
-      if (data.query_type === "TRACK" && data.answer?.waypoints) {
+      if ((data.query_type === "TRACK" && data.answer?.waypoints) || (data.query_type === "Q11" && data.answer?.trajectory)) {
+        const waypoints = data.answer.waypoints || data.answer.trajectory;
         if (thead) {
           thead.innerHTML = `<tr><th>TIME</th><th>BUILDING</th><th>ZONE</th><th>ZONE LABEL</th><th>CONFIDENCE</th></tr>`;
         }
-        data.answer.waypoints.forEach(pt => {
+        waypoints.forEach(pt => {
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>${escapeHTML(pt.time)}</td>
@@ -1465,6 +1498,15 @@ async function runQuery(body) {
             <td>${escapeHTML(pt.zone_label)}</td>
             <td>${pt.probability != null ? (Number(pt.probability)*100).toFixed(1) + '%' : 'N/A'}</td>
           `;
+          tbody.appendChild(tr);
+        });
+      } else if (Array.isArray(data.answer)) {
+        if (thead) {
+          thead.innerHTML = `<tr><th>INDEX</th><th colspan="4">OCCUPANT ID</th></tr>`;
+        }
+        data.answer.forEach((occId, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>#${i + 1}</td><td colspan="4" style="font-weight:700;font-family:var(--mono);">${escapeHTML(occId)}</td>`;
           tbody.appendChild(tr);
         });
       } else if (data.evidence && data.evidence.length) {
