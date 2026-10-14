@@ -49,6 +49,7 @@ from pipeline.query import (
     DEFAULT_AT_TIME,
     TRAJECTORY_QUERIES,
 )
+from pipeline.query_cache import QueryCache
 from security.campus_policy import (
     evaluate_campus_query_policy,
     CampusRole,
@@ -97,6 +98,11 @@ _rosters: Dict[str, List[str]] = {}
 _cached_occupancy: Optional[Dict[str, List[dict]]] = None
 _cached_heatmap: Optional[Dict[str, Dict[str, int]]] = None
 _last_cache_time: float = 0.0
+
+# Query result cache: LRU, 256-entry capacity, 30-second TTL.
+# Keyed on (query_type, building_id, target_id, zone, at_time, t1, t2, caller_role)
+# so that RBAC-differentiated responses are stored separately.
+_query_cache: QueryCache = QueryCache(capacity=256, ttl_seconds=30.0)
 
 # Query Templates according to system specification: Q1 through Q13 and TRACK
 TEMPLATE_QUERIES = {
@@ -227,6 +233,19 @@ def get_layout() -> dict:
     return _load_layout()
 
 
+@app.get("/api/cache-stats")
+def get_cache_stats() -> dict:
+    """Return query-result cache statistics for observability and debugging."""
+    return {
+        "query_cache": _query_cache.stats(),
+        "occupancy_cache": {
+            "populated": _cached_occupancy is not None,
+            "age_seconds": round(time.time() - _last_cache_time, 1) if _cached_occupancy else None,
+            "ttl_seconds": 5.0,
+        },
+    }
+
+
 @app.get("/api/occupancy")
 def get_occupancy() -> dict:
     occupancy, _ = _compute_real_occupancy()
@@ -321,6 +340,19 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
     at_time = _to_hms(raw_time, DEFAULT_AT_TIME)
     t1 = _to_hms(body.t1, "08:00:00")
     t2 = _to_hms(body.t2, "18:00:00")
+
+    # ── Query result cache lookup ────────────────────────────────────────────
+    # Cache key includes caller_role so RBAC-differentiated results are stored
+    # separately (e.g. a student and a dean asking Q6 for the same target may
+    # receive different disclosure levels).
+    caller_role_for_key = get_real_role(caller_id) or caller_id
+    _cache_key = QueryCache.make_key(
+        q_type, building_id, target_id, zone, at_time, t1, t2, caller_role_for_key
+    )
+    _cached_result = _query_cache.get(_cache_key)
+    if _cached_result is not None:
+        # Return cached response with a cache-hit marker for transparency
+        return dict(_cached_result, _cache_hit=True)
 
     # Format human-readable template question
     template_fmt = TEMPLATE_QUERIES[q_type].format(
@@ -611,7 +643,7 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
     elif q_type == "TRACK":
         answer = track_answer(engine, target_id)
 
-    return {
+    result = {
         "success": True,
         "query_type": q_type,
         "template_query": template_fmt,
@@ -621,6 +653,10 @@ def execute_query_endpoint(body: QueryRequestBody) -> dict:
         "answer": answer,
         "evidence": evidence,
     }
+    # Store successful query result in cache (denied/error responses are NOT cached
+    # so that policy changes take effect immediately on retry)
+    _query_cache.set(_cache_key, result)
+    return result
 
 
 # ================================================================

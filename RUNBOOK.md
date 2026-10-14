@@ -144,6 +144,33 @@ Students (Role C) are strictly prohibited from performing zone-level occupant qu
 - Live WebSocket stream: `/ws/live`
 - Grafana dashboard: Available in `monitoring/grafana/dashboards/dsts_dashboard.json`
 - Docker Compose stack: `monitoring/docker-compose.yml`
+- **Query result cache stats**: `GET /api/cache-stats` — returns LRU cache hit rate, size, TTL,
+  evictions and expiration counts for the 256-entry, 30-second-TTL query result cache.
+
+### Mask-Occlusion Handling in Recognition Pipeline
+The Phase 2 local recogniser (`pipeline/recognize.py` + `recognition/mask_handler.py`) includes
+automatic mask-occlusion detection and threshold adjustment:
+- **Detection**: Heuristic based on per-occupant embedding angular spread (std dev).  When spread
+  exceeds 6.5° the capture is flagged as likely masked.
+- **Threshold relaxation**: `accept_angle_deg` is relaxed by +4.0° and `min_votes` is reduced by 25%
+  so that a masked subject can still be recognised despite lower biometric discriminability.
+- **Confidence penalty**: The Definition 3.3 identity probability is reduced by 18 percentage points
+  for masked captures, reflecting reduced evidence quality.
+- **Audit annotation**: Every `RecognitionResult` carries `mask_flag` (bool) and `mask_notes` (str)
+  for downstream filtering and re-verification workflows.
+- **Tunable**: All thresholds live in `recognition.mask_handler.MaskConfig` — no code changes needed
+  to experiment with different sensitivity settings.
+
+### Query Result Cache
+The `/api/query` endpoint caches successful query results in a thread-safe LRU cache
+(`pipeline/query_cache.QueryCache`):
+- **Key**: `(query_type, building_id, target_id, zone, at_time, t1, t2, caller_role)` — ensures
+  RBAC-differentiated results (e.g. student vs dean asking Q6 for the same target) are cached
+  separately.
+- **Capacity**: 256 entries, LRU eviction.
+- **TTL**: 30 seconds — entries expire so pipeline re-runs are reflected promptly.
+- **Cache-hit marker**: Cached responses include `"_cache_hit": true` for transparency.
+- **Not cached**: Denied/error responses are never cached so policy changes take immediate effect.
 
 ## 2. Run the tests
 

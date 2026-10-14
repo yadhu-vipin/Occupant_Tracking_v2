@@ -17,6 +17,9 @@ class RecognitionResult:
     threshold_angle_deg: float
     minimum_votes: int
     candidate_evidence: list[dict[str, Any]]
+    # Mask-occlusion annotation (False / empty-string when no mask was detected)
+    mask_flag: bool = False
+    mask_notes: str = ""
 
     def to_dict(self):
         return asdict(self)

@@ -29,6 +29,11 @@ from buildinglib._vendored.lsh import preprocess
 from buildinglib.refs import reference_tensor
 from buildinglib.verify import vote_evidence
 from buildinglib.node import Reply
+from recognition.mask_handler import (
+    MaskConfig,
+    apply_mask_handling,
+    apply_confidence_penalty,
+)
 from recognition.models import RecognitionResult
 
 EVENT_FIELDS = {"event_id", "timestamp", "current_building", "current_zone", "embedding_row"}
@@ -57,14 +62,22 @@ class LocalRecognizer:
     """Search only the local registered gallery selected by ``current_building``.
 
     Own-gallery (Phase 2) call site. This module never receives ground truth.
+
+    Mask handling is integrated here via ``recognition.mask_handler``:
+    after the initial ``vote_evidence`` call the angular-spread heuristic
+    inspects the angle matrix; if a mask is suspected the acceptance angle
+    and vote threshold are relaxed and recognition is retried with the
+    adjusted parameters.  The identity probability from Definition 3.3 is
+    also penalised to reflect reduced biometric evidence quality.
     """
 
-    def __init__(self, embeddings, meta, params):
+    def __init__(self, embeddings, meta, params, mask_config: MaskConfig | None = None):
         if len(embeddings) != len(meta):
             raise ValueError("embedding corpus and metadata must remain globally row-aligned")
         self.embeddings = embeddings
         self.meta = meta
         self.params = params
+        self.mask_config = mask_config or MaskConfig()
         self._galleries = {}
 
     def _gallery(self, building):
@@ -81,22 +94,40 @@ class LocalRecognizer:
             raise ValueError("recognition accepts observable Event fields only")
 
     def recognize_locally(self, event):
-        """Recognize one observable event without identity or home-building input."""
+        """Recognize one observable event without identity or home-building input.
+
+        Includes mask-occlusion detection: if the embedding angular spread
+        exceeds the configured threshold, recognition thresholds are relaxed
+        and the result is annotated with mask_flag=True.
+        """
         self._check_event(event)
         row = int(event["embedding_row"])
         if row < 0 or row >= len(self.embeddings):
             raise ValueError("event embedding_row is outside the corpus")
         ids, refs = self._gallery(event["current_building"])
         query = preprocess(self.embeddings[row:row + 1], self.params.mean_face)[0]
-        winner, angles, votes, _distances = _vote_and_evidence(
-            refs, ids, query, self.params.accept_angle_deg)
-        return self._result(event, ids, angles, votes, winner)
+
+        # Initial vote pass with original thresholds
+        angles, votes = vote_evidence(refs, query, self.params.accept_angle_deg)
+
+        # Mask detection + threshold adjustment
+        adjusted_params, mask_report = apply_mask_handling(
+            angles, votes, self.params, self.mask_config
+        )
+
+        # If mask was detected, re-run vote_evidence with the relaxed angle
+        if mask_report.mask_detected:
+            angles, votes = vote_evidence(refs, query, adjusted_params.accept_angle_deg)
+
+        winner = int(np.lexsort((angles.min(axis=1), -votes))[0])
+        return self._result(event, ids, angles, votes, winner, adjusted_params, mask_report)
 
     # kept as an alias -- ex `LocalRecognizer.recognize`
     recognize = recognize_locally
 
-    def _result(self, event, ids, angles, votes, winner):
-        accepted = bool(votes[winner] >= self.params.min_votes)
+    def _result(self, event, ids, angles, votes, winner, adjusted_params=None, mask_report=None):
+        params = adjusted_params if adjusted_params is not None else self.params
+        accepted = bool(votes[winner] >= params.min_votes)
         evidence = [
             {
                 "occupant_id": str(identity),
@@ -114,8 +145,10 @@ class LocalRecognizer:
             predicted_occupant_id=str(ids[winner]) if accepted else None,
             accepted=accepted, votes=int(votes[winner]), source="local_registered_gallery",
             best_candidate_id=str(ids[winner]),
-            threshold_angle_deg=float(self.params.accept_angle_deg),
-            minimum_votes=int(self.params.min_votes), candidate_evidence=evidence,
+            threshold_angle_deg=float(params.accept_angle_deg),
+            minimum_votes=int(params.min_votes), candidate_evidence=evidence,
+            mask_flag=mask_report.mask_detected if mask_report else False,
+            mask_notes=mask_report.notes if mask_report else "",
         )
 
 

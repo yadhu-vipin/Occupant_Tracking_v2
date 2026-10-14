@@ -47,14 +47,14 @@ The older interactive/deployment path in `nodelib/deploy.py`'s `DeployedBuilding
 ├── corpus/                      local embedding corpus and metadata (out-of-band, not in Git)
 ├── buildinglib/                 enrollment, artifacts, routing, verification
 ├── events/                      Phase 1 event generator and validator (library; pipeline/generate_events.py is the entry point)
-├── recognition/                 shared result schema (models/contract/io) used by pipeline/recognize.py
+├── recognition/                 shared result schema (models/contract/io) + mask_handler.py used by pipeline/recognize.py
 ├── retrieval/                   only retrieval/output/ -- Phase 3's writable output path
 ├── centralized/                 independent global-search benchmark
 ├── dsts/legacy_state/           zones, bsts, probability, state store -- the state layer pipeline/phase4_state.py runs on
 ├── security/                    X25519, AES-128-GCM, Ed25519, CA, mTLS, ReplayGuard, RBAC (authorize.py + campus_policy.py)
 ├── nodelib/                     per-node deployment wrapper (incl. PointerStore), security handler
 ├── variants/                    generated RBAC role registry (rbac10/) -- gitignored, rebuilt by build_campus_roles.py
-├── tests/                       pytest suite (93 tests)
+├── tests/                       pytest suite (86 tests)
 ├── out/                         generated/published Bloom `.npz` artifacts
 └── nodes/                       generated per-building node folders (own registered.db/visitor.db/pointers.db)
 ```
