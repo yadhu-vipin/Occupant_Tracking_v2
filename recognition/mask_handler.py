@@ -198,7 +198,7 @@ def apply_mask_handling(
         new_angle = orig_angle + cfg.angle_relaxation_deg
         new_votes = max(1, math.ceil(orig_votes * (1.0 - cfg.vote_relaxation)))
         notes = (
-            f"Mask occlusion suspected: embedding spread {spread:.2f}deg > "
+            f"Mask occlusion detected: embedding spread {spread:.2f}deg > "
             f"threshold {cfg.angle_spread_threshold_deg:.2f}deg. "
             f"Acceptance angle relaxed {orig_angle:.1f}deg -> {new_angle:.1f}deg, "
             f"min_votes relaxed {orig_votes} -> {new_votes}."
@@ -244,3 +244,15 @@ def apply_confidence_penalty(
         return probability
     cfg = cfg or MaskConfig()
     return max(0.0, probability - cfg.confidence_penalty)
+
+
+def penalize_probability_for_mask(
+    probability: float | None,
+    cfg: MaskConfig | None = None,
+) -> float | None:
+    """Convenience helper to reduce identity probability directly given a MaskConfig."""
+    if probability is None:
+        return None
+    cfg = cfg or MaskConfig()
+    return max(0.0, probability - cfg.confidence_penalty)
+

@@ -24,14 +24,21 @@ services:
       - "3000:3000"
 
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      # S5 fix: do NOT hard-code admin password here.
+      # Set GRAFANA_ADMIN_PASSWORD in your shell environment or a .env file before
+      # running docker compose.  Example:
+      #   export GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)
+      #   docker compose up -d
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}"
+      # S5 fix: anonymous viewer access disabled — all users must authenticate
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: ""
+      # S5 fix: embedding disabled (CSRF/clickjacking mitigation)
+      GF_SECURITY_ALLOW_EMBEDDING: "false"
 
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 
     depends_on:
-      - prometheus
+      - prometheus

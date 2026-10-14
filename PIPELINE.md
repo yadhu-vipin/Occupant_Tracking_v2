@@ -705,7 +705,7 @@ them locally from the corpus every run and never writes them, so this
 guarantee on the published `.npz` is untouched.)
 
 **test_5 note: there is now a real automated test suite** (`python -m pytest -q`,
-93 tests) covering the pipeline end to end, in addition to the
+125 tests) covering the pipeline end to end, in addition to the
 `if __name__ == "__main__":` smoke blocks below (kept, following the source
 pipeline's own original convention). Most self-test cleanly from inside this
 folder:

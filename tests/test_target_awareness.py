@@ -25,6 +25,7 @@ from security.authorize import (
 )
 from security.campus_policy import (
     CampusRole, register_occupant_role, register_class_roster, clear_campus_registry,
+    register_occupant_building,
 )
 
 # test_5 restructuring: section 5's "QueryEngine Target-Aware Integration
@@ -138,6 +139,11 @@ def test_occupant_target_campus_policy_enforcement():
     register_occupant_role("student_bob", CampusRole.STUDENT)
     register_occupant_role("prof_smith", CampusRole.TEACHER)
     register_occupant_role("dean_01", CampusRole.DEAN)
+
+    register_occupant_building("student_alice", "B1")
+    register_occupant_building("student_bob", "B1")
+    register_occupant_building("prof_smith", "B1")
+    register_occupant_building("dean_01", "B1")
 
     # Register class roster: Alice is in Smith's class, Bob is not
     register_class_roster("prof_smith", ["student_alice"])

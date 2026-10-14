@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-14 23:23:05",
+  "timestamp": "2026-10-15 00:14:27",
   "security_verification": {
     "status": "PASS",
     "nodes_provisioned": [
@@ -38,7 +38,9 @@
       "closed_and_scored": 447,
       "correct": 428,
       "precision": 0.9574944071588367
-    }
+    },
+    "phase4_events_count": 10000,
+    "phase4_results_path": "A:\\Brother eye test\\p2\\v6\\Occupant_Tracking_v2\\dsts\\output\\phase4_results.json"
   },
   "track_generation": {
     "target_occupant": "0000477",
@@ -141,7 +143,7 @@
           "permitted": false,
           "disclosure_level": "L0_NONE",
           "policy_rule": "RULE_A_CROSS_BUILDING_B_C_DENIED",
-          "reason": "Policy denied: Dean of building_5 may not track occupant '0000460' of building_3 who is not currently visiting building_5",
+          "reason": "Policy denied: Dean of building_5 may not track occupant '0001834' of building_3 who is not currently visiting building_5",
           "purpose": "general_lookup",
           "exposed_fields": [],
           "redacted_fields": [

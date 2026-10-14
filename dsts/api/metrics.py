@@ -39,6 +39,17 @@ events_processed_total = Counter(
 
 
 # ================================================================
+# QUERIES
+# ================================================================
+
+queries_executed_total = Counter(
+    "dsts_queries_executed_total",
+    "Number of spatio-temporal queries executed",
+    ["query_type", "status"],
+)
+
+
+# ================================================================
 # RECOGNITION
 # ================================================================
 

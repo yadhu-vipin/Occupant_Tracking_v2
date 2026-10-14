@@ -22,7 +22,9 @@ const state = {
 
   eventsProcessed: 0,
 
-  busy: false
+  busy: false,
+
+  activeToken: "dsts-dean-token"
 };
 
 
@@ -63,6 +65,7 @@ async function api(url, options = {}) {
       ...(options.body
         ? { "Content-Type": "application/json" }
         : {}),
+      Authorization: `Bearer ${state.activeToken || "dsts-dean-token"}`,
       ...(options.headers || {})
     }
   });
@@ -1305,14 +1308,20 @@ $all(".btn-chip").forEach((btn) => {
       const role = btn.dataset.role;
       $all(".access-role").forEach(r => r.classList.remove("active-role"));
       if (role === "dean") {
+        state.activeToken = "dsts-dean-token";
         const c = $("#role-card-a"); if (c) c.classList.add("active-role");
         if ($("#q-purpose")) $("#q-purpose").value = "security_investigation";
+        if ($("#header-role")) $("#header-role").textContent = "DEAN A";
       } else if (role === "teacher") {
+        state.activeToken = "dsts-teacher-token";
         const c = $("#role-card-b"); if (c) c.classList.add("active-role");
         if ($("#q-purpose")) $("#q-purpose").value = "academic_roster";
+        if ($("#header-role")) $("#header-role").textContent = "TEACHER B";
       } else if (role === "student") {
+        state.activeToken = "dsts-student-token";
         const c = $("#role-card-c"); if (c) c.classList.add("active-role");
         if ($("#q-purpose")) $("#q-purpose").value = "office_hours";
+        if ($("#header-role")) $("#header-role").textContent = "STUDENT C";
       }
     }
   });
@@ -1890,47 +1899,41 @@ function setupVoiceQuery() {
 
 
       if (parsed.role) {
-
-        $("#q-role").value =
-          parsed.role;
-
-        $("#header-role").textContent =
-          parsed.role.toUpperCase();
-
+        const rNorm = parsed.role.toLowerCase();
+        if (rNorm === "dean") {
+          if ($("#q-caller")) $("#q-caller").value = "0001738";
+          state.activeToken = "dsts-dean-token";
+          if ($("#header-role")) $("#header-role").textContent = "DEAN A";
+        } else if (rNorm === "teacher") {
+          if ($("#q-caller")) $("#q-caller").value = "0000362";
+          state.activeToken = "dsts-teacher-token";
+          if ($("#header-role")) $("#header-role").textContent = "TEACHER B";
+        } else if (rNorm === "student") {
+          if ($("#q-caller")) $("#q-caller").value = "0000168";
+          state.activeToken = "dsts-student-token";
+          if ($("#header-role")) $("#header-role").textContent = "STUDENT C";
+        }
       }
-
 
       if (
         !parsed.occupant_id &&
         !parsed.zone
       ) {
-
         status.textContent =
           `Heard: "${transcript}" — ` +
           `couldn't find an occupant ID or zone.`;
-
         return;
-
       }
-
 
       status.textContent =
         `Heard: "${transcript}" → running query…`;
 
-
       runQuery({
-        role: $("#q-role").value,
-
-        occupant_id:
-          $("#q-occupant").value.trim() ||
-          null,
-
-        zone:
-          $("#q-zone").value.trim() ||
-          null
-
+        query_type: "Q6",
+        caller_id: $("#q-caller") ? $("#q-caller").value.trim() : "0001738",
+        target_id: $("#q-occupant") ? $("#q-occupant").value.trim() : (parsed.occupant_id || "0000102"),
+        zone: $("#q-zone") ? $("#q-zone").value.trim() : (parsed.zone || "z1"),
       });
-
     };
 
 }
@@ -2232,8 +2235,9 @@ async function boot() {
     connectLive();
 
 
-    $("#header-role").textContent =
-      $("#q-role").value.toUpperCase();
+    if ($("#header-role")) {
+      $("#header-role").textContent = "DEAN A";
+    }
 
 
     showActionStatus(

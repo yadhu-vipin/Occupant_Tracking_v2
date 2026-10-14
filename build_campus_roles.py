@@ -41,7 +41,9 @@ SEED = 42
 def main() -> None:
     corpus_csv = HERE / "corpus" / "meta.csv"
     if not corpus_csv.exists():
-        corpus_csv = HERE / "buildings_prototype" / "corpus" / "meta.csv"
+        raise FileNotFoundError(
+            f"{corpus_csv} not found. Ensure corpus/meta.csv is present (see corpus/README.md)."
+        )
     meta = pd.read_csv(corpus_csv)
     meta = meta.assign(occupant_id=meta["occupant_id"].astype(str).str.zfill(7))
     by_building = {

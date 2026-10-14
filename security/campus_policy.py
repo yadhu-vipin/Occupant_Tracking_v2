@@ -106,11 +106,14 @@ class QueryPurpose(Enum):
 
     @classmethod
     def from_str(cls, val: str) -> "QueryPurpose":
-        norm = val.strip().lower()
+        if not val:
+            return cls.GENERAL_LOOKUP
+        norm = val.strip().lower().replace("-", "_").replace(" ", "_")
         for p in cls:
             if p.value == norm:
                 return p
-        raise ValueError(f"Unknown QueryPurpose: {val}. Valid: {[p.value for p in cls]}")
+        # B4 fix: unknown purpose returns safe default instead of raising ValueError (→ 500)
+        return cls.GENERAL_LOOKUP
 
 
 @dataclass(frozen=True)
@@ -463,7 +466,7 @@ def evaluate_campus_query_policy(
         )
     )
 
-    # Harmonize context
+    # Harmonize context — always fail-closed: missing context never grants investigation rights
     if context is None:
         if purpose is not None:
             context = QueryContext(
@@ -471,10 +474,11 @@ def evaluate_campus_query_policy(
                 authorized_investigation=(purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT)),
             )
         else:
+            # S6 fix: old default was authorized_investigation=True; now strictly fail-closed
             context = QueryContext(
-                purpose=QueryPurpose.SECURITY_INVESTIGATION if c_role == CampusRole.DEAN else QueryPurpose.GENERAL_LOOKUP,
+                purpose=QueryPurpose.GENERAL_LOOKUP,
                 is_office_hours=True,
-                authorized_investigation=True,
+                authorized_investigation=False,
             )
     elif purpose is not None and context.purpose != purpose:
         context = QueryContext(
@@ -713,108 +717,23 @@ def evaluate_campus_query_policy(
                 exposed_fields = []
                 redacted_fields = ["all_data"]
 
-    # ─── CASE B: Building Scoping Inactive (unregistered buildings / unscoped) ─
+    # ─── CASE B: Building Scope Unresolved (fail-closed zero-trust) ───────────────
     else:
-        # Base matrix ceiling lookup
-        matrix_row = MAX_DISCLOSURE_MATRIX.get(c_role, {})
-        base_ceiling = matrix_row.get(t_role, DisclosureLevel.L0_NONE)
-        ceiling = base_ceiling
-
-        if c_role == CampusRole.STUDENT and t_role in (CampusRole.TEACHER, CampusRole.DEAN):
-            if not context.is_office_hours:
-                ceiling = DisclosureLevel.L0_NONE
-                policy_rule = "RULE_C_OFFICE_HOURS_DENIED"
-                reason = f"Policy denied: Student query for {t_role.value} is restricted to official office/consultation hours"
-                exposed_fields = []
-                redacted_fields = ["all_location_data"]
-            else:
-                ceiling = DisclosureLevel.L1_PRESENCE
-                policy_rule = "RULE_C_STAFF_COARSE_AVAILABILITY"
-                target_desc = "cabin" if t_role == CampusRole.TEACHER else "office"
-                reason = f"Policy permitted: student -> {t_role.value} granted L1_PRESENCE ({target_desc} availability check during consultation hours)"
-                exposed_fields = ["occupant_id", "availability", "is_present_at_office", "designated_location", "status"]
-                redacted_fields = ["exact_zone", "building_coordinates", "movement_history", "current_location_when_away"]
-        elif c_role == CampusRole.STUDENT and t_role == CampusRole.STUDENT:
-            ceiling = DisclosureLevel.L0_NONE
-            policy_rule = "RULE_C_PEER_STALKING_DENIED"
-            reason = "Policy denied: student denied access to student"
-            exposed_fields = []
-            redacted_fields = ["all_location_data"]
-        elif c_role == CampusRole.TEACHER and t_role == CampusRole.STUDENT:
-            if not context.is_office_hours:
-                ceiling = DisclosureLevel.L0_NONE
-                policy_rule = "RULE_B_OFFICE_HOURS_DENIED"
-                reason = f"Policy denied: Teacher query for student '{target_id}' is restricted to active campus/office hours"
-                exposed_fields = []
-                redacted_fields = ["all_location_data"]
-            else:
-                ceiling = DisclosureLevel.L2_CURRENT_ZONE
-                is_enrolled = context.enrolled_in_course or (
-                    caller_id is not None and target_id is not None and check_roster and
-                    is_student_in_roster(caller_id, target_id)
-                )
-                if is_enrolled:
-                    policy_rule = "RULE_B_ROSTER_STUDENT"
-                    reason = f"Policy permitted: Teacher '{caller_id}' granted L2_CURRENT_ZONE for enrolled student '{target_id}' (academic roster)"
-                else:
-                    policy_rule = "RULE_B_CAMPUS_SUPERVISION"
-                    reason = f"Policy permitted: Teacher '{caller_id}' granted L2_CURRENT_ZONE for student '{target_id}' during campus hours (academic supervision)"
-                exposed_fields = ["occupant_id", "current_building", "sector", "approx_time", "confidence"]
-                redacted_fields = ["full_trajectory", "exact_zone"]
-        elif c_role == CampusRole.DEAN and t_role in (CampusRole.TEACHER, CampusRole.STUDENT):
-            if context.authorized_investigation or context.purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT):
-                ceiling = DisclosureLevel.L4_HISTORICAL_TRACK
-                policy_rule = "RULE_A_LOCAL_OCCUPANT_INVESTIGATION"
-                reason = f"Policy permitted: Dean granted L4_HISTORICAL_TRACK for authorized {context.purpose.value}"
-                exposed_fields = ["occupant_id", "role", "current_building", "zone", "zone_label", "timestamp", "probability", "trajectory"]
-                redacted_fields = []
-            else:
-                ceiling = DisclosureLevel.L2_CURRENT_ZONE
-                policy_rule = "RULE_A_LOCAL_OCCUPANT_ROUTINE"
-                reason = "Policy permitted: Dean routine query capped at L2_CURRENT_ZONE under Principle of Minimum Necessary Disclosure"
-                exposed_fields = ["occupant_id", "role", "current_building", "sector", "approx_time", "confidence"]
-                redacted_fields = ["full_trajectory", "exact_zone"]
-        elif c_role == CampusRole.TEACHER and t_role == CampusRole.TEACHER:
-            ceiling = DisclosureLevel.L2_CURRENT_ZONE
-            policy_rule = "RULE_B_PEER_TEACHER"
-            reason = "Policy permitted: teacher -> teacher granted L2_CURRENT_ZONE"
-            exposed_fields = ["occupant_id", "current_building", "sector", "approx_time", "confidence"]
-            redacted_fields = ["exact_zone", "full_trajectory"]
-        elif c_role == CampusRole.TEACHER and t_role == CampusRole.DEAN:
-            ceiling = DisclosureLevel.L2_CURRENT_ZONE
-            policy_rule = "RULE_B_DEAN_AVAILABILITY"
-            reason = "Policy permitted: teacher -> dean granted L2_CURRENT_ZONE"
-            exposed_fields = ["occupant_id", "current_building", "sector", "approx_time", "confidence"]
-            redacted_fields = ["exact_zone", "full_trajectory"]
-        elif c_role == CampusRole.DEAN and t_role == CampusRole.DEAN:
-            ceiling = DisclosureLevel.L2_CURRENT_ZONE
-            policy_rule = "RULE_A_LOCAL_DEAN"
-            reason = "Policy permitted: dean -> dean granted L2_CURRENT_ZONE"
-            exposed_fields = ["occupant_id", "current_building", "sector", "approx_time", "confidence"]
-            redacted_fields = ["exact_zone", "full_trajectory"]
-        elif c_role == CampusRole.DEAN and t_role == CampusRole.VISITOR:
-            ceiling = DisclosureLevel.L2_CURRENT_ZONE
-            policy_rule = "RULE_A_VISITOR_IN_OWN_BUILDING"
-            reason = "Policy permitted: dean -> visitor granted L2_CURRENT_ZONE"
-            exposed_fields = ["occupant_id", "current_building", "sector", "approx_time", "confidence"]
-            redacted_fields = ["history_outside_building"]
-        elif c_role == CampusRole.VISITOR and t_role in (CampusRole.DEAN, CampusRole.TEACHER):
-            ceiling = DisclosureLevel.L2_CURRENT_ZONE
-            policy_rule = "RULE_VISITOR_STAFF_LOOKUP"
-            reason = f"Policy permitted: visitor -> {t_role.value} granted L2_CURRENT_ZONE"
-            exposed_fields = ["occupant_id", "current_building", "sector", "approx_time"]
-            redacted_fields = ["exact_zone", "movement_history"]
-        else:
-            ceiling = base_ceiling
-            policy_rule = "RULE_DEFAULT_MATRIX"
-            if ceiling == DisclosureLevel.L0_NONE:
-                reason = f"Policy denied: {c_role.value} denied access to {t_role.value}"
-                exposed_fields = []
-                redacted_fields = ["all_data"]
-            else:
-                reason = f"Policy permitted: {c_role.value} -> {t_role.value} granted {ceiling.name}"
-                exposed_fields = ["occupant_id", "current_building", "sector", "approx_time"]
-                redacted_fields = ["exact_zone", "full_trajectory"]
+        # S6 fix: Missing building info must FAIL-CLOSED (L0_NONE), not fall back
+        # to an unscoped permissive matrix.
+        ceiling = DisclosureLevel.L0_NONE
+        policy_rule = "RULE_BUILDING_SCOPE_UNRESOLVED_DENIED"
+        missing_parts = []
+        if not c_b:
+            missing_parts.append(f"caller '{caller_id}' building")
+        if not t_home_b:
+            missing_parts.append(f"target '{target_id}' home building")
+        reason = (
+            f"Policy denied: Building scope unresolved ({', '.join(missing_parts)}). "
+            f"Zero-trust campus policy requires verified building registration."
+        )
+        exposed_fields = []
+        redacted_fields = ["all_data"]
 
     # Rule 5: Apply Principle of Minimum Necessary Disclosure
     if parsed_requested is not None:

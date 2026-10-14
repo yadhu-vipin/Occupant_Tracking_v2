@@ -42,6 +42,7 @@ Run these one at a time, in this exact order — each one reads a file the
 previous one wrote.
 
 ```powershell
+python build_campus_roles.py
 python pipeline/enroll_and_broadcast.py --all
 python pipeline/generate_events.py --seed 42
 python pipeline/route_and_recognize.py --phase 2
@@ -53,6 +54,7 @@ python pipeline/evaluate_pipeline.py
 
 | # | Command | Reads | Writes |
 |---|---|---|---|
+| 0 | `python build_campus_roles.py` | `corpus/meta.csv` | `variants/rbac10/occupant_roles.json`, `variants/rbac10/class_rosters.json` (assigns Dean, Teacher, Student roles and class rosters) |
 | 1 | `pipeline/enroll_and_broadcast.py --all` | corpus + `shared/` contract | `out/<building>.npz` (published Bloom filters), `nodes/<building>/{building.json, config.json, mean_face.npy, embeddings/, filters/, state/*.db incl. empty pointers.db}` |
 | 2 | `pipeline/generate_events.py --seed N` | corpus | `events/output/generated_events.json`, `events/output/ground_truth.json` |
 | 3 | `pipeline/route_and_recognize.py --phase 2` | events + corpus | `recognition/output/recognition_results.json` |

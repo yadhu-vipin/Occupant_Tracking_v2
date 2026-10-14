@@ -81,10 +81,6 @@ from security.campus_policy import (                                        # no
 )
 
 DEFAULT_PHASE4_RESULTS = ROOT_DIR / "dsts" / "output" / "phase4_results.json"
-if not DEFAULT_PHASE4_RESULTS.exists():
-    _fallback_phase4 = ROOT_DIR / "buildings_prototype" / "dsts" / "output" / "phase4_results.json"
-    if _fallback_phase4.exists():
-        DEFAULT_PHASE4_RESULTS = _fallback_phase4
 DEFAULT_NODES_DIR = ROOT_DIR / "nodes"
 INTERNAL_ZONES = frozenset(ZONES) - {"zT"}
 TRANSITION_ZONE = "zT"
@@ -796,8 +792,18 @@ def _confidence_band(p: float | None) -> str:
 
 
 def load_real_registry() -> tuple[dict[str, str], dict[str, list[str]]]:
-    roles = json.loads((ROLES_DIR / "occupant_roles.json").read_text())
-    rosters = json.loads((ROLES_DIR / "class_rosters.json").read_text())
+    roles_file = ROLES_DIR / "occupant_roles.json"
+    rosters_file = ROLES_DIR / "class_rosters.json"
+    if not roles_file.exists() or not rosters_file.exists():
+        try:
+            from build_campus_roles import main as build_roles_main
+            build_roles_main()
+        except Exception:
+            raise FileNotFoundError(
+                f"Missing {roles_file} or {rosters_file}. Run: python build_campus_roles.py"
+            )
+    roles = json.loads(roles_file.read_text(encoding="utf-8"))
+    rosters = json.loads(rosters_file.read_text(encoding="utf-8"))
     if not roles:
         raise SystemExit("no roles found -- run: python build_campus_roles.py first")
     return roles, rosters

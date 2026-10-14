@@ -44,11 +44,21 @@ def setup_roles():
 
     # Register occupants
     register_occupant_role("dean_01", CampusRole.DEAN)
+    register_occupant_role("dean_02", CampusRole.DEAN)
     register_occupant_role("prof_smith", CampusRole.TEACHER)
     register_occupant_role("prof_jones", CampusRole.TEACHER)
     register_occupant_role("student_alice", CampusRole.STUDENT)
     register_occupant_role("student_bob", CampusRole.STUDENT)
     register_occupant_role("visitor_eve", CampusRole.VISITOR)
+
+    # Register default home buildings for campus scoping
+    register_occupant_building("dean_01", "B1")
+    register_occupant_building("dean_02", "B2")
+    register_occupant_building("prof_smith", "B1")
+    register_occupant_building("prof_jones", "B1")
+    register_occupant_building("student_alice", "B1")
+    register_occupant_building("student_bob", "B1")
+    register_occupant_building("visitor_eve", "B1")
 
     # Register class roster: Alice is in Smith's class, Bob is not
     register_class_roster("prof_smith", ["student_alice"])
@@ -76,27 +86,28 @@ def test_self_query_exemption():
 
 
 def test_dean_matrix_rules():
-    """Dean has full_track/precise on staff & students; current/zone on deans & visitors."""
+    """Dean has full_track/precise on staff & students under authorized investigation; current/zone on deans & visitors."""
+    ctx_inv = QueryContext(purpose=QueryPurpose.SECURITY_INVESTIGATION, authorized_investigation=True)
     # Dean -> Teacher
-    d1 = evaluate_campus_query_policy("dean_01", "prof_smith")
+    d1 = evaluate_campus_query_policy("dean_01", "prof_smith", context=ctx_inv)
     assert d1.permitted is True
     assert d1.access == AccessScope.FULL_TRACK
     assert d1.granularity == LocationGranularity.PRECISE
 
     # Dean -> Student
-    d2 = evaluate_campus_query_policy("dean_01", "student_alice")
+    d2 = evaluate_campus_query_policy("dean_01", "student_alice", context=ctx_inv)
     assert d2.permitted is True
     assert d2.access == AccessScope.FULL_TRACK
     assert d2.granularity == LocationGranularity.PRECISE
 
     # Dean -> Dean (peer)
-    d3 = evaluate_campus_query_policy("dean_01", "dean_02", target_role=CampusRole.DEAN)
+    d3 = evaluate_campus_query_policy("dean_01", "dean_02", target_role=CampusRole.DEAN, context=ctx_inv)
     assert d3.permitted is True
     assert d3.access == AccessScope.CURRENT
     assert d3.granularity == LocationGranularity.ZONE
 
     # Dean -> Visitor
-    d4 = evaluate_campus_query_policy("dean_01", "visitor_eve")
+    d4 = evaluate_campus_query_policy("dean_01", "visitor_eve", context=ctx_inv)
     assert d4.permitted is True
     assert d4.access == AccessScope.CURRENT
     assert d4.granularity == LocationGranularity.ZONE
@@ -410,5 +421,17 @@ def test_policy_explainability_methods():
     assert "PERMITTED" in expl
     assert "RULE_SELF_LOOKUP" in expl
     assert "Exposed Fields:" in expl
+
+
+def test_missing_building_fails_closed():
+    """S6 fix: Unresolved building registration fails closed with L0_NONE."""
+    register_occupant_role("unscoped_user", CampusRole.STUDENT)
+    # Target has no registered building
+    d = evaluate_campus_query_policy("dean_01", "unscoped_user")
+    assert d.permitted is False
+    assert d.level == DisclosureLevel.L0_NONE
+    assert d.policy_rule == "RULE_BUILDING_SCOPE_UNRESOLVED_DENIED"
+    assert "Building scope unresolved" in d.reason
+
 
 

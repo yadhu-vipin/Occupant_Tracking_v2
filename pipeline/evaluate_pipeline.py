@@ -288,6 +288,16 @@ def run_evaluation(
     pointer_report = pointer_precision(n_dir, ground_truth)
     summary = summarize(rows, pointer_report)
 
+    # Incorporate phase4_results_path when present
+    p4_path = phase4_results_path or (ROOT / "dsts" / "output" / "phase4_results.json")
+    if p4_path.exists():
+        try:
+            p4_data = json.loads(p4_path.read_text(encoding="utf-8"))
+            summary["phase4_events_count"] = len(p4_data) if isinstance(p4_data, list) else len(p4_data.keys())
+            summary["phase4_results_path"] = str(p4_path)
+        except Exception:
+            pass
+
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "end_to_end_results.json").write_text(
         json.dumps(rows, indent=2) + "\n", encoding="utf-8")
