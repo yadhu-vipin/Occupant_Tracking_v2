@@ -22,10 +22,9 @@ Threat model coverage:
 import os
 import time
 import hashlib
-import json
 from typing import Dict, Optional, Tuple, List, Set
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 
 @dataclass(frozen=True)
@@ -351,6 +350,10 @@ class TransportSecurityManager:
             "timestamp": time.time(),
         })
         return cert
+
+    def get_certificate(self, building_id: str) -> Optional[CertificateInfo]:
+        """Return the certificate currently issued to ``building_id`` (None if unprovisioned)."""
+        return self._node_certs.get(building_id)
 
     def setup_pinning(self) -> None:
         """Cross-pin all node certificates for mutual authentication."""

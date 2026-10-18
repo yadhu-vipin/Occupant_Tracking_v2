@@ -12,7 +12,7 @@ What crosses the (future) boundary:
 
 The returned R reference vectors are the home building's enrolled data. Holding
 them in another building is a real departure from the project's "no building ever
-holds another building's raw biometric data" premise -- see PIPELINE.md. It is
+holds another building's raw biometric data" premise -- see README.md. It is
 mitigated by transience: a pool entry is evicted the moment the visitor leaves.
 """
 import json
@@ -107,16 +107,54 @@ class Visitor:
     refs: np.ndarray                   # (R, dim) preprocessed -- borrowed from home
     vote_fraction: float               # e.g. 15/20 at admission
     entered_at: float = field(default_factory=time.time)
+    last_seen: float = field(default_factory=time.time)   # refreshed on every pool hit
+
+    def __post_init__(self):
+        # The pool owns a private copy: refs may arrive as a view of another
+        # node's array (in-process), and wiping on eviction must never touch it.
+        self.refs = np.array(self.refs, copy=True)
 
     def key(self):
         return (self.occupant_id, self.home_building)
 
 
-class VisitorPool:
-    """Transient store of identified visitors currently present in a building."""
+DEFAULT_VISITOR_TTL_SECONDS = 4 * 3600
 
-    def __init__(self):
+
+class VisitorPool:
+    """Transient store of identified visitors currently present in a building.
+
+    A visitor who is never seen leaving would otherwise keep another building's
+    reference vectors in memory forever, so every entry expires ``ttl_seconds``
+    after it was last seen (``None`` disables expiry). Expired entries are purged
+    before every admit/match and their reference arrays are overwritten with zeros.
+    """
+
+    def __init__(self, ttl_seconds: float | None = DEFAULT_VISITOR_TTL_SECONDS):
         self._visitors: list[Visitor] = []
+        self.ttl_seconds = ttl_seconds
+
+    def purge_expired(self, now: float | None = None) -> int:
+        """Drop visitors not seen within the TTL. Returns how many were removed."""
+        if self.ttl_seconds is None or not self._visitors:
+            return 0
+        now = time.time() if now is None else now
+        keep, dropped = [], 0
+        for v in self._visitors:
+            if now - v.last_seen > self.ttl_seconds:
+                self._wipe(v)
+                dropped += 1
+            else:
+                keep.append(v)
+        self._visitors = keep
+        return dropped
+
+    @staticmethod
+    def _wipe(visitor: "Visitor") -> None:
+        try:
+            visitor.refs[...] = 0
+        except (TypeError, ValueError):          # read-only / non-array refs: nothing to overwrite
+            pass
 
     def __len__(self):
         return len(self._visitors)
@@ -126,8 +164,11 @@ class VisitorPool:
 
     def admit(self, visitor):
         """Add a visitor (or refresh an existing one's timestamp / refs)."""
+        self.purge_expired()
         for i, v in enumerate(self._visitors):
             if v.key() == visitor.key():
+                if v is not visitor:
+                    self._wipe(v)              # the replaced copy must not linger in memory
                 self._visitors[i] = visitor
                 return
         self._visitors.append(visitor)
@@ -138,20 +179,29 @@ class VisitorPool:
         Votes the capture against every pooled visitor's R refs at once, same
         12/20 rule as own-occupant verification.
         """
+        self.purge_expired()
         if not self._visitors:
             return None
         refs = np.stack([v.refs for v in self._visitors])          # (P, R, dim)
         w, votes, accepted = vote(refs, query, contract.accept_angle_deg, contract.min_votes)
-        return (self._visitors[w], votes) if accepted else None
+        if not accepted:
+            return None
+        self._visitors[w].last_seen = time.time()
+        return self._visitors[w], votes
 
     def depart(self, occupant_id, home_building):
         """Evict a visitor. Returns True if one was removed."""
         before = len(self._visitors)
+        for v in self._visitors:
+            if v.key() == (occupant_id, home_building):
+                self._wipe(v)
         self._visitors = [v for v in self._visitors
                           if v.key() != (occupant_id, home_building)]
         return len(self._visitors) < before
 
     def clear(self):
+        for v in self._visitors:
+            self._wipe(v)
         self._visitors.clear()
 
 
@@ -227,6 +277,7 @@ class Identification:
     pool_votes: int = 0
     filter_scores: dict = field(default_factory=dict)
     correct: bool | None = None        # set by a caller that knows ground truth
+    failures: list = field(default_factory=list)   # (candidate_building, reason) for sealed exchanges that failed
 
     def line(self):
         who = "unknown" if self.occupant_id is None else f"occupant {self.occupant_id}"

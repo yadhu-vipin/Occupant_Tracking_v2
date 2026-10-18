@@ -17,7 +17,7 @@
     "building_8",
     "building_10"
   ],
-  "generated_at": "2026-09-24",
+  "generated_at": "2026-10-17",
   "generator": "pipeline/enroll_and_broadcast.py",
   "n_occupants": 50,
   "occupant_ids": [

@@ -32,7 +32,6 @@ from buildinglib.node import Reply
 from recognition.mask_handler import (
     MaskConfig,
     apply_mask_handling,
-    apply_confidence_penalty,
 )
 from recognition.models import RecognitionResult
 

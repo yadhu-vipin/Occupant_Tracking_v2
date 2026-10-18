@@ -102,7 +102,11 @@ class RetrievalRuntime:
     via ``pipeline.recognize.confirm_at_candidate``.
     """
 
-    def __init__(self, embeddings, meta, artifact_dir, nodes_dir=None):
+    def __init__(self, embeddings, meta, artifact_dir, nodes_dir=None, secure=True):
+        # secure=True: every candidate check is a sealed round trip (see
+        # security/payload.py) and fails closed. False keeps the bare in-process call.
+        self.secure = secure
+        self.secure_failures: list = []     # (current, candidate, reason) for every failed sealed exchange
         self.embeddings = embeddings
         self.meta = meta
         self.contract = load_routing_contract()
@@ -125,6 +129,20 @@ class RetrievalRuntime:
         for store in self._pointer_stores.values():
             store.close()
 
+    def _ask_candidate(self, query, current, candidate):
+        if not getattr(self, "secure", False):
+            return confirm_at_candidate(query, current, self.nodes[candidate], self.contract)
+        mine, theirs = self.nodes[current].security_handler, self.nodes[candidate].security_handler
+        if mine is None or theirs is None:
+            self.secure_failures.append((current, candidate, "security handler unavailable"))
+            return None
+        reply, reason = mine.exchange_with_candidate(
+            current, candidate, query, theirs,
+            lambda cap, src: confirm_at_candidate(cap, src, self.nodes[candidate], self.contract))
+        if reply is None:
+            self.secure_failures.append((current, candidate, reason))
+        return reply
+
     def retrieve(self, event, local_result):
         if set(event) != EVENT_FIELDS:
             raise ValueError("retrieval accepts observable Event fields only")
@@ -142,7 +160,9 @@ class RetrievalRuntime:
                                   self.contract.shortlist_k)
         replies, verified = [], None
         for candidate in shortlist:
-            reply = confirm_at_candidate(query, current, self.nodes[candidate], self.contract)
+            reply = self._ask_candidate(query, current, candidate)
+            if reply is None:           # secure exchange failed closed: this candidate says nothing
+                continue
             record = {"building": candidate, "matched": reply.matched,
                       "occupant_id": reply.occupant_id, "votes": reply.votes,
                       "candidate_distances": getattr(reply, "candidate_distances", None)}
@@ -224,6 +244,9 @@ def run_phase3_cli(args):
     args.retrieval_output.parent.mkdir(parents=True, exist_ok=True)
     args.retrieval_output.write_text(json.dumps(attempts, indent=2) + "\n", encoding="utf-8")
     print(f"RETRIEVAL ATTEMPTS: {len(attempts)} local rejections; no ground truth used.")
+    if runtime.secure_failures:
+        print(f"WARNING: {len(runtime.secure_failures)} sealed exchange(s) failed closed and contributed no reply; "
+              f"first failure: {runtime.secure_failures[0]}")
     confirmed = sum(a["verification_result"] == "CONFIRMED" for a in attempts)
     minted = sum(a["verification_result"] == "CONFIRMED" and a["current_zone"] == TRANSITION_ZONE
                  for a in attempts)

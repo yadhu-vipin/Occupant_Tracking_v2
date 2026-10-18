@@ -342,7 +342,7 @@ class PointerStore:
 # Phase 3's candidate check, ex respond_node.py:respond) instead of
 # duplicating it.
 
-def identify(capture_q, at_node, filters, nodes, contract):
+def identify(capture_q, at_node, filters, nodes, contract, secure=True):
     """Run the full cascade for one capture. ``capture_q`` is preprocessed (dim,).
 
     ``filters`` : {building_id: BloomFilter} for the buildings this node can route
@@ -382,20 +382,29 @@ def identify(capture_q, at_node, filters, nodes, contract):
     ident.shortlist = shortlist
     ident.filter_scores = scores
 
-    # 4. handoff (with zero-trust envelope encryption & signature verification)
+    # 4. handoff. By default the capture, and the reply with the home building's
+    #    reference vectors, cross the boundary only as sealed payloads (ephemeral
+    #    X25519 -> AES-128-GCM, Ed25519-signed, replay-guarded, reply bound to its
+    #    request). Fail closed: if the secure exchange cannot complete, that
+    #    candidate contributes no reply -- there is no plaintext fallback.
+    #    ``secure=False`` exists only for benchmarks/tests of the bare cascade.
     replies = []
     for b in shortlist:
-        if at_node.security_handler and hasattr(nodes[b], "security_handler") and nodes[b].security_handler:
-            envelope = at_node.security_handler.seal_handoff_request(
-                source_building=at_node.building_id,
-                dest_building=b,
-                visitor_id="UNRESOLVED_VISITOR",
-            )
-            ok, meta, reason = nodes[b].security_handler.unseal_handoff_request(b, envelope)
-            if not ok:
-                continue
-        r = confirm_at_candidate(capture_q, at_node.building_id, nodes[b], contract)
-        replies.append(r)
+        if not secure:
+            replies.append(confirm_at_candidate(capture_q, at_node.building_id, nodes[b], contract))
+            continue
+        mine, theirs = at_node.security_handler, nodes[b].security_handler
+        if mine is None or theirs is None:
+            ident.failures.append((b, "security handler unavailable"))
+            log.warning("sealed exchange %s -> %s skipped: security handler unavailable", at_node.building_id, b)
+            continue
+        reply, reason = mine.exchange_with_candidate(
+            at_node.building_id, b, capture_q, theirs,
+            lambda cap, src, _node=nodes[b]: confirm_at_candidate(cap, src, _node, contract))
+        if reply is None:
+            ident.failures.append((b, reason))      # already logged by the handler
+        else:
+            replies.append(reply)
     ident.replies = replies
 
     # 5. aggregate

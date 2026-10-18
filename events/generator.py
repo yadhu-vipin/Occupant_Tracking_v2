@@ -1,5 +1,15 @@
 """Physically valid stochastic Stage 1 events using existing corpus TEST rows only.
 
+One simulated timeline is the single source of everything this module writes. Every occupant follows a path
+of movements; each movement is (a) a camera event, (b) a ground-truth record and (c) a state transition.
+Between two movements an occupant stays where they are, so the true location of every occupant at every
+moment is known and ``state_truth`` (see ``events/models.py``) is just that timeline written out.
+
+Schedules (``GenerationConfig.schedule``):
+  * ``"spread"`` (default): an occupant's moves are spread over the whole day with real dwell time between them.
+  * ``"burst"``: the original model, all of an occupant's moves inside one short burst (30-180 s apart).
+    Kept because the paper's experiments were run with it.
+
 This module is the library: ``GenerationConfig`` + ``EventGenerator``. The
 CLI entry point lives in ``pipeline/generate_events.py``.
 """
@@ -15,8 +25,7 @@ import pandas as pd
 
 from buildinglib.split import default_emb_path, default_meta_path, list_buildings, normalise_occupant_ids
 from dsts.legacy_state.zones import ZONE_ADJACENCY
-from .ground_truth import make_ground_truth
-from .io import save_events
+from .ground_truth import make_ground_truth, make_state_transition
 from .models import Event, OccupantState
 
 
@@ -31,8 +40,11 @@ class GenerationConfig:
     end_time: str = "17:00:00"
     events_per_occupant: int = 20
     occupant_limit: int | None = None
+    schedule: str = "spread"
 
     def __post_init__(self):
+        if self.schedule not in ("spread", "burst"):
+            raise ValueError("schedule must be 'spread' or 'burst'")
         if not 0 <= self.visitor_ratio <= 1:
             raise ValueError("visitor_ratio must be between 0 and 1")
         if self.min_interval <= 0 or self.max_interval < self.min_interval:
@@ -73,6 +85,11 @@ class EventGenerator:
         return cls(pd.read_csv(meta_path), config, embedding_count=raw.shape[0])
 
     def generate(self):
+        """(events, ground_truth). ``generate_with_states`` also returns the state-transition record."""
+        events, truth, _states = self.generate_with_states()
+        return events, truth
+
+    def generate_with_states(self):
         tests = self.meta[self.meta["split"].astype(str).str.lower() == "test"]
         groups = list(tests.groupby(["occupant_id", "building"], sort=True))
         if self.config.occupant_limit:
@@ -87,21 +104,40 @@ class EventGenerator:
         for group_no, ((occupant_id, home), rows) in enumerate(rows_by_occupant.items()):
             path = self._occupant_path(str(occupant_id), str(home), visitor_counts[group_no])
             self.rng.shuffle(rows)
-            latest_start = end - timedelta(seconds=self.config.max_interval * len(path))
-            available_seconds = max(0, int((latest_start - start).total_seconds()))
-            cursor = start + timedelta(seconds=self.rng.randint(0, available_seconds))
-            for row, state in zip(rows[:len(path)], path):
-                cursor += timedelta(seconds=self.rng.randint(self.config.min_interval, self.config.max_interval))
-                if cursor > end:
-                    raise ValueError("interval configuration cannot fit events into the time window")
-                pending.append((cursor, state, int(row)))
-        events, truth = [], []
+            if self.config.schedule == "spread":
+                times = self._spread_times(start, end, len(path))
+            else:
+                latest_start = end - timedelta(seconds=self.config.max_interval * len(path))
+                available_seconds = max(0, int((latest_start - start).total_seconds()))
+                cursor = start + timedelta(seconds=self.rng.randint(0, available_seconds))
+                times = []
+                for _ in path:
+                    cursor += timedelta(seconds=self.rng.randint(self.config.min_interval, self.config.max_interval))
+                    if cursor > end:
+                        raise ValueError("interval configuration cannot fit events into the time window")
+                    times.append(cursor)
+            for when, row, state in zip(times, rows[:len(path)], path):
+                pending.append((when, state, int(row)))
+        events, truth, states = [], [], []
+        last_location = {}                 # occupant -> (building, zone); absent = not on campus yet
         for number, (timestamp, state, row) in enumerate(sorted(pending, key=lambda item: item[0]), 1):
             event = Event(f"E{number:06d}", timestamp.strftime("%H:%M:%S"),
                           state.current_building, state.current_zone, row)
             events.append(event)
             truth.append(make_ground_truth(event, state.occupant_id, state.home_building))
-        return events, truth
+            before = last_location.get(state.occupant_id, (None, None))
+            states.append(make_state_transition(number - 1, event, state.occupant_id, state.home_building, *before))
+            last_location[state.occupant_id] = (state.current_building, state.current_zone)
+        return events, truth, states
+
+    def _spread_times(self, start, end, count):
+        """``count`` move times over the whole day, at least ``min_interval`` seconds apart (dwell in between)."""
+        total = int((end - start).total_seconds())
+        slack = total - self.config.min_interval * (count - 1)
+        if slack < 0:
+            raise ValueError("time window too short for the requested number of events")
+        offsets = sorted(self.rng.randint(0, slack) for _ in range(count))
+        return [start + timedelta(seconds=off + i * self.config.min_interval) for i, off in enumerate(offsets)]
 
     def _visitor_counts(self, occupants):
         """Allocate closed zT-to-zT visitor trips nearest to the requested total."""

@@ -1,5 +1,5 @@
 {
-  "_comment": "FEDERATION CONTRACT - identical for every building. Do not hand-edit; see shared/README.md.",
+  "_comment": "FEDERATION CONTRACT - identical for every building. Do not hand-edit; see README.md (section 5).",
   "schema_version": 1,
   "seed": 42,
   "k": 11,

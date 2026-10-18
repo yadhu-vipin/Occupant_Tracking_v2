@@ -15,7 +15,10 @@ FastAPI application for DSTS Command Center, integrating:
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
+import os
+import random
 import re
 import threading
 import time
@@ -25,8 +28,8 @@ from typing import Optional, List, Dict, Any
 from fastapi import (
     FastAPI,
     WebSocket,
-    WebSocketDisconnect,
     HTTPException,
+    Request,
     Query,
     Header,
     Depends,
@@ -44,6 +47,7 @@ import yaml
 from dsts.api import metrics as m
 from dsts.legacy_state.zones import ZONES, zone_label, zone_sector
 from pipeline.query import (
+    IdentifiedEvent,
     build_engine,
     load_real_registry,
     register_real_registry,
@@ -56,9 +60,9 @@ from pipeline.query import (
     TRAJECTORY_QUERIES,
 )
 from pipeline.query_cache import QueryCache
+from security.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
 from security.campus_policy import (
     evaluate_campus_query_policy,
-    CampusRole,
     DisclosureLevel,
     QueryPurpose,
     QueryContext,
@@ -67,9 +71,7 @@ from security.campus_policy import (
     clear_campus_registry,
 )
 from security.authorize import (
-    authorize,
-    Role,
-    register_node,
+    authorize_with_reason,
     get_audit_log,
     clear_audit_log,
     clear_registry,
@@ -94,7 +96,9 @@ app = FastAPI(
 
 # App Global State
 _connections: set[WebSocket] = set()
-_pending_broadcasts: asyncio.Queue = asyncio.Queue()
+# One queue per connected WebSocket so every client receives every broadcast.
+_subscribers: Dict[WebSocket, asyncio.Queue] = {}
+_simulated_events: List[IdentifiedEvent] = []
 _state_lock = threading.Lock()
 _engine: Optional[QueryEngine] = None
 _roles: Dict[str, str] = {}
@@ -106,30 +110,18 @@ _last_cache_time: float = 0.0
 # Query result cache: LRU, 256-entry capacity, 30-second TTL.
 _query_cache: QueryCache = QueryCache(capacity=256, ttl_seconds=30.0)
 
-# Known building set
-KNOWN_BUILDINGS = frozenset([f"building_{i}" for i in range(1, 11)] + ["building_0"])
+# Known building set: derived from the loaded deployment (see _known_buildings()).
 
 # Time validation regex: HH:MM:SS where HH: 00..23, MM: 00..59, SS: 00..59
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$")
 
-# Token registry for personas and occupants (S1)
-PRESET_TOKENS = {
-    # Role A: Dean (building_5)
-    "dsts-dean-token": "0001738",
-    "dean-token": "0001738",
-    "token-dean": "0001738",
-    # Role B: Teacher (building_5)
-    "dsts-teacher-token": "0000362",
-    "teacher-token": "0000362",
-    "token-teacher": "0000362",
-    # Role C: Student caller (building_5, distinct from target 0000102 to prevent B1 self-lookup bug)
-    "dsts-student-token": "0000168",
-    "student-token": "0000168",
-    "token-student": "0000168",
-    # Student target
-    "dsts-target-token": "0000102",
-    "target-token": "0000102",
-    "token-target": "0000102",
+# Demo personas for the dashboard. They are NOT credentials: they only let POST /api/auth/login
+# mint a signed token for these accounts, and only when the operator sets DSTS_DEMO_MODE=1.
+DEMO_PERSONAS = {
+    "dean": "0001738",      # Dean, building_5
+    "teacher": "0000362",   # Teacher, building_5
+    "student": "0000168",   # Student, building_5 (distinct from the default target)
+    "target": "0000102",    # Student, building_5 (default query target)
 }
 
 # Query Templates according to system specification: Q1 through Q13 and TRACK
@@ -171,33 +163,37 @@ def _get_engine() -> QueryEngine:
 # VALIDATION & AUTHENTICATION (S1, S2, B4, B5, B6)
 # ================================================================
 
-def resolve_token_principal(raw_token: Optional[str]) -> Optional[str]:
-    """Resolve an incoming bearer token to a verified campus occupant ID."""
+def _demo_mode() -> bool:
+    return os.environ.get("DSTS_DEMO_MODE", "").strip().lower() in ("1", "true", "yes")
+
+
+def _strip_bearer(raw_token: Optional[str]) -> Optional[str]:
     if not raw_token:
         return None
     token = raw_token.strip()
     if token.lower().startswith("bearer "):
         token = token[7:].strip()
-    # 1. Preset persona tokens
-    if token in PRESET_TOKENS:
-        return PRESET_TOKENS[token]
-    # 2. Pattern matching dsts-token-<id> or token-<id>
-    for prefix in ("dsts-token-", "token-", "bearer-", "dsts_"):
-        if token.startswith(prefix):
-            candidate = token[len(prefix):].strip()
-            if candidate in _roles or candidate in ("0001738", "0000362", "0000168", "0000102"):
-                return candidate
-    # 3. Direct occupant ID if present in campus role registry
-    if token in _roles or token in ("0001738", "0000362", "0000168", "0000102"):
-        return token
-    return None
+    return token or None
+
+
+def resolve_token_principal(raw_token: Optional[str]) -> Optional[str]:
+    """Return the occupant ID a signed, unexpired token was issued to (None otherwise).
+
+    Only tokens minted by this server (security.tokens.issue_token) verify. An occupant
+    ID, a guessable string or a client-built value is never a valid credential.
+    """
+    principal = verify_token(_strip_bearer(raw_token))
+    if principal is None:
+        return None
+    _get_engine()  # ensure _roles is loaded
+    return principal if principal in _roles else None
 
 
 def get_current_principal(
     authorization: Optional[str] = Header(None),
     x_api_token: Optional[str] = Header(None),
 ) -> str:
-    """FastAPI dependency to extract and authenticate caller principal from token (S1)."""
+    """FastAPI dependency: authenticate the caller from a signed bearer token."""
     raw_token = authorization or x_api_token
     if not raw_token:
         m.auth_failures_total.inc()
@@ -213,6 +209,19 @@ def get_current_principal(
             detail="Invalid or expired authentication token.",
         )
     return principal
+
+
+def require_role(principal: str, *allowed: str) -> str:
+    """Raise 403 unless the principal's campus role is one of `allowed`. Returns the role."""
+    _get_engine()
+    role = get_real_role(principal)
+    if role not in allowed:
+        m.security_verification_failures_total.labels(kind="rebac_persona").inc()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Role '{role}' is not permitted to perform this action (requires: {', '.join(allowed)}).",
+        )
+    return role
 
 
 def validate_hms_time(val: Any, field_name: str = "time") -> str:
@@ -244,15 +253,21 @@ def validate_hms_time(val: Any, field_name: str = "time") -> str:
     return s
 
 
+def _known_buildings() -> frozenset:
+    """Buildings that actually exist in the loaded deployment."""
+    return frozenset(_get_engine().registered.keys())
+
+
 def validate_building(b_id: Optional[str]) -> str:
     """Validate building exists in campus configuration (B6)."""
     if not b_id:
         return "building_5"
     norm = b_id.strip().lower()
-    if norm not in KNOWN_BUILDINGS:
+    known = _known_buildings()
+    if norm not in known:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown building_id: '{b_id}'. Valid campus buildings: {sorted(KNOWN_BUILDINGS)}.",
+            detail=f"Unknown building_id: '{b_id}'. Valid campus buildings: {sorted(known)}.",
         )
     return norm
 
@@ -308,12 +323,17 @@ def _load_layout() -> dict:
 
 
 def _compute_real_occupancy() -> tuple[Dict[str, List[dict]], Dict[str, Dict[str, int]]]:
+    engine = _get_engine()
+    with _state_lock:
+        return _compute_real_occupancy_locked(engine)
+
+
+def _compute_real_occupancy_locked(engine: QueryEngine) -> tuple[Dict[str, List[dict]], Dict[str, Dict[str, int]]]:
     global _cached_occupancy, _cached_heatmap, _last_cache_time
     now = time.time()
     if _cached_occupancy is not None and (now - _last_cache_time < 5.0):
         return _cached_occupancy, _cached_heatmap
 
-    engine = _get_engine()
     latest_by_occupant: Dict[str, Any] = {}
     for event in engine.events:
         curr = latest_by_occupant.get(event.occupant_id)
@@ -342,10 +362,9 @@ def _compute_real_occupancy() -> tuple[Dict[str, List[dict]], Dict[str, Dict[str
         if event.building in heatmap and event.zone in heatmap[event.building]:
             heatmap[event.building][event.zone] += 1
 
-    with _state_lock:
-        _cached_occupancy = occupancy
-        _cached_heatmap = heatmap
-        _last_cache_time = now
+    _cached_occupancy = occupancy
+    _cached_heatmap = heatmap
+    _last_cache_time = now
     return occupancy, heatmap
 
 
@@ -364,14 +383,53 @@ def index() -> FileResponse:
     return FileResponse(str(index_file))
 
 
+class LoginBody(BaseModel):
+    persona: Optional[str] = Field(default=None, description="Demo persona (dean|teacher|student|target); needs DSTS_DEMO_MODE=1")
+    principal_id: Optional[str] = Field(default=None, description="Occupant ID to sign in as; needs `key`")
+    key: Optional[str] = Field(default=None, description="Shared login key (DSTS_LOGIN_KEY)")
+
+
+@app.post("/api/auth/login")
+def login(body: LoginBody) -> dict:
+    """Issue a signed, expiring bearer token.
+
+    Two ways in: (1) demo personas, only when the operator set DSTS_DEMO_MODE=1;
+    (2) an occupant ID plus the operator-provided DSTS_LOGIN_KEY.
+    """
+    _get_engine()
+    if body.persona:
+        if not _demo_mode():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Persona login is disabled. Set DSTS_DEMO_MODE=1 to enable it for demos.")
+        pid = DEMO_PERSONAS.get(body.persona.strip().lower())
+        if pid is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Unknown persona. Valid: {sorted(DEMO_PERSONAS)}.")
+    else:
+        expected = os.environ.get("DSTS_LOGIN_KEY", "")
+        supplied = body.key or ""
+        if not expected or not hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8")) \
+                or not body.principal_id or body.principal_id.strip() not in _roles:
+            m.auth_failures_total.inc()
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+        pid = body.principal_id.strip()
+    return {"token": issue_token(pid), "principal": pid, "role": get_real_role(pid),
+            "building": get_occupant_building(pid), "expires_in": DEFAULT_TTL_SECONDS}
+
+
 @app.get("/api/health")
-def health() -> dict:
+def health(
+    authorization: Optional[str] = Header(None),
+    x_api_token: Optional[str] = Header(None),
+) -> dict:
+    """Liveness probe. Unauthenticated callers get status only; details need a valid token."""
+    base = {"status": "healthy", "service": "dsts-command-center", "version": "2.1.0"}
+    if not resolve_token_principal(authorization or x_api_token):
+        return base
     layout = _load_layout()
     engine = _get_engine()
     return {
-        "status": "healthy",
-        "service": "dsts-command-center",
-        "version": "2.1.0",
+        **base,
         "buildings_count": len(layout.get("buildings", [])),
         "total_events_loaded": len(engine.events),
         "registered_occupants": sum(len(occ) for occ in engine.registered.values()),
@@ -380,12 +438,13 @@ def health() -> dict:
 
 
 @app.get("/api/layout")
-def get_layout() -> dict:
+def get_layout(principal: str = Depends(get_current_principal)) -> dict:
     return _load_layout()
 
 
 @app.get("/api/cache-stats")
-def get_cache_stats() -> dict:
+def get_cache_stats(principal: str = Depends(get_current_principal)) -> dict:
+    require_role(principal, "dean")
     return {
         "query_cache": _query_cache.stats(),
         "occupancy_cache": {
@@ -400,36 +459,52 @@ def get_cache_stats() -> dict:
 # RBAC-PROTECTED SYSTEM ENDPOINTS (S3)
 # ================================================================
 
+def _quantize_hms(ts: str, minutes: int = 15) -> str:
+    """Round an HH:MM:SS time down to a ``minutes`` bucket (L2 discloses an approximate time only)."""
+    h, mi, _ = (int(x) for x in str(ts).split(":"))
+    return f"{h:02d}:{(mi // minutes) * minutes:02d}"
+
+
+def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
+    """Run every occupant in the snapshot through the persona/building policy for ``principal``.
+
+    L3+ : listed under the exact zone, with probability and exact time.
+    L2  : listed under the functional sector only, with an approximate time.
+    L1/L0/denied: not listed (aggregate counts are available from /api/heatmap).
+    """
+    out: Dict[str, List[dict]] = {z: [] for z in raw}
+    for zone, rows in raw.items():
+        for row in rows:
+            ts = row["timestamp"]
+            ctx = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP,
+                               is_office_hours=("08:00:00" <= ts <= "18:00:00"),
+                               authorized_investigation=False)
+            d = evaluate_campus_query_policy(principal, row["occupant"], context=ctx, purpose=ctx.purpose,
+                                             target_current_building=row["building_id"])
+            if not d.permitted:
+                continue
+            if d.level >= DisclosureLevel.L3_PRECISE_CURRENT:
+                out[zone].append({**row, "disclosure": d.level.name})
+            elif d.level == DisclosureLevel.L2_CURRENT_ZONE:
+                sector = zone_sector(zone)
+                out.setdefault(sector, []).append({
+                    **row, "zone": sector, "zone_label": sector, "probability": None,
+                    "timestamp": _quantize_hms(ts), "disclosure": d.level.name,
+                })
+    return out
+
+
 @app.get("/api/occupancy")
 def get_occupancy(principal: str = Depends(get_current_principal)) -> dict:
-    """
-    Return occupancy state subject to RBAC (S3):
-      - Dean: full campus view
-      - Teacher: filtered to their home building only
-      - Student: aggregate-only summary (anti-stalking policy)
+    """Per-occupant live view, filtered row by row through the same persona/building policy as /api/query.
+
+    Nobody gets more than the policy allows for that exact occupant: a Dean sees their own building
+    (and visitors in it) at sector level, a teacher sees roster students at sector level, a student sees
+    only themselves. Campus-wide aggregate counts live in /api/heatmap.
     """
     _get_engine()
-    caller_role = get_real_role(principal)
-    caller_bld = get_occupant_building(principal)
     raw_occupancy, _ = _compute_real_occupancy()
-
-    if caller_role == "student":
-        # Students receive aggregate zone counts only — individual occupants redacted
-        return {
-            "aggregate_counts": {z: len(occupants) for z, occupants in raw_occupancy.items()},
-            "redacted": True,
-            "reason": "Individual occupant identities redacted under anti-stalking policy.",
-        }
-
-    if caller_role == "teacher":
-        # Teachers can only see occupants in their assigned home building
-        filtered: Dict[str, List[dict]] = {}
-        for z, items in raw_occupancy.items():
-            filtered[z] = [r for r in items if r.get("building_id") == caller_bld]
-        return filtered
-
-    # Dean / Admin sees full occupancy
-    return raw_occupancy
+    return _disclosed_occupancy(principal, raw_occupancy)
 
 
 @app.get("/api/heatmap")
@@ -455,15 +530,21 @@ def get_security_log(principal: str = Depends(get_current_principal)) -> list[di
             detail="Security audit log access is restricted to Dean / Security Administrator.",
         )
 
-    audit_entries = get_audit_log()
     formatted = []
-    for entry in audit_entries[-200:]:
-        formatted.append({
-            "time": entry.get("timestamp", time.time()),
-            "kind": "auth_permit" if entry.get("decision") == "PERMIT" else "auth_failure",
-            "building_id": entry.get("principal_id", "system"),
-            "detail": f"{entry.get('action')} on {entry.get('resource')} [{entry.get('reason') or 'OK'}]",
-        })
+    # Bulk registration / tuning events (one per occupant at start-up) would bury real decisions.
+    noise = {"NODE_REGISTERED", "PRECISION_UPDATED"}
+    entries = [e for e in get_audit_log() if e.get("event_type") not in noise]
+    for entry in reversed(entries[-200:]):             # newest first
+        who = entry.get("principal") or "system"
+        if "decision" in entry:                       # authorize() decisions
+            kind = "auth_permit" if entry["decision"] == "PERMIT" else "auth_failure"
+            detail = f"{entry.get('verb')} on {entry.get('target')} [{entry.get('reason') or 'OK'}]"
+        else:                                         # lifecycle / security events (registration, replay, ...)
+            kind = str(entry.get("event_type", "event")).lower()
+            extras = ", ".join(f"{k}={v}" for k, v in entry.items() if k not in ("timestamp", "event_type", "principal"))
+            detail = f"{entry.get('event_type', 'EVENT')} {extras}".strip()
+        formatted.append({"time": entry.get("timestamp", time.time()), "kind": kind,
+                          "building_id": who, "detail": detail})
     return formatted
 
 
@@ -476,79 +557,174 @@ class SimulateRequestBody(BaseModel):
     seed: Optional[int] = Field(default=42)
 
 
-@app.post("/api/simulate")
-async def simulate_events(body: SimulateRequestBody, principal: str = Depends(get_current_principal)) -> dict:
+# Simulated events are appended to the in-memory event log only (never written to
+# phase4_results.json) and are tagged source="simulated" so /api/reset can drop them.
+SIM_SOURCE = "simulated"
+SIM_START_S, SIM_END_S = 8 * 3600, 18 * 3600
+MAX_SIMULATED_EVENTS = 5000
+
+
+def _fmt_hms(sec: int) -> str:
+    return f"{sec // 3600:02d}:{(sec % 3600) // 60:02d}:{sec % 60:02d}"
+
+
+def _generate_sim_events(engine: QueryEngine, n: int, seed: Optional[int], offset: int) -> List[IdentifiedEvent]:
+    """Deterministically synthesize n identified events for registered occupants.
+
+    ~80% of events are in the occupant's home building, the rest in a random other
+    building (so they appear as visitors). Zones exclude the transition zone zT.
     """
-    Simulate mobility events to update campus occupancy states (B2).
-    Increments events_processed_total counter and broadcasts update to live WebSocket clients.
-    """
-    _get_engine()
-    m.events_processed_total.labels(building_id="campus").inc(body.n_events)
-    # Clear occupancy cache to force recompute
-    global _cached_occupancy
+    rng = random.Random(seed)
+    buildings = sorted(engine.registered.keys())
+    internal_zones = [z for z in ZONES if z != "zT"]
+    roster = [(b, occ) for b in buildings for occ in sorted(engine.registered[b])]
+    events: List[IdentifiedEvent] = []
+    for i in range(n):
+        home, occ = rng.choice(roster)
+        if rng.random() < 0.8 or len(buildings) == 1:
+            building = home
+        else:
+            building = rng.choice([b for b in buildings if b != home])
+        events.append(IdentifiedEvent(
+            event_id=f"sim-{seed}-{offset + i}",
+            timestamp=_fmt_hms(rng.randint(SIM_START_S, SIM_END_S)),
+            building=building,
+            zone=rng.choice(internal_zones),
+            occupant_id=occ,
+            home_building=home,
+            identity_probability=round(rng.uniform(0.6, 1.0), 3),
+            zone_distribution=None,
+            source=SIM_SOURCE,
+        ))
+    return events
+
+
+def _invalidate_derived_state() -> None:
+    """Drop caches that are derived from engine.events."""
+    global _cached_occupancy, _cached_heatmap, _last_cache_time
     with _state_lock:
         _cached_occupancy = None
+        _cached_heatmap = None
+        _last_cache_time = 0.0
+    _query_cache.clear()
+
+
+async def _broadcast(message: dict) -> None:
+    """Deliver message to every connected WebSocket client."""
+    for q in list(_subscribers.values()):
+        q.put_nowait(message)
+
+
+@app.post("/api/simulate")
+async def simulate_events(body: SimulateRequestBody, principal: str = Depends(get_current_principal)) -> dict:
+    """Append n synthetic identified events to the in-memory event log.
+
+    The events show up in occupancy, heatmap and queries until /api/reset is called.
+    """
+    require_role(principal, "dean")
+    engine = _get_engine()
+    with _state_lock:
+        room = MAX_SIMULATED_EVENTS - len(_simulated_events)
+        n = min(body.n_events, max(room, 0))
+        if n <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Simulation cap of {MAX_SIMULATED_EVENTS} events reached. Call /api/reset first.",
+            )
+        new_events = _generate_sim_events(engine, n, body.seed, offset=len(_simulated_events))
+        _simulated_events.extend(new_events)
+        engine.events.extend(new_events)
+        total_simulated = len(_simulated_events)
+    _invalidate_derived_state()
+
+    per_building: Dict[str, int] = {}
+    for e in new_events:
+        per_building[e.building] = per_building.get(e.building, 0) + 1
+    for b, cnt in per_building.items():
+        m.events_processed_total.labels(building_id=b).inc(cnt)
 
     _, heatmap = _compute_real_occupancy()
-    # Queue broadcast for connected WebSocket clients (B3)
-    await _pending_broadcasts.put({
+    await _broadcast({
         "type": "simulation_tick",
-        "events_run": body.n_events,
+        "events_run": n,
         "seed": body.seed,
         "timestamp": time.time(),
         "heatmap": heatmap,
     })
-
     return {
         "status": "success",
-        "events_run": body.n_events,
+        "events_run": n,
         "seed": body.seed,
+        "simulated_total": total_simulated,
+        "capped": n < body.n_events,
         "timestamp": time.time(),
     }
+
+
+def _find_demo_walk(engine: QueryEngine, home: str, away: str) -> Optional[List[IdentifiedEvent]]:
+    """Return the real event sequence of the first occupant who lives in `home` and was seen in `away`."""
+    by_occ: Dict[str, List[IdentifiedEvent]] = {}
+    for e in engine.events:
+        if e.source != SIM_SOURCE and e.home_building == home:
+            by_occ.setdefault(e.occupant_id, []).append(e)
+    for occ in sorted(by_occ):
+        evs = sorted(by_occ[occ], key=lambda e: e.timestamp)
+        if any(e.building == away for e in evs):
+            return evs
+    return None
 
 
 @app.post("/api/demo-walk")
 async def demo_walk(principal: str = Depends(get_current_principal)) -> dict:
-    """Execute the canonical B1 -> B5 inter-building transition scenario (B2)."""
-    _get_engine()
+    """Replay a real inter-building walk (home building_1 -> building_5) from the event log.
+
+    Read-only: nothing is added to the log. Returns aggregate statistics of the walk only
+    (no occupant identity), and pushes the refreshed heatmap to live clients.
+    """
+    require_role(principal, "dean")
+    engine = _get_engine()
+    home, away = "building_1", "building_5"
     start_t = time.perf_counter()
-    events_run = 14
-    m.events_processed_total.labels(building_id="building_1").inc(events_run // 2)
-    m.events_processed_total.labels(building_id="building_5").inc(events_run // 2)
-
+    walk = _find_demo_walk(engine, home, away)
+    if walk is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No real {home} -> {away} walk found in the event log.",
+        )
+    per_building: Dict[str, int] = {}
+    for e in walk:
+        per_building[e.building] = per_building.get(e.building, 0) + 1
+    for b, cnt in per_building.items():
+        m.events_processed_total.labels(building_id=b).inc(cnt)
     elapsed = time.perf_counter() - start_t
+
     _, heatmap = _compute_real_occupancy()
-
-    await _pending_broadcasts.put({
-        "type": "demo_walk",
-        "home_building": "building_1",
-        "away_building": "building_5",
-        "events_run": events_run,
-        "heatmap": heatmap,
-    })
-
-    return {
-        "status": "success",
-        "events_run": events_run,
-        "home_building": "building_1",
-        "away_building": "building_5",
-        "seconds": round(elapsed, 4),
+    summary = {
+        "events_run": len(walk),
+        "buildings_visited": sorted(per_building),
+        "zones_visited": len({(e.building, e.zone) for e in walk}),
+        "first_seen": walk[0].timestamp,
+        "last_seen": walk[-1].timestamp,
     }
+    await _broadcast({"type": "demo_walk", "home_building": home, "away_building": away, **summary, "heatmap": heatmap})
+    return {"status": "success", "home_building": home, "away_building": away,
+            "seconds": round(elapsed, 4), **summary}
 
 
 @app.post("/api/reset")
 def reset_system(principal: str = Depends(get_current_principal)) -> dict:
-    """Reset system caches and audit state (B2)."""
-    global _cached_occupancy, _cached_heatmap, _last_cache_time
+    """Drop simulated events and derived caches. The audit log is append-only and is never cleared here."""
+    require_role(principal, "dean")
+    engine = _get_engine()
     with _state_lock:
-        _query_cache.clear()
-        clear_audit_log()
-        _cached_occupancy = None
-        _cached_heatmap = None
-        _last_cache_time = 0.0
+        if _simulated_events:
+            sim_ids = {id(e) for e in _simulated_events}
+            engine.events[:] = [e for e in engine.events if id(e) not in sim_ids]
+            _simulated_events.clear()
+    _invalidate_derived_state()
     return {
         "status": "reset",
-        "message": "System state, audit log, and query cache reset successfully.",
+        "message": "Simulated events and caches reset successfully (audit log retained).",
     }
 
 
@@ -558,8 +734,8 @@ def reset_system(principal: str = Depends(get_current_principal)) -> dict:
 
 class QueryRequestBody(BaseModel):
     query_type: str = Field(default="Q6", description="Q1..Q13 or TRACK")
-    caller_id: Optional[str] = Field(default=None, description="Optional caller ID to verify against auth token")
-    role: Optional[str] = Field(default=None, description="Role shorthand: dean, teacher, student")
+    caller_id: Optional[str] = Field(default=None, description="Optional; must match the identity in the bearer token")
+    role: Optional[str] = Field(default=None, description="Ignored (kept for client compatibility); role comes from the token")
     target_id: Optional[str] = Field(default=None, description="Target occupant ID for point and trajectory queries")
     occupant_id: Optional[str] = Field(default=None, description="Alias for target_id")
     building_id: Optional[str] = Field(default="building_5", description="Building ID (building_1 .. building_10)")
@@ -571,8 +747,84 @@ class QueryRequestBody(BaseModel):
     t1: Optional[Any] = Field(default=None, description="Start time t1 for interval queries")
     t2: Optional[Any] = Field(default=None, description="End time t2 for interval queries")
     purpose: Optional[str] = Field(default="general_lookup", description="Query purpose")
-    # Client-supplied privilege flags are disallowed or ignored for privilege escalation (S2)
-    token: Optional[str] = Field(default=None, description="Optional bearer token in body for testing")
+
+
+_BUILDING_QUERIES = ("Q1", "Q2")
+_ZONE_QUERIES = ("Q10", "Q12", "Q13")
+_OCCUPANT_QUERIES = ("Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q11", "TRACK")
+_SCOPE_RULE_BY_ROLE = {
+    "dean": "RULE_A_CROSS_BUILDING_DENIED",
+    "teacher": "RULE_B_CROSS_BUILDING_DENIED",
+    "student": "RULE_C_CROSS_BUILDING_DENIED",
+}
+
+
+def _denied_response(q_type: str, template_fmt: str, caller_meta: dict, rule: str, reason: str,
+                     target_meta: Optional[dict] = None, metric_kind: str = "rebac_persona") -> dict:
+    m.security_verification_failures_total.labels(kind=metric_kind).inc()
+    m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
+    out = {
+        "success": False,
+        "query_type": q_type,
+        "template_query": template_fmt,
+        "caller": caller_meta,
+        "decision": {
+            "permitted": False,
+            "disclosure_level": "L0_NONE",
+            "policy_rule": rule,
+            "reason": reason,
+            "visitor_status": None,
+            "exposed_fields": [],
+            "redacted_fields": ["all_data"],
+        },
+        "answer": None,
+        "evidence": [],
+        "error": reason,
+    }
+    if target_meta is not None:
+        out["target"] = target_meta
+    return out
+
+
+def _cached_exec(key: tuple, fn) -> tuple[dict, bool]:
+    """Run `fn` (the already-authorized engine computation) through the result cache.
+
+    The cache only ever sits *behind* the authorization decision: every request is
+    authenticated, authorized and audited first, and `key` includes whatever the
+    decision depends on, so a cached value can never be served across callers or
+    disclosure levels.
+    """
+    cached = _query_cache.get(key)
+    if cached is not None:
+        return cached, True
+    value = fn()
+    _query_cache.set(key, value)
+    return value, False
+
+
+def _building_scope_denial(caller_role: str, caller_bld: Optional[str], building_id: str) -> Optional[tuple[str, str]]:
+    """Every role is confined to its own home building for building- and zone-level queries."""
+    if caller_bld is None:
+        return "RULE_CALLER_BUILDING_UNRESOLVED", "Caller's home building is unresolved; building-scoped queries are denied."
+    if caller_bld != building_id:
+        return (_SCOPE_RULE_BY_ROLE.get(caller_role, "RULE_CROSS_BUILDING_DENIED"),
+                f"{caller_role.capitalize()} of {caller_bld} cannot query external building {building_id}.")
+    return None
+
+
+def _filter_zone_answer(q_type: str, answer: Any, keep: set) -> Any:
+    if q_type == "Q13":
+        return {
+            "total_visitors": answer["total_visitors"],
+            "disclosed_visitors": len(keep),
+            "occupants": sorted(o for o in answer["occupants"] if o in keep),
+            "top_visitors": [t for t in answer["top_visitors"] if t["occupant_id"] in keep],
+        }
+    return [o for o in answer if o in keep]
+
+
+def _zone_ids(q_type: str, answer: Any) -> list[str]:
+    return list(answer["occupants"]) if q_type == "Q13" else list(answer)
 
 
 @app.post("/api/query")
@@ -589,44 +841,22 @@ def execute_query_endpoint(
             detail=f"Unknown query type: {q_type}. Valid: {list(TEMPLATE_QUERIES.keys())}",
         )
 
-    # 1. Real Authentication & Caller Derivation (S1)
-    raw_token = authorization or x_api_token or body.token
-    if not raw_token and body.caller_id:
-        # Fallback to test/demo token mapping if caller_id provided in dev
-        raw_token = f"dsts-token-{body.caller_id}"
-    if not raw_token:
-        m.auth_failures_total.inc()
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Provide a valid Bearer token in the Authorization header.",
-        )
-
-    authenticated_caller_id = resolve_token_principal(raw_token)
-    if not authenticated_caller_id:
-        m.auth_failures_total.inc()
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired authentication token.",
-        )
-
-    # If caller_id is supplied in the request body, verify it matches authenticated identity (S1 anti-spoofing)
-    if body.caller_id and body.caller_id.strip() != authenticated_caller_id:
+    # 1. Authentication: identity comes only from a signed token (never from the body)
+    caller_id = get_current_principal(authorization, x_api_token)
+    if body.caller_id and body.caller_id.strip() != caller_id:
         m.security_verification_failures_total.labels(kind="spoof_detected").inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Caller ID mismatch: request claimed '{body.caller_id}' but token belongs to '{authenticated_caller_id}'.",
+            detail=f"Caller ID mismatch: request claimed '{body.caller_id}' but token belongs to '{caller_id}'.",
         )
-
-    caller_id = authenticated_caller_id
     caller_role = get_real_role(caller_id)
     caller_bld = get_occupant_building(caller_id)
     caller_meta = {"id": caller_id, "role": caller_role, "building": caller_bld}
 
-    # 2. Input Validation (B4, B5, B6)
+    # 2. Input validation
     building_id = validate_building(body.building_id)
     zone = validate_zone(body.zone)
     parsed_purpose = validate_purpose(body.purpose)
-
     raw_time = (
         body.time_t if body.time_t is not None
         else (body.at_time if body.at_time is not None
@@ -637,25 +867,20 @@ def execute_query_endpoint(
     t1 = validate_hms_time(body.t1, "t1") if body.t1 is not None else "08:00:00"
     t2 = validate_hms_time(body.t2, "t2") if body.t2 is not None else "18:00:00"
 
-    # 3. Privilege Escalation Prevention (S2)
-    # Disallow self-asserted investigation or audit privileges by non-Deans
+    # 3. Privilege escalation prevention: investigation rights come from role, never from the request
     if parsed_purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT) and caller_role != "dean":
         m.security_verification_failures_total.labels(kind="rebac_persona").inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.",
         )
-
     auth_inv = (caller_role == "dean" and parsed_purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT))
-    # Determine office hours based on time
     is_office_hours = ("08:00:00" <= at_time <= "18:00:00")
 
-    # 4. Resolve Target ID (B1 fix: default target 0000102 differs from default student caller 0000168)
+    # 4. Target resolution
     target_id = (body.target_id or body.occupant_id or "").strip()
-    if not target_id and q_type in ("Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q11", "TRACK"):
+    if not target_id and q_type in _OCCUPANT_QUERIES:
         target_id = "0000102"
-
-    # Check target existence (B9 fix: non-existent target returns 404, not misleading RBAC denial)
     if target_id:
         target_role = get_occupant_role(target_id)
         if target_role is None and target_id not in _roles and target_id not in engine.registered.get(building_id, []):
@@ -664,105 +889,31 @@ def execute_query_endpoint(
                 detail=f"Target occupant '{target_id}' not found in campus registry.",
             )
 
-    # 5. Query Result Cache Lookup
-    cache_key = QueryCache.make_key(
-        q_type, building_id, target_id, zone, at_time, t1, t2, caller_role or caller_id
-    )
-    cached_res = _query_cache.get(cache_key)
-    if cached_res is not None:
-        return dict(cached_res, _cache_hit=True)
-
     template_fmt = TEMPLATE_QUERIES[q_type].format(
-        building_id=building_id,
-        target_id=target_id or "<target>",
-        time_t=at_time,
-        zone=zone,
-        t1=t1,
-        t2=t2,
+        building_id=building_id, target_id=target_id or "<target>", time_t=at_time, zone=zone, t1=t1, t2=t2,
     )
+    base_key = (q_type, building_id, target_id, zone, at_time, t1, t2)
 
-    # ────────────────────────────────────────────────────────────
-    # Case 1: Building-Wide Queries (Q1, Q2) — Layer 1 + Layer 2 RBAC (S4)
-    # ────────────────────────────────────────────────────────────
-    if q_type in ("Q1", "Q2"):
-        target_resource = f"building:{building_id}"
-        permitted = authorize(caller_id, "QUERY", target_resource)
-        last_reason = get_audit_log()[-1]["reason"] if get_audit_log() else ""
+    # ── Case 1: building-wide queries (Q1, Q2) ─────────────────────────────
+    if q_type in _BUILDING_QUERIES:
+        denial = _building_scope_denial(caller_role, caller_bld, building_id)
+        if denial:
+            return _denied_response(q_type, template_fmt, caller_meta, *denial)
+        permitted, last_reason = authorize_with_reason(caller_id, "QUERY", f"building:{building_id}")
         if not permitted:
-            m.security_verification_failures_total.labels(kind="rbac_infra").inc()
-            m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
-            return {
-                "success": False,
-                "query_type": q_type,
-                "template_query": template_fmt,
-                "caller": caller_meta,
-                "decision": {
-                    "permitted": False,
-                    "disclosure_level": "L0_NONE",
-                    "policy_rule": "RULE_INFRA_RBAC_DENIED",
-                    "reason": f"Infrastructure authorization denied: {last_reason}",
-                    "visitor_status": None,
-                    "exposed_fields": [],
-                    "redacted_fields": ["all_data"],
-                },
-                "answer": None,
-                "evidence": [],
-            }
+            return _denied_response(q_type, template_fmt, caller_meta, "RULE_INFRA_RBAC_DENIED",
+                                    f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
 
-        # Layer 2 Check: Students cannot query external buildings; teachers cannot cross-query without mandate
-        if caller_role == "student" and caller_bld and caller_bld != building_id:
-            m.security_verification_failures_total.labels(kind="rebac_persona").inc()
-            m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
-            return {
-                "success": False,
-                "query_type": q_type,
-                "template_query": template_fmt,
-                "caller": caller_meta,
-                "decision": {
-                    "permitted": False,
-                    "disclosure_level": "L0_NONE",
-                    "policy_rule": "RULE_C_CROSS_BUILDING_DENIED",
-                    "reason": f"Student in {caller_bld} cannot query external building {building_id}.",
-                    "visitor_status": None,
-                    "exposed_fields": [],
-                    "redacted_fields": ["all_data"],
-                },
-                "answer": None,
-                "evidence": [],
-                "error": f"Student in {caller_bld} cannot query external building {building_id}.",
-            }
+        include_evidence = auth_inv  # only a Dean on an investigation/audit, in their own building
+        key = QueryCache.make_key(*base_key, caller_role=f"agg|evidence={include_evidence}")
 
-        if caller_role == "teacher" and caller_bld and caller_bld != building_id and not auth_inv:
-            m.security_verification_failures_total.labels(kind="rebac_persona").inc()
-            m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
-            return {
-                "success": False,
-                "query_type": q_type,
-                "template_query": template_fmt,
-                "caller": caller_meta,
-                "decision": {
-                    "permitted": False,
-                    "disclosure_level": "L0_NONE",
-                    "policy_rule": "RULE_B_CROSS_BUILDING_DENIED",
-                    "reason": f"Teacher in {caller_bld} cannot query external building {building_id} without authorized security mandate.",
-                    "visitor_status": None,
-                    "exposed_fields": [],
-                    "redacted_fields": ["all_data"],
-                },
-                "answer": None,
-                "evidence": [],
-                "error": f"Teacher in {caller_bld} cannot query external building {building_id}.",
-            }
+        def _run_building() -> dict:
+            res = engine.Q1(building_id=building_id, after_time=at_time) if q_type == "Q1" \
+                else engine.Q2(building_id=building_id, at_time=at_time)
+            return {"answer": res.answer, "evidence": res.evidence if include_evidence else []}
 
-        if q_type == "Q1":
-            res = engine.Q1(building_id=building_id, after_time=at_time)
-        else:
-            res = engine.Q2(building_id=building_id, at_time=at_time)
-
-        # Non-investigation queries return aggregate-only output: individual occupant trajectories redacted (S4)
-        evidence_out = res.evidence if (auth_inv and caller_role == "dean") else []
+        data, hit = _cached_exec(key, _run_building)
         m.queries_executed_total.labels(query_type=q_type, status="success").inc()
-
         result = {
             "success": True,
             "query_type": q_type,
@@ -770,99 +921,63 @@ def execute_query_endpoint(
             "caller": caller_meta,
             "decision": {
                 "permitted": True,
-                "disclosure_level": "L2_CURRENT_ZONE" if not auth_inv else "L4_HISTORICAL_TRACK",
+                "disclosure_level": "L4_HISTORICAL_TRACK" if include_evidence else "L2_CURRENT_ZONE",
                 "policy_rule": "RULE_BUILDING_AGGREGATE",
-                "reason": "Building-level aggregate permitted; individual occupant IDs redacted under privacy policy",
+                "reason": "Building-level aggregate permitted; individual occupant IDs redacted unless an authorized investigation",
                 "visitor_status": "AGGREGATE",
                 "exposed_fields": ["building_id", "counts", "aggregate_metrics"],
                 "redacted_fields": ["individual_trajectories", "individual_occupant_ids", "biometric_data"],
             },
-            "answer": res.answer,
-            "evidence": evidence_out,
+            "answer": data["answer"],
+            "evidence": data["evidence"],
         }
-        _query_cache.set(cache_key, result)
+        if hit:
+            result["_cache_hit"] = True
         return result
 
-    # ────────────────────────────────────────────────────────────
-    # Case 2: Zone-Centric Queries (Q10, Q12, Q13)
-    # ────────────────────────────────────────────────────────────
-    if q_type in ("Q10", "Q12", "Q13"):
+    # ── Case 2: zone-centric queries (Q10, Q12, Q13) ───────────────────────
+    if q_type in _ZONE_QUERIES:
         if caller_role == "student":
-            m.security_verification_failures_total.labels(kind="rebac_persona").inc()
-            m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
-            return {
-                "success": False,
-                "query_type": q_type,
-                "template_query": template_fmt,
-                "caller": caller_meta,
-                "decision": {
-                    "permitted": False,
-                    "disclosure_level": "L0_NONE",
-                    "policy_rule": "RULE_C_PEER_ZONE_SURVEILLANCE_DENIED",
-                    "reason": "Student role cannot perform zone-level occupant surveillance (anti-stalking peer isolation)",
-                    "visitor_status": None,
-                    "exposed_fields": [],
-                    "redacted_fields": ["occupants", "trajectories"],
-                },
-                "answer": None,
-                "evidence": [],
-                "error": "Zone-level occupant queries are restricted to administrative and faculty roles.",
-            }
-
-        if caller_role == "teacher" and caller_bld and caller_bld != building_id and not auth_inv:
-            m.security_verification_failures_total.labels(kind="rebac_persona").inc()
-            m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
-            return {
-                "success": False,
-                "query_type": q_type,
-                "template_query": template_fmt,
-                "caller": caller_meta,
-                "decision": {
-                    "permitted": False,
-                    "disclosure_level": "L0_NONE",
-                    "policy_rule": "RULE_B_CROSS_BUILDING_ZONE_DENIED",
-                    "reason": f"Teacher in {caller_bld} cannot perform zone surveillance in external building {building_id} without authorized security mandate.",
-                    "visitor_status": None,
-                    "exposed_fields": [],
-                    "redacted_fields": ["occupants"],
-                },
-                "answer": None,
-                "evidence": [],
-                "error": f"Teacher in {caller_bld} cannot perform zone surveillance in external building {building_id}.",
-            }
-
-        target_resource = f"building:{building_id}" if building_id else f"zone:{zone}"
-        permitted = authorize(caller_id, "QUERY", target_resource)
-        last_reason = get_audit_log()[-1]["reason"] if get_audit_log() else ""
+            return _denied_response(
+                q_type, template_fmt, caller_meta, "RULE_C_PEER_ZONE_SURVEILLANCE_DENIED",
+                "Student role cannot perform zone-level occupant surveillance (anti-stalking peer isolation).")
+        denial = _building_scope_denial(caller_role, caller_bld, building_id)
+        if denial:
+            return _denied_response(q_type, template_fmt, caller_meta, *denial)
+        permitted, last_reason = authorize_with_reason(caller_id, "QUERY", f"building:{building_id}")
         if not permitted:
-            m.security_verification_failures_total.labels(kind="rbac_infra").inc()
-            m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
+            return _denied_response(q_type, template_fmt, caller_meta, "RULE_INFRA_RBAC_DENIED",
+                                    f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
+
+        ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours, authorized_investigation=auth_inv)
+        key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}|{is_office_hours}")
+
+        def _run_zone() -> dict:
+            if q_type == "Q10":
+                res = engine.Q10(zone=zone, at_time=at_time, building_id=building_id)
+            elif q_type == "Q12":
+                res = engine.Q12(zone=zone, t1=t1, t2=t2, building_id=building_id)
+            else:
+                res = engine.Q13(zone=zone, building_id=building_id)
+            ids = _zone_ids(q_type, res.answer)
+            # A zone answer reveals an exact zone per occupant, i.e. L3 disclosure about each of them.
+            # Each occupant is therefore run through the same persona/building policy as a point
+            # query; only those the caller may see at L3+ are disclosed, the rest are counted.
+            keep = set()
+            for occ in ids:
+                d = evaluate_campus_query_policy(
+                    caller_id, occ, context=ctx, purpose=ctx.purpose, target_current_building=building_id)
+                if d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT:
+                    keep.add(occ)
+            filtered = _filter_zone_answer(q_type, res.answer, keep)
             return {
-                "success": False,
-                "query_type": q_type,
-                "template_query": template_fmt,
-                "caller": caller_meta,
-                "decision": {
-                    "permitted": False,
-                    "disclosure_level": "L0_NONE",
-                    "policy_rule": "RULE_INFRA_RBAC_DENIED",
-                    "reason": f"Infrastructure authorization denied: {last_reason}",
-                    "visitor_status": None,
-                    "exposed_fields": [],
-                    "redacted_fields": ["all_data"],
-                },
-                "answer": None,
-                "evidence": [],
-                "error": f"Infrastructure authorization denied: {last_reason}",
+                "answer": filtered,
+                "evidence": [f"  {len(keep)} of {len(ids)} occupant(s) disclosed; "
+                             f"{len(ids) - len(keep)} withheld by persona/building policy"],
+                "disclosed": len(keep),
             }
 
-        if q_type == "Q10":
-            res = engine.Q10(zone=zone, at_time=at_time, building_id=building_id)
-        elif q_type == "Q12":
-            res = engine.Q12(zone=zone, t1=t1, t2=t2, building_id=building_id)
-        else:  # Q13
-            res = engine.Q13(zone=zone, building_id=building_id)
-
+        data, hit = _cached_exec(key, _run_zone)
         m.queries_executed_total.labels(query_type=q_type, status="success").inc()
         result = {
             "success": True,
@@ -871,67 +986,25 @@ def execute_query_endpoint(
             "caller": caller_meta,
             "decision": {
                 "permitted": True,
-                "disclosure_level": "L3_PRECISE_CURRENT",
-                "policy_rule": "RULE_ADMIN_ZONE_OCCUPANCY",
-                "reason": f"Authorized zone surveillance permitted for {caller_role} in {building_id}",
+                "disclosure_level": "L3_PRECISE_CURRENT" if data["disclosed"] else "L2_CURRENT_ZONE",
+                "policy_rule": "RULE_ZONE_PER_OCCUPANT_FILTER",
+                "reason": f"Zone query in {building_id}: each occupant filtered through persona/building policy (L3+ required to be listed)",
                 "visitor_status": "ZONE_MONITORING",
-                "exposed_fields": ["occupants", "visit_counts", "zone_id", "building_id"],
-                "redacted_fields": ["biometric_raw_gallery"],
+                "exposed_fields": ["occupants (policy-permitted only)", "counts", "zone_id", "building_id"],
+                "redacted_fields": ["occupants (policy-denied)", "biometric_raw_gallery"],
             },
-            "answer": res.answer,
-            "evidence": res.evidence,
+            "answer": data["answer"],
+            "evidence": data["evidence"],
         }
-        _query_cache.set(cache_key, result)
+        if hit:
+            result["_cache_hit"] = True
         return result
 
-    # ────────────────────────────────────────────────────────────
-    # Case 3: Occupant Queries (Q3..Q9, Q11, TRACK) (B8 no global mutation)
-    # ────────────────────────────────────────────────────────────
+    # ── Case 3: occupant queries (Q3..Q9, Q11, TRACK) ──────────────────────
     if not target_id:
         raise HTTPException(status_code=400, detail=f"{q_type} requires target_id.")
 
     target_curr_b = resolve_target_current_building(engine, target_id, at_time)
-
-    # Layer 1 Check: Infrastructure RBAC
-    target_resource = f"occupant:{target_id}"
-    permitted = authorize(caller_id, "QUERY", target_resource)
-    last_reason = get_audit_log()[-1]["reason"] if get_audit_log() else ""
-    if not permitted and not last_reason.startswith("target_occupant_denied_by_policy"):
-        m.security_verification_failures_total.labels(kind="rbac_infra").inc()
-        m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
-        return {
-            "success": False,
-            "query_type": q_type,
-            "template_query": template_fmt,
-            "caller": caller_meta,
-            "target": {"id": target_id, "role": get_real_role(target_id), "home_building": get_occupant_building(target_id), "current_building": target_curr_b},
-            "decision": {
-                "permitted": False,
-                "disclosure_level": "L0_NONE",
-                "policy_rule": "RULE_LAYER1_DENIED",
-                "reason": f"Infrastructure RBAC denied: {last_reason}",
-                "visitor_status": None,
-                "exposed_fields": [],
-                "redacted_fields": ["all_data"],
-            },
-            "answer": None,
-            "evidence": [],
-        }
-
-    # Layer 2 Check: Campus ReBAC with target_current_building passed cleanly (B8)
-    ctx = QueryContext(
-        purpose=parsed_purpose,
-        is_office_hours=is_office_hours,
-        authorized_investigation=auth_inv,
-    )
-    decision = evaluate_campus_query_policy(
-        caller_id,
-        target_id,
-        context=ctx,
-        purpose=ctx.purpose,
-        target_current_building=target_curr_b,
-    )
-
     target_meta = {
         "id": target_id,
         "role": get_real_role(target_id),
@@ -939,22 +1012,22 @@ def execute_query_endpoint(
         "current_building": target_curr_b,
     }
 
-    if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
-        m.security_verification_failures_total.labels(kind="rebac_persona").inc()
-        m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
-        return {
-            "success": False,
-            "query_type": q_type,
-            "template_query": template_fmt,
-            "caller": caller_meta,
-            "target": target_meta,
-            "decision": decision.to_dict(),
-            "answer": None,
-            "evidence": [],
-            "error": decision.reason,
-        }
+    # Layer 1: infrastructure RBAC (always runs, always audited)
+    permitted, last_reason = authorize_with_reason(caller_id, "QUERY", f"occupant:{target_id}")
+    if not permitted and not last_reason.startswith("target_occupant_denied_by_policy"):
+        return _denied_response(q_type, template_fmt, caller_meta, "RULE_LAYER1_DENIED",
+                                f"Infrastructure RBAC denied: {last_reason}", target_meta, metric_kind="rbac_infra")
 
-    # Trajectory Scope Gating
+    # Layer 2: building-scoped persona ReBAC
+    ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours, authorized_investigation=auth_inv)
+    decision = evaluate_campus_query_policy(
+        caller_id, target_id, context=ctx, purpose=ctx.purpose, target_current_building=target_curr_b,
+    )
+    if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
+        out = _denied_response(q_type, template_fmt, caller_meta, decision.policy_rule, decision.reason, target_meta)
+        out["decision"] = decision.to_dict()
+        return out
+
     if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L4_HISTORICAL_TRACK:
         m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
         return {
@@ -969,42 +1042,31 @@ def execute_query_endpoint(
             "error": f"{q_type} is a full trajectory query requiring L4_HISTORICAL_TRACK; caller only holds {decision.level.name}.",
         }
 
-    # Execute Authorized Query
-    answer = None
-    evidence = []
-    if q_type == "Q6":
-        answer = q6_answer_for_disclosure(engine, target_id, decision.level, at_time, decision)
-    elif q_type == "Q3":
-        res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=at_time)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "Q4":
-        res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "Q5":
-        res = engine.Q5(occupant_id=target_id, building_id=building_id)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "Q7":
-        res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "Q8":
-        res = engine.Q8(occupant_id=target_id, zone=zone, building_id=building_id)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "Q9":
-        res = engine.Q9(occupant_id=target_id, zone=zone, building_id=building_id)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "Q11":
-        res = engine.Q11(occupant_id=target_id, t1=t1, t2=t2)
-        answer = res.answer
-        evidence = res.evidence
-    elif q_type == "TRACK":
-        answer = track_answer(engine, target_id)
+    # Execute (cached behind the decision: the key carries the granted level and rule)
+    key = QueryCache.make_key(*base_key, caller_role=f"occ|{decision.level.name}|{decision.policy_rule}")
 
+    def _run_occupant() -> dict:
+        if q_type == "Q6":
+            return {"answer": q6_answer_for_disclosure(engine, target_id, decision.level, at_time, decision), "evidence": []}
+        if q_type == "TRACK":
+            return {"answer": track_answer(engine, target_id), "evidence": []}
+        if q_type == "Q3":
+            res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=at_time)
+        elif q_type == "Q4":
+            res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
+        elif q_type == "Q5":
+            res = engine.Q5(occupant_id=target_id, building_id=building_id)
+        elif q_type == "Q7":
+            res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
+        elif q_type == "Q8":
+            res = engine.Q8(occupant_id=target_id, zone=zone, building_id=building_id)
+        elif q_type == "Q9":
+            res = engine.Q9(occupant_id=target_id, zone=zone, building_id=building_id)
+        else:  # Q11
+            res = engine.Q11(occupant_id=target_id, t1=t1, t2=t2)
+        return {"answer": res.answer, "evidence": res.evidence}
+
+    data, hit = _cached_exec(key, _run_occupant)
     m.queries_executed_total.labels(query_type=q_type, status="success").inc()
     result = {
         "success": True,
@@ -1013,10 +1075,11 @@ def execute_query_endpoint(
         "caller": caller_meta,
         "target": target_meta,
         "decision": decision.to_dict(),
-        "answer": answer,
-        "evidence": evidence,
+        "answer": data["answer"],
+        "evidence": data["evidence"],
     }
-    _query_cache.set(cache_key, result)
+    if hit:
+        result["_cache_hit"] = True
     return result
 
 
@@ -1025,7 +1088,18 @@ def execute_query_endpoint(
 # ================================================================
 
 @app.get("/metrics")
-def metrics() -> Response:
+def metrics(request: Request, authorization: Optional[str] = Header(None)) -> Response:
+    """Prometheus scrape endpoint.
+
+    Access: a Bearer token equal to DSTS_METRICS_TOKEN, or -- only when that variable is
+    unset -- a client on the loopback interface.
+    """
+    expected = os.environ.get("DSTS_METRICS_TOKEN", "")
+    supplied = _strip_bearer(authorization) or ""
+    token_ok = bool(expected) and hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+    loopback = bool(request.client) and request.client.host in ("127.0.0.1", "::1", "localhost")
+    if not (token_ok or (not expected and loopback)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Metrics access denied.")
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -1044,9 +1118,16 @@ async def ws_live(websocket: WebSocket, token: Optional[str] = Query(None)) -> N
 
     await websocket.accept()
     _connections.add(websocket)
+    queue: asyncio.Queue = asyncio.Queue()
+    _subscribers[websocket] = queue
 
+    async def _drain_client() -> None:
+        # Detect client disconnects; incoming messages are ignored.
+        while True:
+            await websocket.receive_text()
+
+    reader = asyncio.create_task(_drain_client())
     try:
-        # Initial snapshot
         _, heatmap = _compute_real_occupancy()
         await websocket.send_json({
             "type": "connected",
@@ -1055,25 +1136,23 @@ async def ws_live(websocket: WebSocket, token: Optional[str] = Query(None)) -> N
             "heatmap": heatmap,
             "timestamp": time.time(),
         })
-
-        # Real live broadcast loop (B3)
-        while True:
+        while not reader.done():
             try:
-                # Wait for pending broadcasts or heartbeat timeout
-                msg = await asyncio.wait_for(_pending_broadcasts.get(), timeout=3.0)
+                msg = await asyncio.wait_for(queue.get(), timeout=3.0)
                 await websocket.send_json(msg)
             except asyncio.TimeoutError:
-                # Periodic heartbeat tick
                 _, heatmap = _compute_real_occupancy()
                 await websocket.send_json({
                     "type": "heartbeat",
                     "timestamp": time.time(),
                     "heatmap": heatmap,
                 })
-    except WebSocketDisconnect:
-        _connections.discard(websocket)
     except Exception:
+        pass
+    finally:
+        reader.cancel()
         _connections.discard(websocket)
+        _subscribers.pop(websocket, None)
 
 
 def main():

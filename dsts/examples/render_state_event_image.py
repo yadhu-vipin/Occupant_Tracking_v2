@@ -6,7 +6,7 @@ Every number is the same real data state_event_example.py prints (see that
 module's docstring for exactly where each one comes from); this module only
 adds the matplotlib rendering on top.
 
-Run from the buildings_prototype/ directory (needs matplotlib):
+Run from the repository root (needs matplotlib):
 
     python -m dsts.examples.render_state_event_image
     python -m dsts.examples.render_state_event_image --event-id E000494

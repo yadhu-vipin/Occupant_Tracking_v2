@@ -10,8 +10,8 @@ randomizes generation deterministically. No functional change to the
 generator itself -- this file is "the one file someone runs" for event
 generation.
 
-Writes ``events/output/generated_events.json`` + ``events/output/ground_truth.json``
-by default.
+Writes ``events/output/generated_events.json``, ``ground_truth.json`` and ``state_truth.json`` (the state
+sequence s_0..s_n, from the same simulated timeline) by default.
 """
 import argparse
 import sys
@@ -56,6 +56,8 @@ def parse_args(argv=None):
     parser.add_argument("--end-time", default="17:00:00", help="Inclusive HH:MM[:SS] simulation end.")
     parser.add_argument("--events-per-occupant", type=int, default=20)
     parser.add_argument("--occupant-limit", type=int, default=None)
+    parser.add_argument("--schedule", choices=("spread", "burst"), default="spread",
+                        help="spread: moves spread over the day with dwell time (default); burst: the original short bursts.")
     return parser.parse_args(argv)
 
 
@@ -66,9 +68,9 @@ def main(argv=None):
                               start_time=_normalise_clock(args.start_time),
                               end_time=_normalise_clock(args.end_time),
                               events_per_occupant=args.events_per_occupant,
-                              occupant_limit=args.occupant_limit)
-    events, truth = EventGenerator.from_corpus(args.meta, args.emb, config).generate()
-    save_events(events, truth, args.output_dir)
+                              occupant_limit=args.occupant_limit, schedule=args.schedule)
+    events, truth, states = EventGenerator.from_corpus(args.meta, args.emb, config).generate_with_states()
+    save_events(events, truth, args.output_dir, states)
     print_report(events, truth, config)
     return 0
 

@@ -1,0 +1,567 @@
+% Routing of face queries across buildings: LSH + per-building Bloom filter + multi-probe routing.
+% Springer LNCS single-column format (llncs class, version 2.25 template). Compile with pdflatex.
+\documentclass[runningheads]{llncs}
+%
+\usepackage[T1]{fontenc}
+% T1 fonts are used to generate the final print and online PDFs.
+%
+\usepackage{newtxtext}       %
+\usepackage[varvw]{newtxmath}       % selects Times Roman as basic font
+\usepackage{amsmath}
+%
+\newcommand{\code}[1]{\texttt{#1}}
+%
+\begin{document}
+%
+\title{Routing Face Queries Across Buildings with Locality-Sensitive Hashing and Per-Building Bloom Filters}
+%
+\titlerunning{LSH--Bloom Building Routing}
+% The full title is too long for the running head, so a short title is given.
+%
+% TODO: replace with the real author list, affiliations and (optionally) ORCID iDs
+\author{First Author\inst{1} \and Second Author\inst{1}}
+%
+\authorrunning{F. Author and S. Author}
+% First names are abbreviated in the running head.
+%
+\institute{Department of Computer Science and Engineering, Institution Name, City, Country\\
+\email{author@institution.edu}}
+%
+\maketitle              % typeset the header of the contribution
+%
+\begin{abstract}
+A camera network that covers several buildings often has to find out which building a seen face belongs to.
+A central gallery of face embeddings answers this, but it keeps sensitive biometric data in one place. We study
+a routing step that avoids the central gallery. Each building publishes one Bloom filter built from
+locality-sensitive hashing (LSH) codes of its own occupants. A captured face becomes $L$ codes that are checked
+against all filters, and only the best-scoring buildings verify the face against their own reference embeddings.
+On 500 CASIA-WebFace identities in 10 buildings, averaged over 20 random building assignments, the default setting
+identifies <<abs_p3>>\% of queries correctly, against <<abs_cen>>\% for a centralized search with the same vote rule;
+an adaptive rule that asks extra buildings only when the ranking is unclear reaches <<abs_ad>>\% and contacts
+<<abs_adasked>> buildings on average. The mean face and the accept angle come from reference photographs only; $K$ and
+$P$ were chosen after seeing test accuracy, so alternatives are reported. The real false-positive rate of the filters is <<abs_fpr>>\% instead of the configured 1\%; LSH code collisions
+cause the difference. When the same people are regrouped into more and smaller buildings, the share of queries
+whose true building is in the shortlist falls from <<abs_rec10>>\% at 10 buildings to <<abs_rec100>>\% at 100. Someone
+who holds the filters can tell which building a person belongs to (AUC <<mem_auc3>>). Costs are computed, not measured; encryption and unknown visitors are not evaluated.
+
+\keywords{Face identification \and Distributed systems \and Locality-sensitive hashing \and
+Bloom filter \and Privacy in data analytics.}
+\end{abstract}
+%
+%=====================================================================
+\section{Introduction}
+\label{sec:intro}
+
+When a face is seen at one building of a campus or company, the system often has to find out who the person is and
+where that person is registered. The usual answer is one central gallery with the face embeddings of everyone. This
+is simple and accurate, but it stores sensitive biometric data in a single place, which is an attractive target and
+may conflict with data-minimization rules. The other extreme is a gallery in each building and a request to every
+building for every query, which shows every query to every building.
+
+We study the step between these two: a routing step that decides which few buildings should be asked. Each
+building publishes one Bloom filter~\cite{bloom1970} built from LSH codes of its own occupants. A query is checked
+against all filters, and only the best-scoring buildings receive it. Reference embeddings are not published. The
+idea of publishing a compact summary of what each site holds, and checking the summaries before contacting a site,
+is used in web cache sharing~\cite{fan2000}. Face matching is approximate, so the summary cannot hold exact keys;
+it holds LSH codes instead.
+
+\emph{Scope.} This paper is about the routing step. We measure how accurate it is, how many buildings it contacts,
+how many false positives the filters give, and how it behaves when there are more buildings. All queries come from
+enrolled people; identifying unknown visitors is left for future work. We do not implement or test any
+cryptographic protection. We assume that messages between buildings use a standard authenticated, encrypted
+channel, and Section~\ref{sec:model} states what is and is not protected. Storage and communication costs are
+computed from message sizes; no distributed run was measured.
+
+Our contributions are:
+\begin{itemize}
+\item a routing design with one Bloom filter of LSH codes per building, and a way to choose the code length $K$ and
+the number of codes $L$ from measured angle distributions;
+\item measurements on 500 identities and 20 building assignments: accuracy against a centralized search, the gain
+from multi-probe hashing, and a real false-positive rate of <<fpr_eff_mean>>\% that we trace to collisions between LSH codes;
+\item a rule that asks extra buildings only when the two best scores are close, which is as accurate as asking all
+shortlisted buildings and contacts about half as many;
+\item an evaluation with up to 100 buildings, an analytic cost comparison, and a measurement of what the published
+filters reveal about who is in a building.
+\end{itemize}
+
+%=====================================================================
+\section{Related Work}
+\label{sec:related}
+
+\emph{Face identification with secure computation.} Erkin et al.~\cite{erkin2009} let one party with a face image
+and another party with a database of face templates run Eigenfaces recognition, using homomorphic encryption and
+secure multiparty computation, so that the database holder learns neither the image nor the result. Sadeghi et
+al.~\cite{sadeghi2010} combine homomorphic encryption with garbled circuits and need fewer rounds, less
+communication and less computation for the same task. These protocols protect one query
+against one database holder. We address a different part of the problem: finding which of many sites holds the
+person.
+
+\emph{Biometric template protection and Bloom filters.} Jain et al.~\cite{jain2008} survey ways to protect stored
+biometric templates. Rathgeb et al.~\cite{rathgeb2014} apply Bloom filters to iris templates. We use Bloom filters
+differently: one filter summarizes all occupants of a building, and it is used to choose which building to ask.
+
+\emph{Approximate nearest-neighbour search.} LSH~\cite{indyk1998,charikar2002}, multi-probe
+LSH~\cite{lv2007}, product quantization~\cite{jegou2011} and GPU libraries~\cite{johnson2021} make search over large
+galleries fast. They assume that one machine or one organization holds the whole gallery.
+
+\emph{Bloom-filter summaries in distributed systems.} Summary Cache~\cite{fan2000} lets web proxies exchange Bloom
+filters of their contents and ask only the proxies whose filter matches; Broder and Mitzenmacher~\cite{broder2004}
+survey such uses. Our routing step follows this idea, with LSH codes in place of exact keys.
+
+\emph{Camera networks.} Mohan and Menon~\cite{mohan2020} model the identification and tracking of occupants across
+buildings as a distributed state transition system. We study how a query can be routed to the building that holds the
+person. To our knowledge, the combination of LSH codes and per-building Bloom filters has not been measured for this
+task before.
+
+%=====================================================================
+\section{System and Threat Model}
+\label{sec:model}
+
+There are $B$ buildings. Each building holds the reference embeddings of its $N=50$ occupants ($R=20$ photographs
+each) and never publishes them. A query is a photograph of a person who is enrolled in exactly one building. We
+assume that the buildings follow the protocol but may try to learn from what they see, and that messages between
+buildings use an authenticated, encrypted channel. This channel is assumed; we do not implement or evaluate it.
+
+\emph{What the design avoids.} No building publishes its reference embeddings, there is no gallery in one central
+place, and no reference embedding is sent between buildings during routing or verification. We do not claim that the
+published filters are irreversible or that they give biometric privacy.
+
+\emph{What it does not protect.} A filter holds hashed LSH codes of the occupants, not their embeddings. Still,
+anyone who holds the filters, the public hash parameters and a photograph of a person can compute the same routing
+score that routing uses, and can therefore test whether that person belongs to a building; Section~\ref{sec:leak}
+measures how well. This leakage is the signal that routing needs, so it cannot be removed without losing routing.
+Guessing candidate faces and using outside information could leak more, and we did not study them. A shortlisted
+building also receives the query embedding. Malicious or colluding buildings, attacks that guess embeddings from many
+queries, and traffic analysis are outside the scope of this paper. In a full system, a building that confirms a
+visitor may keep that person's reference embeddings for the length of the visit; this does share templates, it is
+outside the scope of this paper, and it is not evaluated.
+
+%=====================================================================
+\section{Method}
+\label{sec:method}
+
+\subsection{Embedding and Preprocessing}
+
+Faces are detected with SCRFD-10GF~\cite{guo2022} and converted by ArcFace~\cite{deng2019} (InsightFace
+\code{buffalo\_l}, pretrained and not trained by us) into a vector $\tilde{x}\in\mathbb{R}^{512}$, which is scaled
+to unit length and called $x$. For unit vectors, $u\cdot v=\cos\theta$, so $\theta=\arccos(u\cdot v)$ is the angle
+between two faces.
+
+ArcFace embeddings lie in a narrow cone, so hyperplanes through the origin would put almost all of them on the same
+side. We subtract the population mean $\bar{x}$ and scale to unit length again,
+\begin{equation}
+  \operatorname{pre}(x)=\frac{x-\bar{x}}{\lVert x-\bar{x}\rVert},
+\end{equation}
+using the same $\bar{x}$ at every building and for every query.
+
+\subsection{Random-Hyperplane LSH}
+
+Let $H$ be $K\cdot L$ vectors in $\mathbb{R}^{512}$ drawn independently from a standard Gaussian with a fixed seed
+that all buildings share. Each vector $h$ gives one bit: $b=1$ if $x\cdot h\ge 0$, and $b=0$ otherwise. Groups of $K$
+consecutive bits are packed into an integer,
+\begin{equation}
+  c_\ell=\sum_{i=0}^{K-1} b_{\ell,i}\,2^{i}\in[0,2^{K}),\qquad \ell=0,\dots,L-1,
+\end{equation}
+which gives $L$ codes per face. So that a match counts only within its own slot, each code is combined with its slot
+number into an \emph{item}, $s_\ell=\ell\cdot 2^{K}+c_\ell$. This is the angular LSH family of
+Charikar~\cite{charikar2002}: for unit vectors at angle $\theta$ (in degrees), a random hyperplane gives them the
+same bit with probability
+\begin{equation}
+  p_{\text{bit}}=1-\frac{\theta}{180}.
+\end{equation}
+We use this family, and not MinHash~\cite{broder1997} or bit sampling, because ArcFace embeddings are dense real
+vectors that are compared by angle.
+
+\subsection{Choosing $K$ and $L$}
+\label{sec:kl}
+
+Two codes match only if all $K$ bits agree, which has probability $p_{\text{bit}}^{K}$. We average this value over
+the array of measured pair angles, separately for genuine pairs (same person) and impostor pairs (different people),
+to get $p_{\text{code}}^{(G)}$ and $p_{\text{code}}^{(I)}$. The average is taken \emph{after} raising to the power
+$K$. The function $x\mapsto x^{K}$ is convex, so pairs with small angles dominate the average; using the mean angle
+first gives a value of $p_{\text{code}}^{(G)}$ that is too low. The $L$ codes use independent hyperplanes, so
+\begin{equation}
+  \text{recall}=1-\bigl(1-p_{\text{code}}^{(G)}\bigr)^{L},\qquad
+  \text{FPR}_{\text{imp}}=1-\bigl(1-p_{\text{code}}^{(I)}\bigr)^{L},
+\end{equation}
+and for a recall target of $0.90$
+\begin{equation}
+  L=\left\lceil\frac{\ln(1-0.90)}{\ln\bigl(1-p_{\text{code}}^{(G)}\bigr)}\right\rceil.
+\end{equation}
+For each $K$ from 4 to 15 we solve for $L$, drop values of $K$ with $\text{FPR}_{\text{imp}}>0.10$, and keep the
+smallest $K\!\cdot\!L$. The pairs are measured on reference photographs only (Section~\ref{sec:setup}). This model
+picks $K=10$, $L=88$: for $K=10$ it gives $p_{\text{code}}^{(G)}=<<pg10>>$ and $\text{FPR}_{\text{imp}}=<<fpr10>>$, for
+$K=11$ it needs $L=122$ ($<<pg11>>$ and $<<fpr11>>$), and for $K=13$ it needs $L=<<L13>>$ ($<<pg13>>$ and $<<fpr13>>$).
+The model looks at each pair on its own, but a real filter holds 50 people, so we also run the full pipeline with the
+model's choice and with $K=11$, $L=122$ (Section~\ref{sec:k1011}).
+
+\subsection{Per-Building Bloom Filter}
+\label{sec:bloom}
+
+Each building publishes a Bloom filter of its occupants' codes. The 20 preprocessed reference embeddings of an
+occupant are averaged and scaled to unit length to give one centroid, which is encoded into $L$ items. A building
+therefore stores $n=N\cdot L=6100$ items at $L=122$. The filter size follows the standard formula for a target
+false-positive rate $f^{\star}=0.01$,
+\begin{equation}
+  m=\left\lceil\frac{-n\ln f^{\star}}{(\ln 2)^{2}}\right\rceil=58{,}469,\qquad
+  \kappa=\operatorname{round}\!\left(\frac{m}{n}\ln 2\right)=7,
+\end{equation}
+which is about 7.3\,KB per building. The filter is always sized for $N=50$ occupants, so its length does not reveal
+how many people a building really has.
+
+Bit positions are computed with Kirsch--Mitzenmacher double hashing~\cite{kirsch2006}. Two hashes of the item, with
+salts derived from the shared seed $\sigma$, are combined as
+\begin{equation}
+  h_1=\text{SM64}(s\oplus(2\sigma+1)),\quad h_2=\text{SM64}(s\oplus(2\sigma+2))\,\vee\,1,\quad
+  p_j=\bigl((h_1+j\,h_2)\bmod 2^{64}\bigr)\bmod m,
+\end{equation}
+for $j=0,\dots,\kappa-1$, where SM64 is the SplitMix64 finalizer~\cite{steele2014}. The sum wraps around at 64 bits
+before the reduction modulo $m$. Setting the lowest bit of $h_2$ makes it odd, so it is never zero and the $\kappa$
+positions do not all land on the same bit. \textsc{Add} sets the $\kappa$ bits of an item, and \textsc{Check}
+reports an item as present only if all $\kappa$ bits are set. There are no false negatives. We wrote the Bloom
+filter and the LSH encoder ourselves in NumPy, without external hashing or Bloom-filter libraries.
+
+\subsection{Multi-Probe Routing}
+\label{sec:probe}
+
+With a recall target of $0.90$, about one query in ten matches none of its own building's codes exactly, and the true
+building falls out of the shortlist. When a code misses, it is usually because one bit flipped, and that bit is
+typically the one whose projection $|x\cdot h|$ was closest to zero. Following multi-probe LSH~\cite{lv2007}, for
+each slot we also look up the codes obtained by flipping, one at a time, each of the $P$ bits with the smallest
+margin,
+\begin{equation}
+  s'_{\ell,j}=\ell\cdot2^{K}+\bigl(c_\ell\ \text{XOR}\ 2^{w_{\ell,j}}\bigr),\quad j=1,\dots,P,
+\end{equation}
+where $w_{\ell,j}$ is the index of the $j$-th weakest bit of slot $\ell$. This gives $L(1+P)$ lookups per filter.
+The routing score of a building is the number of \emph{different slots} with at least one item present, so it stays
+between 0 and $L$. The $S=5$ buildings with the highest scores form the shortlist, and ties are broken by building
+order. The size of the shortlist is fixed.
+
+\subsection{Verification and Policies}
+\label{sec:vote}
+
+A shortlisted building compares the query with its private reference embeddings. A reference \emph{votes} if its
+angle to the query is at most $\tau$. The occupant with the most votes wins (ties go to the smallest single angle),
+and the match is accepted only if the winner has at least $V=12$ of 20 votes. Otherwise the system abstains. The
+accept angle $\tau$ is the cutoff that gives the smallest sum of the genuine false-reject rate and the impostor
+false-accept rate. The centralized baseline applies the same vote to every enrolled occupant.
+
+We use two ways to choose the final answer among the shortlisted buildings, and the results below always say which
+one is used. In the \emph{default rule}, the winner is the occupant with the most votes among all occupants of the
+$S$ shortlisted buildings, and ties go to the smallest angle. This rule gives the multi-probe results and the
+headline number of the abstract. In the \emph{policies} (Section~\ref{sec:escalation}), buildings are asked one by
+one, each asked building returns its own best occupant, and ties between buildings are decided by rank order.
+\emph{Sequential}: ask the buildings in rank order and stop at the first one whose best vote reaches $V$; a wrong
+building ranked above the true one can then confirm first. \emph{Query-all}: ask all $S$ buildings and take the
+highest vote. \emph{Adaptive}: let $g$ be the difference between the two highest routing scores. If $g\le g_0$, the
+ranking is unclear and all $S$ buildings are asked; otherwise the sequential rule is used.
+\label{sec:escalation}
+
+%=====================================================================
+\section{Experimental Setup}
+\label{sec:setup}
+
+We use 500 identities of CASIA-WebFace~\cite{yi2014}, spread over $B=10$ buildings of 50 people. Each person has 20
+enrolled reference photographs and 20 held-out test photographs, which gives 20,000 embeddings. Every one of the
+10,000 test photographs is a query and is routed over all $B$ buildings. The evaluation is \emph{closed-set}: every
+query belongs to an enrolled person. We use $K=11$, $L=122$, $P=3$, $S=5$, $V=12$ and $f^{\star}=0.01$.
+
+\emph{Use of test photographs.} The mean face, the accept angle and the angle statistics behind $K$ and $L$ are
+estimated from reference photographs only: the mean face is the mean of the 10,000 reference embeddings, genuine
+pairs are two reference photographs of the same person, and impostor pairs are reference photographs of different
+people. This gives $\tau=<<tau>>^{\circ}$. An earlier version of these experiments used test photographs for the mean
+face and for $\tau$ ($80.54^{\circ}$). With the reference-only estimates, correct-identification rates changed by at
+most 0.06 points, and misidentification rates fell by 0.1 to 0.15 points because $\tau$ is lower. The values $K=11$ and $P=3$ were
+chosen after looking at test accuracy, so we report $K=10$, the choice of the model, next to $K=11$, and the whole
+sweep over $P$ (Section~\ref{sec:k1011}).
+
+\emph{Seeds.} Each result is repeated for 20 seeds. Seed $s$ changes three things together: the random assignment of
+the 500 identities to buildings of 50, the LSH hyperplanes, and the Bloom filter salt. The embeddings, the mean face
+and the accept angle stay the same, so the centralized baseline is a single number. We report the mean over seeds
+with a 95\% confidence half-width ($\pm$, Student-$t$ with 19 degrees of freedom) and, for comparisons, the paired
+difference over seeds. For $B=2$ and $B=5$ we take the identities of the first two and the first five buildings of
+the original layout and regroup them into buildings of 50. A single run with the original assignment and hyperplane
+seed 42 gave <<ship_p3>>\% at $P=3$ with the default rule, <<ship_diff>> points <<ship_dir>> the 20-seed mean; <<ship_ge>>
+of the 20 seeds reach that value.
+
+\emph{Metrics.} Every query ends in exactly one of four outcomes: \emph{correct}; \emph{misidentified} (a wrong
+person is accepted, the most serious error); \emph{abstained-reject} (the true building was shortlisted but nobody
+reached $V$ votes); and \emph{abstained-routing} (the true building was not shortlisted and no one reached $V$
+votes). The centralized baseline gives <<cen_correct>>\% correct, <<cen_misid>>\% misidentified and <<cen_abst>>\%
+abstained.
+
+%=====================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Choice of $K$ and $L$}
+\label{sec:k1011}
+
+The analytic model uses only the angle arrays, so it has no seed. Using the mean angle first gives
+$p_{\text{code}}^{(G)}=<<short_pg>>$ at $K=11$, against the correct array average of $<<pg11>>$, which is about
+<<short_low>>\% too low. The model picks $K=10$, $L=88$. In the full pipeline at $P=3$ with the default rule, $K=11$,
+$L=122$ is more accurate than $K=10$ by $<<k11k10>>$ points (paired) and better in <<k11k10_wins>> of 20 seeds: correct
+<<k11_corr>>\% against <<k10_corr>>\%, mainly because routing failures fall from <<k10_rout>>\% to <<k11_rout>>\%. Both
+results are reported; we use $K=11$ in the rest of the paper, and we note that this choice was made after seeing test accuracy.
+
+\subsection{Multi-Probe and Decentralized versus Centralized Identification}
+
+Table~\ref{tab:probe} varies $P$ at $B=10$ with the default rule. Without probing, $<<p0_rout_pm>>\%$ of queries are lost
+to routing misses. Multi-probe with $P=3$ reduces this to $<<p3_rout_pm>>\%$ (a <<rel_red>>\% relative reduction), raises
+correct identification from $<<p0_corr>>\%$ to $<<p3_corr>>\%$ (a paired gain of $<<gain>>$ points, positive in
+<<gain_wins>> of 20 seeds) and lowers misidentification from <<p0_mis>>\% to <<p3_mis>>\%. The gains get smaller as $P$
+grows, while the number of lookups grows linearly, so we use $P=3$ as a compromise on cost, not as the best possible
+value.
+
+\begin{table}[htbp]
+\caption{Multi-probe sweep at $B=10$ ($K=11$, $L=122$, default rule): mean over 20 seeds ($\pm$ 95\% CI), in \%. The
+number of items looked up per filter and query is $L(1+P)$.}
+\label{tab:probe}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|r|r|r|r|r|r|}
+\hline
+$P$ & correct & misid. & abst.-reject & abst.-routing & items \\
+\hline
+<<PROBE_ROWS>>
+\hline
+\end{tabular}
+\end{table}
+
+\noindent We now compare the decentralized system with the centralized baseline. At $B=2$ and $B=5$ the shortlist of
+$S=5$ covers every building, so routing cannot fail and the two systems give the same result in every seed
+(<<b2c>>\% correct at $B=2$ and <<b5c>>\% at $B=5$). At $B=10$ the decentralized system is $<<gap>>$ points behind the
+baseline, and <<p3_rout>> points of queries are routing failures. Before multi-probe the gap was <<gap0>> points, so
+multi-probe closes <<closed>>\% of it. Misidentification (<<p3_mis>>\% against <<cen_misid>>\%) hardly changes, so the
+loss comes from missed matches and not from more wrong accepts.
+
+\subsection{Effective False-Positive Rate}
+\label{sec:fpr}
+
+The 1\% target describes the bit array for items that are independent of the stored ones. We measured the rate the
+system really has by building all ten filters and testing the enrolled items of the \emph{other nine} buildings
+against each one. The real per-item rate is $<<fpr_eff>>\%$ over the 20 seeds. When we compare the integer codes
+directly, without a Bloom array, $<<coll>>\%$ of the items of other buildings already equal an enrolled item in the
+same slot. This is close to the <<uni>>\% expected if the codes of 50 occupants were evenly spread over
+$2^{11}=2048$ values, namely $1-(1-2^{-K})^{N}$. The Bloom array alone, tested on random integers that were never
+inserted, gives $<<bloom>>\%$ at <<fill>>\% fill, close to its design rate. The extra false positives therefore come
+from the LSH codes, not from the Bloom array.
+
+A larger $K$ gives more possible codes and lowers the real false-positive rate, but $L$ must grow to keep recall at
+0.90. At $K=13$, $L=<<L13>>$ each filter grows from 7.3\,KB to about <<size13>>\,KB and the real rate falls to
+<<fpr13_eff>>\%. With $P=6$ it is $<<k13_k11p7>>$ points more accurate than the best $K=11$ setting ($P=7$,
+<<p7_corr>>\%; paired, better in <<k13_k11p7_wins>> of 20 seeds) and $<<k13_k11p3>>$ points more accurate than the
+default (<<k13_corr>>\% against <<p3_corr>>\%; better in <<k13_k11p3_wins>> of 20 seeds), but it needs <<look13>> lookups
+per filter and query against 488 or 976.
+
+\subsection{Verification Policies}
+\label{sec:adaptive}
+
+Table~\ref{tab:adaptive} compares the policies of Section~\ref{sec:escalation} on the same 10,000 queries. These
+results use the policies' own rule for choosing among buildings (best occupant per building, ties by rank order), so
+query-all gives <<qa_corr>>\% here and not the <<p3_corr>>\% of the default rule in Table~\ref{tab:probe}. The two differ
+only when two shortlisted buildings return the same number of votes, which happens for <<tie_n>> of 10,000 queries on
+average. Every query is routed over all ten buildings, including its own, so there is no separate local-recognition
+stage. Sequential first-match raises the misidentification rate to <<seq_mis>>\%, because a wrong building ranked above
+the true one sometimes confirms first. Asking all five buildings lowers it to <<qa_mis>>\% and gains $<<qa_seq>>$ points,
+but it contacts 5 buildings per query. The adaptive rule with $g_0=5$ is slightly more accurate than asking all five
+($<<ad_qa>>$ points, paired, better in <<ad_qa_wins>> of 20 seeds) while contacting <<ad_asked>> buildings on average;
+<<ad_esc>>\% of the queries ask all five. All three policies abstain on exactly the same queries, because acceptance
+depends only on whether some shortlisted building reaches $V$ votes.
+
+\begin{table}[htbp]
+\caption{Verification policies at $B=10$ (policy rule): mean over 20 seeds ($\pm$ 95\% CI). Asking every building would
+contact 10.}
+\label{tab:adaptive}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+Policy & correct (\%) & misid. (\%) & buildings asked & asked all five \\
+\hline
+<<POL_ROWS>>
+\hline
+\end{tabular}
+\end{table}
+
+We repeated the comparison at two and five buildings (the same people regrouped into buildings of 50 for each seed;
+the shortlist is every building). Table~\ref{tab:small} shows that the adaptive rule helps wherever ranking errors
+occur. <<SMALL_TEXT>>
+
+\begin{table}[htbp]
+\caption{Verification policies at $B=2$ and $B=5$ (policy rule): mean over 20 seeds ($\pm$ 95\% CI). Query-all asks
+every building.}
+\label{tab:small}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|l|r|r|r|r|r|r|}
+\hline
+ & \multicolumn{3}{c|}{$B=2$} & \multicolumn{3}{c|}{$B=5$} \\
+Policy & correct (\%) & asked & all & correct (\%) & asked & all \\
+\hline
+<<SMALL_ROWS>>
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Cost}
+\label{sec:cost}
+
+The cost figures are computed from message sizes and from the measured number of buildings asked; they are not
+measurements. We did not measure latency, throughput or traffic in a distributed run, because all calls were
+in-process. A query embedding has 512 single-precision values, which is 2,048 bytes. Routing replaces a 20.5\,MB
+gallery in one place with ten published filters of 7.3\,KB each (the buildings keep 2.05\,MB of private embeddings
+each). A query then costs <<seq_kb>>\,KB with sequential asking (<<seq_asked>> buildings), <<ad_kb>>\,KB with the
+adaptive rule (<<ad_asked>> buildings) and 10.2\,KB when all five shortlisted buildings are asked, against 20.5\,KB
+when all ten buildings are asked and 2.0\,KB for a central gallery. Each query still costs $B\cdot L(1+P)=4{,}880$
+filter lookups, a cost that grows linearly with $B$.
+
+\subsection{What the Filters Reveal}
+\label{sec:leak}
+
+We measured the simplest attack. Someone who holds all published filters and the public hash parameters scores a
+photograph against every filter, in the same way as routing does. With $P=3$, this score separates the occupants of a
+building from everyone else with an AUC of <<mem_auc3>> (<<mem_auc0>> without probing), averaged over buildings and
+10 seeds, and the highest-scoring building is the person's own building for <<mem_top3>>\% of the photographs
+(<<mem_top0>>\% without probing). The filters therefore leak which building a person belongs to. This is not a way to
+recover a face, but it is a real leak, and it grows with the accuracy of the routing itself. We did not test attacks
+that use many queries, candidate guessing or outside information, so we make no claim of biometric privacy.
+
+\subsection{More Buildings}
+\label{sec:scale}
+
+The corpus has only 500 identities, so a larger network can only be built with smaller buildings. We regroup the same
+500 people into $B=10$, 25, 50 and 100 buildings of 50, 20, 10 and 5 people. Each filter is sized for its own number
+of occupants, so the total size of all filters stays the same (about 73\,KB). We use 2,000 queries per seed (4
+photographs per person) and 10 seeds. Table~\ref{tab:scale} shows that the share of queries whose true building is in
+the shortlist falls from <<sc10_rec>>\% to <<sc100_rec>>\%, and correct identification falls from <<sc10_ad>>\% to
+<<sc100_ad>>\% (adaptive policy), while the centralized search stays at <<sc_cen>>\%. The adaptive policy still asks
+about 2.5 buildings. The real false-positive rate of a filter falls with building size, from <<sc10_fpr>>\% to
+<<sc100_fpr>>\%, so the loss comes from having to pick 5 buildings out of more of them, not from more false hits per
+filter. Lookups per query grow in proportion to $B$ (from 4,880 to 48,800). These results are for smaller buildings
+and a fixed set of people; they do not replace a test with a larger population.
+
+\begin{table}[htbp]
+\caption{Growth in the number of buildings (same 500 people, $K=11$, $L=122$, $P=3$, $S=5$): mean over 10 seeds, in
+\%. Recall is the share of queries whose true building is in the shortlist.}
+\label{tab:scale}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|r|r|r|r|r|r|r|}
+\hline
+$B$ & people/bldg & recall & correct (adaptive) & correct (all five) & real FPR & filter size \\
+\hline
+<<SC_ROWS>>
+\hline
+\end{tabular}
+\end{table}
+
+%=====================================================================
+\section{Limitations and Conclusion}
+\label{sec:limits}
+
+\emph{Limitations.} All results use the same 500 identities and photographs from one public dataset; the intervals
+describe the effect of building assignments and hash randomness, not a different population. The values $K=11$ and
+$P=3$ were chosen after seeing test accuracy, and we report the alternatives next to them. CASIA-WebFace photographs
+come from the web and not from surveillance cameras, so the absolute accuracy is probably higher than it would be in
+practice. The ArcFace model was pretrained on a large public face collection, and we did not check how much it overlaps
+with CASIA-WebFace. The largest network has 100 small buildings. The evaluation is closed-set, so we did not measure
+what happens when a person who is enrolled nowhere, such as a visitor, is seen. The vote rule ($\tau$ and $V=12$) was
+chosen for enrolled people, and a first test with held-out people showed that it can accept a noticeable share of
+them, so the acceptance rule has to be studied and tightened before the system is used with unknown visitors. Storage
+and communication costs are computed from message sizes; we did not measure latency or traffic in a distributed run.
+We did not implement or evaluate the encrypted channel, the visit-length storage of templates or attacks on the
+filters beyond the membership test of Section~\ref{sec:leak}. A Bloom filter cannot delete items, so a change in
+enrollment needs a rebuild.
+
+\emph{Conclusion.} Per-building Bloom filters of LSH codes can route face queries to the right building without a
+central gallery. With multi-probe hashing the default setting identifies <<abs_p3>>\% of queries correctly at 10
+buildings against <<abs_cen>>\% for a centralized search, and the adaptive rule reaches <<abs_ad>>\% while contacting
+about <<abs_adasked>> buildings. The cost is lost recall that grows with the number of buildings, and a false-positive
+rate that LSH collisions raise well above the Bloom filter's design value. The privacy conclusions are limited to what
+was evaluated: the design avoids publishing reference embeddings and a central gallery, and it leaks which building a
+person belongs to (AUC <<mem_auc3>>); encryption, stronger attacks and template storage during visits were not
+evaluated. The next steps are a larger and more varied population, the identification of unknown visitors with a
+stricter acceptance rule, and measurements in a distributed deployment.
+
+\begin{credits}
+\subsubsection{\ackname} % TODO: add funding or acknowledgments, or delete this heading.
+This study was funded by [funding body] (grant number [number]).
+
+\subsubsection{\discintname}
+% TODO: authors must confirm this statement before submission.
+The authors have no competing interests to declare that are relevant to the content of this article.
+\end{credits}
+%
+% ---- Bibliography ----
+%
+\begin{thebibliography}{19}
+
+\bibitem{bloom1970} Bloom, B.H.: Space/time trade-offs in hash coding with allowable errors.
+Commun. ACM \textbf{13}(7), 422--426 (1970)
+
+\bibitem{fan2000} Fan, L., Cao, P., Almeida, J., Broder, A.Z.: Summary cache: a scalable wide-area web cache
+sharing protocol. IEEE/ACM Trans. Netw. \textbf{8}(3), 281--293 (2000)
+
+\bibitem{broder2004} Broder, A., Mitzenmacher, M.: Network applications of Bloom filters: a survey.
+Internet Math. \textbf{1}(4), 485--509 (2004)
+
+\bibitem{erkin2009} Erkin, Z., Franz, M., Guajardo, J., Katzenbeisser, S., Lagendijk, I., Toft, T.:
+Privacy-preserving face recognition. In: Goldberg, I., Atallah, M.J. (eds.) PETS 2009, LNCS, vol. 5672,
+pp. 235--253. Springer, Heidelberg (2009)
+
+\bibitem{sadeghi2010} Sadeghi, A.R., Schneider, T., Wehrenberg, I.: Efficient privacy-preserving face
+recognition. In: Lee, D., Hong, S. (eds.) ICISC 2009, LNCS, vol. 5984, pp. 229--244. Springer, Heidelberg (2010)
+
+\bibitem{jain2008} Jain, A.K., Nandakumar, K., Nagar, A.: Biometric template security. EURASIP J. Adv.
+Signal Process. \textbf{2008}, 579416 (2008)
+
+\bibitem{rathgeb2014} Rathgeb, C., Breitinger, F., Busch, C., Baier, H.: On application of Bloom filters to
+iris biometrics. IET Biometrics \textbf{3}(4), 207--218 (2014)
+
+\bibitem{indyk1998} Indyk, P., Motwani, R.: Approximate nearest neighbors: towards removing the curse of
+dimensionality. In: Proceedings of the 30th Annual ACM Symposium on Theory of Computing, pp. 604--613.
+ACM (1998)
+
+\bibitem{charikar2002} Charikar, M.S.: Similarity estimation techniques from rounding algorithms.
+In: Proceedings of the 34th Annual ACM Symposium on Theory of Computing, pp. 380--388. ACM (2002)
+
+\bibitem{lv2007} Lv, Q., Josephson, W., Wang, Z., Charikar, M., Li, K.: Multi-probe LSH: efficient
+indexing for high-dimensional similarity search. In: Proceedings of the 33rd International Conference on
+Very Large Data Bases, pp. 950--961. VLDB Endowment (2007)
+
+\bibitem{jegou2011} J\'egou, H., Douze, M., Schmid, C.: Product quantization for nearest neighbor search.
+IEEE Trans. Pattern Anal. Mach. Intell. \textbf{33}(1), 117--128 (2011)
+
+\bibitem{johnson2021} Johnson, J., Douze, M., J\'egou, H.: Billion-scale similarity search with GPUs.
+IEEE Trans. Big Data \textbf{7}(3), 535--547 (2021)
+
+\bibitem{broder1997} Broder, A.Z.: On the resemblance and containment of documents. In: Proceedings of
+Compression and Complexity of Sequences 1997, pp. 21--29. IEEE (1997)
+
+\bibitem{kirsch2006} Kirsch, A., Mitzenmacher, M.: Less hashing, same performance: building a
+better Bloom filter. In: Azar, Y., Erlebach, T. (eds.) ESA 2006, LNCS, vol. 4168, pp. 456--467.
+Springer, Heidelberg (2006)
+
+\bibitem{steele2014} Steele, G.L., Lea, D., Flood, C.H.: Fast splittable pseudorandom number
+generators. In: Proceedings of OOPSLA 2014, pp. 453--472. ACM (2014)
+
+\bibitem{deng2019} Deng, J., Guo, J., Xue, N., Zafeiriou, S.: ArcFace: additive angular margin loss
+for deep face recognition. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pp. 4690--4699. IEEE (2019)
+
+\bibitem{guo2022} Guo, J., Deng, J., Lattas, A., Zafeiriou, S.: Sample and computation redistribution for
+efficient face detection. In: International Conference on Learning Representations (2022)
+
+\bibitem{yi2014} Yi, D., Lei, Z., Liao, S., Li, S.Z.: Learning face representation from scratch.
+arXiv preprint arXiv:1411.7923 (2014)
+
+\bibitem{mohan2020} Mohan, L., Menon, V.: Modelling large scale camera networks for identification and
+tracking: an abstract framework. IET Comput. Vis. \textbf{14}(7), 426--433 (2020)
+
+\end{thebibliography}
+\end{document}

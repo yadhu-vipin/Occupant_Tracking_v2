@@ -20,8 +20,8 @@ Protection flow:
 
 import time
 import threading
-from typing import Tuple, Set, Dict, Optional
-from dataclasses import dataclass, field
+from typing import Dict
+from dataclasses import dataclass
 
 
 @dataclass

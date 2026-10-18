@@ -24,7 +24,11 @@ const state = {
 
   busy: false,
 
-  activeToken: "dsts-dean-token"
+  activeToken: null,
+
+  persona: "dean",
+
+  tokens: {}
 };
 
 
@@ -56,6 +60,93 @@ function escapeHTML(value) {
    API HELPER
    ================================================================ */
 
+const PERSONAS = ["dean", "teacher", "student"];
+
+
+async function loginPersona(persona) {
+
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ persona })
+  });
+
+  if (!response.ok) {
+
+    let detail = `Sign-in failed (${response.status})`;
+
+    try {
+      detail = (await response.json()).detail || detail;
+    } catch (error) {
+      /* keep default message */
+    }
+
+    throw new Error(detail);
+
+  }
+
+  return (await response.json()).token;
+
+}
+
+
+async function loginAllPersonas() {
+
+  for (const persona of PERSONAS) {
+    state.tokens[persona] = await loginPersona(persona);
+  }
+
+  state.activeToken = state.tokens[state.persona] || null;
+
+}
+
+
+function setPersona(persona) {
+
+  state.persona = persona;
+
+  state.activeToken = state.tokens[persona] || null;
+
+  // Reconnect the live stream so it authenticates as the new persona.
+  if (state.ws && state.ws.readyState <= 1) {
+    state.ws.close();
+  }
+
+  applyPersonaToControls();
+
+  // Everything on screen was fetched as the previous persona: refetch under the new one.
+  refreshAll();
+
+}
+
+
+/*
+ * Simulation / demo / reset are Dean-only on the server (403 otherwise); mirror that
+ * in the UI so other personas do not get buttons that can only fail.
+ */
+function applyPersonaToControls() {
+
+  const isDean = state.persona === "dean";
+
+  ["#btn-simulate", "#btn-walk", "#btn-reset"].forEach((selector) => {
+
+    const button = $(selector);
+
+    if (!button) {
+      return;
+    }
+
+    button.disabled = !isDean;
+
+    button.title = isDean
+      ? ""
+      : "Dean only: simulation, demo and reset are restricted by RBAC";
+
+  });
+
+}
+
+
 async function api(url, options = {}) {
 
   const response = await fetch(url, {
@@ -65,10 +156,21 @@ async function api(url, options = {}) {
       ...(options.body
         ? { "Content-Type": "application/json" }
         : {}),
-      Authorization: `Bearer ${state.activeToken || "dsts-dean-token"}`,
+      ...(state.activeToken
+        ? { Authorization: `Bearer ${state.activeToken}` }
+        : {}),
       ...(options.headers || {})
     }
   });
+
+  // Tokens are short-lived; on 401 sign the personas in again once and retry.
+  if (response.status === 401 && !options._retried && !url.startsWith("/api/auth/")) {
+
+    await loginAllPersonas();
+
+    return api(url, { ...options, _retried: true });
+
+  }
 
   if (!response.ok) {
 
@@ -260,9 +362,32 @@ function getOccupancyRows() {
 
 function getBuildingOccupancy(buildingId) {
 
+  const zones = state.heatmap && state.heatmap[buildingId];
+
+  if (zones) {
+
+    return Object.values(zones)
+      .reduce((sum, n) => sum + Number(n || 0), 0);
+
+  }
+
   return getOccupancyRows()
     .filter((row) => row.building_id === buildingId)
     .length;
+
+}
+
+
+function getCampusOccupancy() {
+
+  if (state.heatmap && Object.keys(state.heatmap).length) {
+
+    return Object.keys(state.heatmap)
+      .reduce((sum, id) => sum + getBuildingOccupancy(id), 0);
+
+  }
+
+  return getOccupancyRows().length;
 
 }
 
@@ -282,14 +407,14 @@ function updateOccupancyStats() {
   const rows = getOccupancyRows();
 
   $("#stat-occupants").textContent =
-    rows.length;
+    getCampusOccupancy();
 
   const badge = $("#occupancy-count-badge");
 
   if (badge) {
 
     badge.textContent =
-      `${rows.length} record${rows.length === 1 ? "" : "s"}`;
+      `${rows.length} visible record${rows.length === 1 ? "" : "s"}`;
 
   }
 
@@ -413,7 +538,7 @@ function renderOccupancyTable(bodyElement, snapshot) {
       <tr>
         <td colspan="4">
           <div class="empty-state">
-            No occupants currently tracked.
+            No occupants are visible to your role at this time.
           </div>
         </td>
       </tr>
@@ -543,6 +668,8 @@ async function refreshHeatmap() {
 
     state.heatmap =
       await api("/api/heatmap");
+
+    updateOccupancyStats();
 
 
     const container =
@@ -731,6 +858,27 @@ async function refreshSecurity() {
       "Security refresh failed:",
       error
     );
+
+    // Never keep showing a previous persona's audit log: clear it and say why.
+    state.security = [];
+
+    const body = $("#security-body");
+
+    if (body) {
+
+      body.innerHTML = `
+        <tr>
+          <td colspan="4">
+            <div class="empty-state">
+              ${escapeHTML(error.message || "Security log unavailable.")}
+            </div>
+          </td>
+        </tr>
+      `;
+
+    }
+
+    updateSecurityStats();
 
   }
 
@@ -1189,13 +1337,24 @@ $("#btn-reset").addEventListener(
       });
 
 
-      state.eventsProcessed = 0;
-
       state.activity = [];
+
+      try {
+
+        const health = await api("/api/health");
+
+        state.eventsProcessed =
+          Number(health.total_events_loaded || 0);
+
+      } catch (error) {
+
+        state.eventsProcessed = 0;
+
+      }
 
 
       $("#stat-events").textContent =
-        "0";
+        state.eventsProcessed;
 
 
       $("#activity-feed").innerHTML = `
@@ -1308,17 +1467,17 @@ $all(".btn-chip").forEach((btn) => {
       const role = btn.dataset.role;
       $all(".access-role").forEach(r => r.classList.remove("active-role"));
       if (role === "dean") {
-        state.activeToken = "dsts-dean-token";
+        setPersona("dean");
         const c = $("#role-card-a"); if (c) c.classList.add("active-role");
         if ($("#q-purpose")) $("#q-purpose").value = "security_investigation";
         if ($("#header-role")) $("#header-role").textContent = "DEAN A";
       } else if (role === "teacher") {
-        state.activeToken = "dsts-teacher-token";
+        setPersona("teacher");
         const c = $("#role-card-b"); if (c) c.classList.add("active-role");
         if ($("#q-purpose")) $("#q-purpose").value = "academic_roster";
         if ($("#header-role")) $("#header-role").textContent = "TEACHER B";
       } else if (role === "student") {
-        state.activeToken = "dsts-student-token";
+        setPersona("student");
         const c = $("#role-card-c"); if (c) c.classList.add("active-role");
         if ($("#q-purpose")) $("#q-purpose").value = "office_hours";
         if ($("#header-role")) $("#header-role").textContent = "STUDENT C";
@@ -1558,34 +1717,6 @@ async function runQuery(body) {
   } finally {
     setButtonBusy(button, false);
   }
-}
-
-
-    if ($("#q-speak").checked) {
-      speakResults(data, body);
-    }
-
-
-    return data;
-
-
-  } catch (error) {
-
-    console.error(error);
-
-    $("#query-note").textContent =
-      `Query failed: ${error.message}`;
-
-
-  } finally {
-
-    setButtonBusy(
-      button,
-      false
-    );
-
-  }
-
 }
 
 
@@ -1902,15 +2033,15 @@ function setupVoiceQuery() {
         const rNorm = parsed.role.toLowerCase();
         if (rNorm === "dean") {
           if ($("#q-caller")) $("#q-caller").value = "0001738";
-          state.activeToken = "dsts-dean-token";
+          setPersona("dean");
           if ($("#header-role")) $("#header-role").textContent = "DEAN A";
         } else if (rNorm === "teacher") {
           if ($("#q-caller")) $("#q-caller").value = "0000362";
-          state.activeToken = "dsts-teacher-token";
+          setPersona("teacher");
           if ($("#header-role")) $("#header-role").textContent = "TEACHER B";
         } else if (rNorm === "student") {
           if ($("#q-caller")) $("#q-caller").value = "0000168";
-          state.activeToken = "dsts-student-token";
+          setPersona("student");
           if ($("#header-role")) $("#header-role").textContent = "STUDENT C";
         }
       }
@@ -2045,7 +2176,8 @@ function connectLive() {
 
   const socket =
     new WebSocket(
-      `${protocol}://${location.host}/ws/live`
+      `${protocol}://${location.host}/ws/live?token=` +
+      encodeURIComponent(state.activeToken || "")
     );
 
 
@@ -2092,7 +2224,13 @@ function connectLive() {
           JSON.parse(message.data);
 
 
-        if (data.type === "occupancy") {
+        if (
+          data.type === "occupancy" ||
+          data.type === "connected" ||
+          data.type === "heartbeat" ||
+          data.type === "simulation_tick" ||
+          data.type === "demo_walk"
+        ) {
 
           state.heatmap =
             data.heatmap || state.heatmap;
@@ -2103,10 +2241,18 @@ function connectLive() {
           refreshHeatmap();
 
 
-          addActivity(
-            "Occupancy state updated",
-            "Live WebSocket event"
-          );
+          if (
+            data.type === "simulation_tick" ||
+            data.type === "demo_walk" ||
+            data.type === "occupancy"
+          ) {
+
+            addActivity(
+              "Occupancy state updated",
+              "Live WebSocket event"
+            );
+
+          }
 
         }
 
@@ -2224,9 +2370,27 @@ async function boot() {
 
   try {
 
+    await loginAllPersonas();
+
     await loadLayout();
 
     await refreshAll();
+
+    try {
+
+      const health = await api("/api/health");
+
+      state.eventsProcessed =
+        Number(health.total_events_loaded || 0);
+
+      $("#stat-events").textContent =
+        state.eventsProcessed;
+
+    } catch (error) {
+
+      console.error("Health fetch failed:", error);
+
+    }
 
     setupVoiceQuery();
 

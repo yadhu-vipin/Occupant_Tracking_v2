@@ -28,12 +28,11 @@ import json
 import time
 import hashlib
 import os
-from typing import Optional, Dict, Any
-from dataclasses import dataclass, field, asdict
+from typing import Dict, Any
+from dataclasses import dataclass, asdict
 
 from .crypto import (
-    NodeIdentity, SecureChannel, load_ed25519_public,
-    aes_gcm_encrypt, aes_gcm_decrypt, generate_nonce,
+    NodeIdentity, SecureChannel,
 )
 
 

@@ -17,7 +17,7 @@ dsts/pipeline.py where more than one occupant's state is updated from a
 single event, which is what makes a multi-occupant table like this possible
 at all (a "local_registered_gallery" event only ever touches one occupant).
 
-Run from the buildings_prototype/ directory:
+Run from the repository root:
 
     python -m dsts.examples.state_event_example
     python -m dsts.examples.state_event_example --event-id E000494

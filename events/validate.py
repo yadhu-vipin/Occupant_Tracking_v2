@@ -64,8 +64,28 @@ def validate_events(events, ground_truth, meta, start_time="08:00:00", end_time=
     return True
 
 
+def validate_state_truth(states, ground_truth):
+    """The state sequence must come from the same timeline as the events: one transition per event, same order,
+    same occupant and location, and every transition starts exactly where the occupant's previous one ended."""
+    if len(states) != len(ground_truth):
+        raise ValueError("state_truth and ground_truth have different lengths")
+    where = {}
+    for k, (state, truth) in enumerate(zip(states, ground_truth)):
+        if state["state"] != k or state["event_id"] != truth["event_id"]:
+            raise ValueError(f"state {k} is not aligned with event {truth['event_id']}")
+        for key in ("timestamp", "occupant_id", "home_building", "current_building", "current_zone"):
+            if state[key] != truth[key]:
+                raise ValueError(f"state {k} disagrees with ground truth on {key}")
+        previous = where.get(state["occupant_id"], (None, None))
+        if (state["from_building"], state["from_zone"]) != previous:
+            raise ValueError(f"state {k}: occupant {state['occupant_id']} did not start where they last were")
+        where[state["occupant_id"]] = (state["current_building"], state["current_zone"])
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate Stage 1 observable events and ground truth.")
+    parser.add_argument("--state-truth", type=Path, default=None, help="also validate this state_truth.json")
     here = Path(__file__).resolve().parent
     parser.add_argument("--events", type=Path, default=here / "output" / "generated_events.json")
     parser.add_argument("--ground-truth", type=Path, default=here / "output" / "ground_truth.json")
@@ -76,6 +96,11 @@ def main():
     events, truth = load_events(args.events, args.ground_truth)
     validate_events(events, truth, pd.read_csv(args.meta), embedding_count=raw.shape[0])
     print(f"VALID: {len(events)} events; all probes are unique TEST rows and ground truth is separate.")
+    states_path = args.state_truth or Path(args.ground_truth).with_name("state_truth.json")
+    if states_path.exists():
+        import json
+        validate_state_truth(json.loads(states_path.read_text(encoding="utf-8")), truth)
+        print(f"VALID: {states_path.name} matches the events state by state (same timeline).")
 
 
 if __name__ == "__main__":

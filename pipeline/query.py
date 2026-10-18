@@ -55,7 +55,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -74,10 +74,10 @@ from security.authorize import (                                            # no
     register_node, set_enforce_policy,
 )
 from security.campus_policy import (                                        # noqa: E402
-    CampusRole, DisclosureLevel, PolicyDecision, QueryContext, QueryPurpose,
+    DisclosureLevel, PolicyDecision, QueryContext, QueryPurpose,
     check_office_presence, clear_campus_registry, evaluate_campus_query_policy,
     get_occupant_role, register_class_roster, register_occupant_building, register_occupant_role,
-    register_occupant_current_building, get_occupant_current_building, is_visitor,
+    register_occupant_current_building,
 )
 
 DEFAULT_PHASE4_RESULTS = ROOT_DIR / "dsts" / "output" / "phase4_results.json"

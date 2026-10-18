@@ -7,6 +7,7 @@ services:
 
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./metrics_token:/etc/prometheus/metrics_token:ro
 
     ports:
       - "9090:9090"
@@ -41,4 +42,4 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 
     depends_on:
-      - prometheus
+      - prometheus

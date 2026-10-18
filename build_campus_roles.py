@@ -16,13 +16,10 @@ every real occupant gets a role, none left unassigned.
 Each teacher's roster = ~4 students, round-robin from their own building's
 39 students (so every student is on exactly one teacher's roster).
 
-NOTE ON SCOPE: security/campus_policy.py's CampusRole.DEAN is a flat, global
-role -- the access matrix (MAX_DISCLOSURE_MATRIX) has no per-building scoping
-built in. So having 10 separate "dean" IDs does NOT by itself restrict any of
-them to querying only their own building's occupants; the policy code as it
-stands would let any of them query Teachers/Students in ANY building at
-Dean-level access. That's a real, disclosable gap, not something this script
-papers over -- see the demo output for a concrete case.
+NOTE ON SCOPE: each Dean's authority is limited to their own building. That
+scoping is enforced in security/campus_policy.py (building-scoped hierarchical
+RBAC, A > B > C), which reads the home building registered for every occupant
+from the roles written here.
 
     python build_campus_roles.py
 """
@@ -42,7 +39,7 @@ def main() -> None:
     corpus_csv = HERE / "corpus" / "meta.csv"
     if not corpus_csv.exists():
         raise FileNotFoundError(
-            f"{corpus_csv} not found. Ensure corpus/meta.csv is present (see corpus/README.md)."
+            f"{corpus_csv} not found. Ensure corpus/meta.csv is present (see README.md, section 1)."
         )
     meta = pd.read_csv(corpus_csv)
     meta = meta.assign(occupant_id=meta["occupant_id"].astype(str).str.zfill(7))

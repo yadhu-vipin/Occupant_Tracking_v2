@@ -10,5 +10,5 @@ One file per pipeline step, run in this order:
     6. pipeline/query.py --caller .. --query Q6 ..
     7. pipeline/evaluate_pipeline.py
 
-See RUNBOOK.md for details.
+See README.md for details.
 """

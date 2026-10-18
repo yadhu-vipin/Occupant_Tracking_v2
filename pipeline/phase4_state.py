@@ -67,6 +67,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -89,8 +91,14 @@ from dsts.legacy_state.store import FakeOccupantRegistry
 from dsts.legacy_state.zones import ZONES
 from nodelib.deploy import PointerStore, SplitSqliteStore
 
+log = logging.getLogger(__name__)
+
 EVENT_FIELDS = {"event_id", "timestamp", "current_building", "current_zone", "embedding_row"}
 TRANSITION_ZONE = "zT"
+# A present visitor not seen for this long (event-clock seconds) is presumed to have
+# left without a zT event; their borrowed reference vectors are dropped and their
+# open visit pointer is closed. Mirrors buildinglib.node.VisitorPool's TTL.
+PRESENT_VISITOR_TTL_SECONDS = 4 * 3600
 
 
 class BuildingContext:
@@ -179,6 +187,30 @@ def _confirmed_visitor(retrieval_attempt):
     return retrieval_attempt["verified_occupant_id"], retrieval_attempt["verified_building"], distances
 
 
+def _hms_to_seconds(value):
+    """Seconds since midnight. Events carry only a time of day, so expiry assumes events are processed in time
+    order within one day (the generated event days are 08:00-17:00)."""
+    h, m, sec = (int(x) for x in str(value).split(":"))
+    return h * 3600 + m * 60 + sec
+
+
+def _expire_present_visitors(context, now_s, nodes_dir, timestamp):
+    """Evict visitors unseen for ``PRESENT_VISITOR_TTL_SECONDS``: wipe their borrowed refs and close their pointer."""
+    for occupant_id, entry in list(context.present_visitors.items()):
+        last_seen = entry.get("last_seen")
+        if last_seen is None or now_s - last_seen <= PRESENT_VISITOR_TTL_SECONDS:
+            continue
+        refs = entry.get("refs")
+        if isinstance(refs, np.ndarray) and refs.flags.writeable and refs.base is None:
+            refs[...] = 0                      # only wipe arrays this pool owns outright
+        del context.present_visitors[occupant_id]
+        try:
+            with PointerStore(Path(nodes_dir) / entry["home_building"] / "state") as pointers:
+                pointers.clear(occupant_id, exit_time=timestamp)
+        except (OSError, sqlite3.Error) as exc:     # no nodes dir / unreadable store: expiry still stands
+            log.warning("could not close pointer of expired visitor %s: %s", occupant_id, exc)
+
+
 def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_dir, corpus=None):
     """Apply Definition 3.3 + BSTS for one event; return its Phase 4 output row.
 
@@ -219,6 +251,8 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         if current_building not in contexts:
             contexts[current_building] = BuildingContext(current_building, nodes_dir)
         context = contexts[current_building]
+        now_s = _hms_to_seconds(event["timestamp"])
+        _expire_present_visitors(context, now_s, nodes_dir, event["timestamp"])
 
         if local is not None:
             distances = local[1]
@@ -236,14 +270,16 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
             result = occupant_probabilities(distances)
             to_persist = result.probabilities  # every present visitor is updated
             row["presence_mode"] = "present_visitor_pool"
+            context.present_visitors[occupant_id]["last_seen"] = now_s
         else:
             distances = home_gallery_distances
             result = occupant_probabilities(distances)
             to_persist = {occupant_id: result.probabilities[occupant_id]}
             row["presence_mode"] = "new_visitor_home_gallery"
             if corpus is not None:
-                refs = corpus.occupant_refs(home_building, occupant_id)
-                context.present_visitors[occupant_id] = {"home_building": home_building, "refs": refs}
+                # private copy: the pool owns (and on expiry wipes) what it borrowed
+                refs = np.array(corpus.occupant_refs(home_building, occupant_id), copy=True)
+                context.present_visitors[occupant_id] = {"home_building": home_building, "refs": refs, "last_seen": now_s}
 
         row["distance_scores"] = distances
         row["sigma"] = result.sigma

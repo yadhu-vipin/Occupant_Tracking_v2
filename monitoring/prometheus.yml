@@ -10,6 +10,12 @@ scrape_configs:
 
     metrics_path: /metrics
 
+    # /metrics requires this bearer token (DSTS_METRICS_TOKEN on the server).
+    # Put the same token, with no trailing newline, in monitoring/metrics_token.
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics_token
+
     static_configs:
       - targets:
           - "host.docker.internal:8000"

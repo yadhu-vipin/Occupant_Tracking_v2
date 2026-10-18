@@ -78,8 +78,11 @@ def test_validation_rejects_identity_leakage_and_building_teleportation():
 
     event_dicts = [item.to_dict() for item in events]
     truth_dicts = [item.to_dict() for item in truth]
-    for index in range(1, len(truth_dicts)):
-        if truth_dicts[index - 1]["current_building"] != truth_dicts[index]["current_building"]:
+    last = {}                            # occupant -> index of their previous event
+    for index, item in enumerate(truth_dicts):
+        previous = last.get(item["occupant_id"])
+        last[item["occupant_id"]] = index
+        if previous is not None and truth_dicts[previous]["current_building"] != item["current_building"]:
             event_dicts[index]["current_zone"] = truth_dicts[index]["current_zone"] = "z6"
             break
     with pytest.raises(ValueError, match="zT"):

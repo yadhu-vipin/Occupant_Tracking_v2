@@ -1,0 +1,781 @@
+{
+ "tau": 80.43167114257812,
+ "runs": [
+  {
+   "seed": 0,
+   "b10": {
+    "recall_at_5": 0.947,
+    "sequential_correct": 0.915,
+    "sequential_asked": 1.472,
+    "adaptive_g5_correct": 0.9235,
+    "adaptive_g5_asked": 2.4875,
+    "query_all_correct": 0.923,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9555,
+    "effective_fpr": 0.03537340619307833,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.913,
+    "sequential_correct": 0.898,
+    "sequential_asked": 1.549,
+    "adaptive_g5_correct": 0.9005,
+    "adaptive_g5_asked": 2.4875,
+    "query_all_correct": 0.9005,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9555,
+    "effective_fpr": 0.020519125683060108,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.886,
+    "sequential_correct": 0.878,
+    "sequential_asked": 1.607,
+    "adaptive_g5_correct": 0.879,
+    "adaptive_g5_asked": 2.4855,
+    "query_all_correct": 0.879,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9555,
+    "effective_fpr": 0.015274673803947808,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.871,
+    "sequential_correct": 0.8665,
+    "sequential_asked": 1.6505,
+    "adaptive_g5_correct": 0.8675,
+    "adaptive_g5_asked": 2.512,
+    "query_all_correct": 0.8675,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9555,
+    "effective_fpr": 0.012854446100347743,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 1,
+   "b10": {
+    "recall_at_5": 0.9495,
+    "sequential_correct": 0.918,
+    "sequential_asked": 1.501,
+    "adaptive_g5_correct": 0.9255,
+    "adaptive_g5_asked": 2.592,
+    "query_all_correct": 0.9255,
+    "query_all_asked": 5.0,
+    "central_correct": 0.954,
+    "effective_fpr": 0.0356976320582878,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.901,
+    "sequential_correct": 0.8895,
+    "sequential_asked": 1.572,
+    "adaptive_g5_correct": 0.893,
+    "adaptive_g5_asked": 2.5365,
+    "query_all_correct": 0.892,
+    "query_all_asked": 5.0,
+    "central_correct": 0.954,
+    "effective_fpr": 0.020488387978142075,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.893,
+    "sequential_correct": 0.8875,
+    "sequential_asked": 1.5925,
+    "adaptive_g5_correct": 0.8875,
+    "adaptive_g5_asked": 2.524,
+    "query_all_correct": 0.887,
+    "query_all_asked": 5.0,
+    "central_correct": 0.954,
+    "effective_fpr": 0.015168283706925394,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.876,
+    "sequential_correct": 0.874,
+    "sequential_asked": 1.639,
+    "adaptive_g5_correct": 0.8735,
+    "adaptive_g5_asked": 2.59,
+    "query_all_correct": 0.8735,
+    "query_all_asked": 5.0,
+    "central_correct": 0.954,
+    "effective_fpr": 0.012650438814373239,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 2,
+   "b10": {
+    "recall_at_5": 0.947,
+    "sequential_correct": 0.913,
+    "sequential_asked": 1.4865,
+    "adaptive_g5_correct": 0.924,
+    "adaptive_g5_asked": 2.529,
+    "query_all_correct": 0.924,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9575,
+    "effective_fpr": 0.03555009107468124,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.908,
+    "sequential_correct": 0.8975,
+    "sequential_asked": 1.559,
+    "adaptive_g5_correct": 0.9005,
+    "adaptive_g5_asked": 2.5165,
+    "query_all_correct": 0.8995,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9575,
+    "effective_fpr": 0.020476092896174865,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.895,
+    "sequential_correct": 0.8885,
+    "sequential_asked": 1.592,
+    "adaptive_g5_correct": 0.8905,
+    "adaptive_g5_asked": 2.474,
+    "query_all_correct": 0.8905,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9575,
+    "effective_fpr": 0.015266644362663095,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.877,
+    "sequential_correct": 0.8755,
+    "sequential_asked": 1.6175,
+    "adaptive_g5_correct": 0.876,
+    "adaptive_g5_asked": 2.5185,
+    "query_all_correct": 0.876,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9575,
+    "effective_fpr": 0.01278522934260639,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 3,
+   "b10": {
+    "recall_at_5": 0.9515,
+    "sequential_correct": 0.9215,
+    "sequential_asked": 1.497,
+    "adaptive_g5_correct": 0.929,
+    "adaptive_g5_asked": 2.5645,
+    "query_all_correct": 0.929,
+    "query_all_asked": 5.0,
+    "central_correct": 0.959,
+    "effective_fpr": 0.035408014571949,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.9085,
+    "sequential_correct": 0.8915,
+    "sequential_asked": 1.5695,
+    "adaptive_g5_correct": 0.8945,
+    "adaptive_g5_asked": 2.5215,
+    "query_all_correct": 0.8945,
+    "query_all_asked": 5.0,
+    "central_correct": 0.959,
+    "effective_fpr": 0.02037704918032787,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.8845,
+    "sequential_correct": 0.8805,
+    "sequential_asked": 1.6045,
+    "adaptive_g5_correct": 0.8825,
+    "adaptive_g5_asked": 2.5215,
+    "query_all_correct": 0.8815,
+    "query_all_asked": 5.0,
+    "central_correct": 0.959,
+    "effective_fpr": 0.01515289394446303,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.864,
+    "sequential_correct": 0.861,
+    "sequential_asked": 1.668,
+    "adaptive_g5_correct": 0.862,
+    "adaptive_g5_asked": 2.532,
+    "query_all_correct": 0.862,
+    "query_all_asked": 5.0,
+    "central_correct": 0.959,
+    "effective_fpr": 0.012579897333995697,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 4,
+   "b10": {
+    "recall_at_5": 0.9485,
+    "sequential_correct": 0.914,
+    "sequential_asked": 1.5025,
+    "adaptive_g5_correct": 0.9235,
+    "adaptive_g5_asked": 2.5435,
+    "query_all_correct": 0.923,
+    "query_all_asked": 5.0,
+    "central_correct": 0.955,
+    "effective_fpr": 0.03555009107468124,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.908,
+    "sequential_correct": 0.8995,
+    "sequential_asked": 1.5545,
+    "adaptive_g5_correct": 0.902,
+    "adaptive_g5_asked": 2.53,
+    "query_all_correct": 0.901,
+    "query_all_asked": 5.0,
+    "central_correct": 0.955,
+    "effective_fpr": 0.0204077868852459,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.8935,
+    "sequential_correct": 0.884,
+    "sequential_asked": 1.58,
+    "adaptive_g5_correct": 0.8885,
+    "adaptive_g5_asked": 2.536,
+    "query_all_correct": 0.888,
+    "query_all_asked": 5.0,
+    "central_correct": 0.955,
+    "effective_fpr": 0.015183338909334227,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.872,
+    "sequential_correct": 0.8695,
+    "sequential_asked": 1.6525,
+    "adaptive_g5_correct": 0.8705,
+    "adaptive_g5_asked": 2.564,
+    "query_all_correct": 0.8705,
+    "query_all_asked": 5.0,
+    "central_correct": 0.955,
+    "effective_fpr": 0.012797151846332176,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 5,
+   "b10": {
+    "recall_at_5": 0.9485,
+    "sequential_correct": 0.913,
+    "sequential_asked": 1.4855,
+    "adaptive_g5_correct": 0.928,
+    "adaptive_g5_asked": 2.4845,
+    "query_all_correct": 0.9265,
+    "query_all_asked": 5.0,
+    "central_correct": 0.957,
+    "effective_fpr": 0.03526958105646631,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.9195,
+    "sequential_correct": 0.908,
+    "sequential_asked": 1.5375,
+    "adaptive_g5_correct": 0.913,
+    "adaptive_g5_asked": 2.501,
+    "query_all_correct": 0.913,
+    "query_all_asked": 5.0,
+    "central_correct": 0.957,
+    "effective_fpr": 0.020209699453551916,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.892,
+    "sequential_correct": 0.8865,
+    "sequential_asked": 1.5885,
+    "adaptive_g5_correct": 0.8895,
+    "adaptive_g5_asked": 2.5495,
+    "query_all_correct": 0.8885,
+    "query_all_asked": 5.0,
+    "central_correct": 0.957,
+    "effective_fpr": 0.015211441953830713,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.8785,
+    "sequential_correct": 0.872,
+    "sequential_asked": 1.6365,
+    "adaptive_g5_correct": 0.873,
+    "adaptive_g5_asked": 2.5305,
+    "query_all_correct": 0.873,
+    "query_all_asked": 5.0,
+    "central_correct": 0.957,
+    "effective_fpr": 0.012768007948335816,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 6,
+   "b10": {
+    "recall_at_5": 0.942,
+    "sequential_correct": 0.91,
+    "sequential_asked": 1.4965,
+    "adaptive_g5_correct": 0.9165,
+    "adaptive_g5_asked": 2.545,
+    "query_all_correct": 0.9165,
+    "query_all_asked": 5.0,
+    "central_correct": 0.95,
+    "effective_fpr": 0.035163934426229504,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.9025,
+    "sequential_correct": 0.8875,
+    "sequential_asked": 1.5745,
+    "adaptive_g5_correct": 0.8935,
+    "adaptive_g5_asked": 2.537,
+    "query_all_correct": 0.8935,
+    "query_all_asked": 5.0,
+    "central_correct": 0.95,
+    "effective_fpr": 0.020301229508196725,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.893,
+    "sequential_correct": 0.884,
+    "sequential_asked": 1.5955,
+    "adaptive_g5_correct": 0.8895,
+    "adaptive_g5_asked": 2.5515,
+    "query_all_correct": 0.8895,
+    "query_all_asked": 5.0,
+    "central_correct": 0.95,
+    "effective_fpr": 0.015411508865841419,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.8665,
+    "sequential_correct": 0.864,
+    "sequential_asked": 1.66,
+    "adaptive_g5_correct": 0.8635,
+    "adaptive_g5_asked": 2.602,
+    "query_all_correct": 0.8635,
+    "query_all_asked": 5.0,
+    "central_correct": 0.95,
+    "effective_fpr": 0.01267478059281338,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 7,
+   "b10": {
+    "recall_at_5": 0.956,
+    "sequential_correct": 0.9185,
+    "sequential_asked": 1.49,
+    "adaptive_g5_correct": 0.931,
+    "adaptive_g5_asked": 2.489,
+    "query_all_correct": 0.929,
+    "query_all_asked": 5.0,
+    "central_correct": 0.956,
+    "effective_fpr": 0.034766848816029136,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.9015,
+    "sequential_correct": 0.89,
+    "sequential_asked": 1.577,
+    "adaptive_g5_correct": 0.894,
+    "adaptive_g5_asked": 2.508,
+    "query_all_correct": 0.8925,
+    "query_all_asked": 5.0,
+    "central_correct": 0.956,
+    "effective_fpr": 0.020239071038251365,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.8905,
+    "sequential_correct": 0.8825,
+    "sequential_asked": 1.585,
+    "adaptive_g5_correct": 0.8855,
+    "adaptive_g5_asked": 2.483,
+    "query_all_correct": 0.8855,
+    "query_all_asked": 5.0,
+    "central_correct": 0.956,
+    "effective_fpr": 0.015214118434258947,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.8665,
+    "sequential_correct": 0.863,
+    "sequential_asked": 1.675,
+    "adaptive_g5_correct": 0.8635,
+    "adaptive_g5_asked": 2.5305,
+    "query_all_correct": 0.8625,
+    "query_all_asked": 5.0,
+    "central_correct": 0.956,
+    "effective_fpr": 0.012589335982778607,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 8,
+   "b10": {
+    "recall_at_5": 0.953,
+    "sequential_correct": 0.9185,
+    "sequential_asked": 1.4695,
+    "adaptive_g5_correct": 0.927,
+    "adaptive_g5_asked": 2.5085,
+    "query_all_correct": 0.925,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9525,
+    "effective_fpr": 0.03536976320582878,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.9035,
+    "sequential_correct": 0.891,
+    "sequential_asked": 1.581,
+    "adaptive_g5_correct": 0.894,
+    "adaptive_g5_asked": 2.514,
+    "query_all_correct": 0.8935,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9525,
+    "effective_fpr": 0.02026502732240437,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.8935,
+    "sequential_correct": 0.889,
+    "sequential_asked": 1.5925,
+    "adaptive_g5_correct": 0.89,
+    "adaptive_g5_asked": 2.4845,
+    "query_all_correct": 0.8895,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9525,
+    "effective_fpr": 0.015071261291401804,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.866,
+    "sequential_correct": 0.8645,
+    "sequential_asked": 1.68,
+    "adaptive_g5_correct": 0.8645,
+    "adaptive_g5_asked": 2.558,
+    "query_all_correct": 0.8645,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9525,
+    "effective_fpr": 0.01267411823149528,
+    "filter_bytes": 731
+   }
+  },
+  {
+   "seed": 9,
+   "b10": {
+    "recall_at_5": 0.9415,
+    "sequential_correct": 0.915,
+    "sequential_asked": 1.5035,
+    "adaptive_g5_correct": 0.9215,
+    "adaptive_g5_asked": 2.5475,
+    "query_all_correct": 0.92,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9505,
+    "effective_fpr": 0.036289617486338806,
+    "filter_bytes": 7309
+   },
+   "b25": {
+    "recall_at_5": 0.9035,
+    "sequential_correct": 0.8885,
+    "sequential_asked": 1.599,
+    "adaptive_g5_correct": 0.8925,
+    "adaptive_g5_asked": 2.546,
+    "query_all_correct": 0.892,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9505,
+    "effective_fpr": 0.020538251366120218,
+    "filter_bytes": 2924
+   },
+   "b50": {
+    "recall_at_5": 0.8905,
+    "sequential_correct": 0.8825,
+    "sequential_asked": 1.5875,
+    "adaptive_g5_correct": 0.8825,
+    "adaptive_g5_asked": 2.54,
+    "query_all_correct": 0.8825,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9505,
+    "effective_fpr": 0.01541251254600201,
+    "filter_bytes": 1462
+   },
+   "b100": {
+    "recall_at_5": 0.863,
+    "sequential_correct": 0.858,
+    "sequential_asked": 1.6715,
+    "adaptive_g5_correct": 0.8605,
+    "adaptive_g5_asked": 2.575,
+    "query_all_correct": 0.8605,
+    "query_all_asked": 5.0,
+    "central_correct": 0.9505,
+    "effective_fpr": 0.012849975161450571,
+    "filter_bytes": 731
+   }
+  }
+ ],
+ "summary": {
+  "b10": {
+   "recall_at_5": {
+    "mean": 0.9484499999999999,
+    "std": 0.004499691347439536,
+    "ci95": 0.003218661648884517,
+    "min": 0.9415,
+    "max": 0.956
+   },
+   "sequential_correct": {
+    "mean": 0.9156500000000001,
+    "std": 0.0034241787336527687,
+    "ci95": 0.0024493397253137297,
+    "min": 0.91,
+    "max": 0.9215
+   },
+   "sequential_asked": {
+    "mean": 1.4904000000000002,
+    "std": 0.012137636599528842,
+    "ci95": 0.008682138932313852,
+    "min": 1.4695,
+    "max": 1.5035
+   },
+   "adaptive_g5_correct": {
+    "mean": 0.9249499999999999,
+    "std": 0.004152977512848152,
+    "ci95": 0.002970654744328277,
+    "min": 0.9165,
+    "max": 0.931
+   },
+   "adaptive_g5_asked": {
+    "mean": 2.5291,
+    "std": 0.03614845931863639,
+    "ci95": 0.025857253462809992,
+    "min": 2.4845,
+    "max": 2.592
+   },
+   "query_all_correct": {
+    "mean": 0.92415,
+    "std": 0.003851767271151151,
+    "ci95": 0.0027551968877015005,
+    "min": 0.9165,
+    "max": 0.929
+   },
+   "query_all_asked": {
+    "mean": 5.0,
+    "std": 0.0,
+    "ci95": 0.0,
+    "min": 5.0,
+    "max": 5.0
+   },
+   "central_correct": {
+    "mean": 0.9547000000000001,
+    "std": 0.002964606025914551,
+    "ci95": 0.002120604055452123,
+    "min": 0.95,
+    "max": 0.959
+   },
+   "effective_fpr": {
+    "mean": 0.03544389799635701,
+    "std": 0.00039173270933186483,
+    "ci95": 0.0002802092300969855,
+    "min": 0.034766848816029136,
+    "max": 0.036289617486338806
+   },
+   "filter_bytes": 7309
+  },
+  "b25": {
+   "recall_at_5": {
+    "mean": 0.9068999999999999,
+    "std": 0.005844275451718173,
+    "ci95": 0.004180452348729746,
+    "min": 0.901,
+    "max": 0.9195
+   },
+   "sequential_correct": {
+    "mean": 0.8941000000000001,
+    "std": 0.006484168755086859,
+    "ci95": 0.004638172640167689,
+    "min": 0.8875,
+    "max": 0.908
+   },
+   "sequential_asked": {
+    "mean": 1.5673,
+    "std": 0.01770467609292966,
+    "ci95": 0.012664282402094471,
+    "min": 1.5375,
+    "max": 1.599
+   },
+   "adaptive_g5_correct": {
+    "mean": 0.8977499999999999,
+    "std": 0.006434499030831998,
+    "ci95": 0.004602643528451891,
+    "min": 0.8925,
+    "max": 0.913
+   },
+   "adaptive_g5_asked": {
+    "mean": 2.5198,
+    "std": 0.018100337627299193,
+    "ci95": 0.012947301949054883,
+    "min": 2.4875,
+    "max": 2.546
+   },
+   "query_all_correct": {
+    "mean": 0.8972,
+    "std": 0.006592082793439093,
+    "ci95": 0.004715364329508389,
+    "min": 0.892,
+    "max": 0.913
+   },
+   "query_all_asked": {
+    "mean": 5.0,
+    "std": 0.0,
+    "ci95": 0.0,
+    "min": 5.0,
+    "max": 5.0
+   },
+   "central_correct": {
+    "mean": 0.9547000000000001,
+    "std": 0.002964606025914551,
+    "ci95": 0.002120604055452123,
+    "min": 0.95,
+    "max": 0.959
+   },
+   "effective_fpr": {
+    "mean": 0.020382172131147545,
+    "std": 0.00012220276465800843,
+    "ci95": 8.741251824221426e-05,
+    "min": 0.020209699453551916,
+    "max": 0.020538251366120218
+   },
+   "filter_bytes": 2924
+  },
+  "b50": {
+   "recall_at_5": {
+    "mean": 0.8911499999999999,
+    "std": 0.0034160568561492806,
+    "ci95": 0.0024435300878033056,
+    "min": 0.8845,
+    "max": 0.895
+   },
+   "sequential_correct": {
+    "mean": 0.8843,
+    "std": 0.0035839146815241627,
+    "ci95": 0.0025635999999999996,
+    "min": 0.878,
+    "max": 0.889
+   },
+   "sequential_asked": {
+    "mean": 1.5925,
+    "std": 0.008279828232249476,
+    "ci95": 0.00592262080501529,
+    "min": 1.58,
+    "max": 1.607
+   },
+   "adaptive_g5_correct": {
+    "mean": 0.8864999999999998,
+    "std": 0.003951089863709897,
+    "ci95": 0.0028262430539498875,
+    "min": 0.879,
+    "max": 0.8905
+   },
+   "adaptive_g5_asked": {
+    "mean": 2.51495,
+    "std": 0.0302163035462645,
+    "ci95": 0.021613939687386893,
+    "min": 2.474,
+    "max": 2.5515
+   },
+   "query_all_correct": {
+    "mean": 0.88615,
+    "std": 0.003909035118230012,
+    "ci95": 0.0027961609914309263,
+    "min": 0.879,
+    "max": 0.8905
+   },
+   "query_all_asked": {
+    "mean": 5.0,
+    "std": 0.0,
+    "ci95": 0.0,
+    "min": 5.0,
+    "max": 5.0
+   },
+   "central_correct": {
+    "mean": 0.9547000000000001,
+    "std": 0.002964606025914551,
+    "ci95": 0.002120604055452123,
+    "min": 0.95,
+    "max": 0.959
+   },
+   "effective_fpr": {
+    "mean": 0.015236667781866844,
+    "std": 0.00010897317079598571,
+    "ci95": 7.794929441059727e-05,
+    "min": 0.015071261291401804,
+    "max": 0.01541251254600201
+   },
+   "filter_bytes": 1462
+  },
+  "b100": {
+   "recall_at_5": {
+    "mean": 0.87005,
+    "std": 0.005654152849405851,
+    "ci95": 0.004044456281133464,
+    "min": 0.863,
+    "max": 0.8785
+   },
+   "sequential_correct": {
+    "mean": 0.8667999999999999,
+    "std": 0.005779273310719952,
+    "ci95": 0.004133955848820833,
+    "min": 0.858,
+    "max": 0.8755
+   },
+   "sequential_asked": {
+    "mean": 1.65505,
+    "std": 0.019782778706069905,
+    "ci95": 0.014150764177598316,
+    "min": 1.6175,
+    "max": 1.68
+   },
+   "adaptive_g5_correct": {
+    "mean": 0.86745,
+    "std": 0.005454101412902236,
+    "ci95": 0.003901358046885721,
+    "min": 0.8605,
+    "max": 0.876
+   },
+   "adaptive_g5_asked": {
+    "mean": 2.55125,
+    "std": 0.0310807639688745,
+    "ci95": 0.022232294457612763,
+    "min": 2.512,
+    "max": 2.602
+   },
+   "query_all_correct": {
+    "mean": 0.8673500000000001,
+    "std": 0.0055430136207662295,
+    "ci95": 0.003964957589937119,
+    "min": 0.8605,
+    "max": 0.876
+   },
+   "query_all_asked": {
+    "mean": 5.0,
+    "std": 0.0,
+    "ci95": 0.0,
+    "min": 5.0,
+    "max": 5.0
+   },
+   "central_correct": {
+    "mean": 0.9547000000000001,
+    "std": 0.002964606025914551,
+    "ci95": 0.002120604055452123,
+    "min": 0.95,
+    "max": 0.959
+   },
+   "effective_fpr": {
+    "mean": 0.01272233813545289,
+    "std": 0.00010171703549158821,
+    "ci95": 7.275892853435312e-05,
+    "min": 0.012579897333995697,
+    "max": 0.012854446100347743
+   },
+   "filter_bytes": 731
+  }
+ }
+}

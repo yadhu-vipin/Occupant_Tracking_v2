@@ -20,17 +20,25 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dsts.api.server import app, _get_engine
+from security.tokens import issue_token
 
 client = TestClient(app)
 
-DEAN_TOKEN = "dsts-dean-token"       # 0001738 (Dean, building_5)
-TEACHER_TOKEN = "dsts-teacher-token" # 0000362 (Teacher, building_5)
-STUDENT_TOKEN = "dsts-student-token" # 0000168 (Student, building_5)
+# Signed tokens (the server only accepts tokens it minted itself)
+DEAN_TOKEN = issue_token("0001738")      # Dean, building_5
+TEACHER_TOKEN = issue_token("0000362")   # Teacher, building_5
+STUDENT_TOKEN = issue_token("0000168")   # Student, building_5
 
 
 @pytest.fixture(autouse=True)
 def init_engine():
-    _get_engine()
+    """Other test modules clear the global role/principal registries; restore them for every test."""
+    import dsts.api.server as srv
+    from pipeline.query import register_real_registry
+    from security.authorize import set_enforce_policy
+    engine = _get_engine()
+    set_enforce_policy(True)
+    register_real_registry(srv._roles, srv._rosters, engine)
 
 
 # ================================================================
@@ -122,30 +130,59 @@ def test_occupancy_unauthenticated_returns_401():
     assert resp.status_code == 401
 
 
-def test_occupancy_student_returns_aggregate_only():
-    """Students cannot see individual occupant IDs (anti-stalking policy)."""
-    resp = client.get(
-        "/api/occupancy",
-        headers={"Authorization": f"Bearer {STUDENT_TOKEN}"},
-    )
+def _occupancy(token):
+    resp = client.get("/api/occupancy", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["redacted"] is True
-    assert "aggregate_counts" in data
+    return [(zone, r) for zone, rows in resp.json().items() for r in rows]
 
 
-def test_occupancy_teacher_filtered_to_home_building():
-    """Teacher only sees occupants in their home building."""
-    resp = client.get(
-        "/api/occupancy",
-        headers={"Authorization": f"Bearer {TEACHER_TOKEN}"},
-    )
+def test_occupancy_student_sees_no_peer_students():
+    """Anti-stalking: a student's live view never lists another student, at any precision."""
+    from pipeline.query import get_real_role
+    for zone, r in _occupancy(STUDENT_TOKEN):
+        assert r["occupant"] == "0000168" or get_real_role(r["occupant"]) != "student", r
+        assert r["building_id"] == "building_5" or r["home_building"] == "building_5"
+
+
+def test_occupancy_rows_are_never_more_precise_than_policy_allows():
+    """Every row is the per-occupant policy outcome: exact zone only at L3+, else sector with no probability."""
+    from dsts.legacy_state.zones import ZONES
+    for token in (DEAN_TOKEN, TEACHER_TOKEN, STUDENT_TOKEN):
+        for zone, r in _occupancy(token):
+            if r["disclosure"] == "L2_CURRENT_ZONE":
+                assert zone not in ZONES and r["probability"] is None
+                assert len(r["timestamp"]) == 5              # approximate HH:MM only
+            else:
+                assert r["disclosure"] in ("L3_PRECISE_CURRENT", "L4_HISTORICAL_TRACK") and zone in ZONES
+
+
+def test_occupancy_teacher_confined_to_own_building_and_sector_level_for_students():
+    from pipeline.query import get_real_role
+    rows = _occupancy(TEACHER_TOKEN)
+    assert rows, "teacher should see at least their roster/building at sector level"
+    for zone, r in rows:
+        assert r["building_id"] == "building_5" or r["home_building"] == "building_5"
+        if get_real_role(r["occupant"]) == "student":
+            assert r["disclosure"] == "L2_CURRENT_ZONE"          # teacher -> student is capped at L2
+
+
+def test_occupancy_dean_confined_to_own_building_scope():
+    from pipeline.query import get_real_role
+    rows = _occupancy(DEAN_TOKEN)
+    assert rows
+    for zone, r in rows:
+        in_scope = r["building_id"] == "building_5" or r["home_building"] == "building_5"
+        assert in_scope or get_real_role(r["occupant"]) == "dean", r      # only peer deans are coarse-visible
+
+
+def test_security_log_entries_are_readable():
+    resp = client.get("/api/security-log", headers={"Authorization": f"Bearer {DEAN_TOKEN}"})
     assert resp.status_code == 200
-    data = resp.json()
-    # Check that all returned occupants are in building_5
-    for zone, rows in data.items():
-        for r in rows:
-            assert r["building_id"] == "building_5"
+    entries = resp.json()
+    for e in entries:
+        assert "None on None" not in e["detail"] and e["kind"] and e["building_id"]
+        assert e["kind"] != "node_registered"                      # bulk start-up registrations are not shown
+    assert [e["time"] for e in entries] == sorted((e["time"] for e in entries), reverse=True)   # newest first
 
 
 def test_security_log_student_forbidden():
@@ -319,8 +356,9 @@ def test_b6_invalid_building_returns_400():
 # B7: METRICS
 # ================================================================
 
-def test_b7_metrics_endpoint():
-    resp = client.get("/metrics")
+def test_b7_metrics_endpoint(monkeypatch):
+    monkeypatch.setenv("DSTS_METRICS_TOKEN", "scrape-secret")
+    resp = client.get("/metrics", headers={"Authorization": "Bearer scrape-secret"})
     assert resp.status_code == 200
     assert "dsts_queries_executed_total" in resp.text
 
@@ -429,3 +467,101 @@ def test_b8_concurrent_requests_state_integrity():
     assert len(results) == 20
     assert all(r.status_code == 200 for r in results)
 
+
+
+# ================================================================
+# NON-SECURITY FIXES: REAL SIMULATE / DEMO-WALK / RESET, WS FAN-OUT
+# ================================================================
+
+def _auth(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_simulate_really_adds_events_and_reset_removes_them():
+    engine = _get_engine()
+    client.post("/api/reset", headers=_auth(DEAN_TOKEN))
+    base = len(engine.events)
+
+    r = client.post("/api/simulate", headers=_auth(DEAN_TOKEN), json={"n_events": 40, "seed": 7})
+    assert r.status_code == 200
+    assert r.json()["events_run"] == 40
+    assert len(engine.events) == base + 40
+    assert sum(1 for e in engine.events if e.source == "simulated") == 40
+
+    r = client.post("/api/reset", headers=_auth(DEAN_TOKEN))
+    assert r.status_code == 200
+    assert len(engine.events) == base
+
+
+def test_simulate_is_deterministic_for_a_seed():
+    from dsts.api.server import _generate_sim_events
+    engine = _get_engine()
+    a = _generate_sim_events(engine, 25, 123, 0)
+    b = _generate_sim_events(engine, 25, 123, 0)
+    assert [(e.occupant_id, e.zone, e.timestamp, e.building) for e in a] == \
+           [(e.occupant_id, e.zone, e.timestamp, e.building) for e in b]
+    assert all(e.zone != "zT" for e in a)
+
+
+def test_simulate_cap_enforced():
+    import dsts.api.server as srv
+    client.post("/api/reset", headers=_auth(DEAN_TOKEN))
+    old = srv.MAX_SIMULATED_EVENTS
+    srv.MAX_SIMULATED_EVENTS = 30
+    try:
+        r1 = client.post("/api/simulate", headers=_auth(DEAN_TOKEN), json={"n_events": 50, "seed": 1})
+        assert r1.status_code == 200 and r1.json()["events_run"] == 30 and r1.json()["capped"] is True
+        r2 = client.post("/api/simulate", headers=_auth(DEAN_TOKEN), json={"n_events": 5, "seed": 2})
+        assert r2.status_code == 409
+    finally:
+        srv.MAX_SIMULATED_EVENTS = old
+        client.post("/api/reset", headers=_auth(DEAN_TOKEN))
+
+
+def test_simulate_invalidates_occupancy_cache():
+    client.post("/api/reset", headers=_auth(DEAN_TOKEN))
+    before = sum(len(v) for v in client.get("/api/occupancy", headers=_auth(DEAN_TOKEN)).json().values())
+    client.post("/api/simulate", headers=_auth(DEAN_TOKEN), json={"n_events": 400, "seed": 99})
+    after = sum(len(v) for v in client.get("/api/occupancy", headers=_auth(DEAN_TOKEN)).json().values())
+    assert after >= before
+    client.post("/api/reset", headers=_auth(DEAN_TOKEN))
+
+
+def test_demo_walk_replays_real_events_without_mutating_log():
+    engine = _get_engine()
+    n = len(engine.events)
+    r = client.post("/api/demo-walk", headers=_auth(DEAN_TOKEN))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["events_run"] > 0
+    assert "building_5" in body["buildings_visited"]
+    assert "occupant_id" not in body
+    assert len(engine.events) == n
+
+
+def test_unknown_building_comes_from_deployment_not_hardcoded_list():
+    r = client.post("/api/query", headers=_auth(DEAN_TOKEN), json={"query_type": "Q5", "building_id": "building_0"})
+    assert r.status_code == 400
+
+
+def test_websocket_broadcast_reaches_every_client():
+    with client.websocket_connect(f"/ws/live?token={DEAN_TOKEN}") as ws1, \
+         client.websocket_connect(f"/ws/live?token={TEACHER_TOKEN}") as ws2:
+        assert ws1.receive_json()["type"] == "connected"
+        assert ws2.receive_json()["type"] == "connected"
+        client.post("/api/simulate", headers=_auth(DEAN_TOKEN), json={"n_events": 5, "seed": 3})
+        for ws in (ws1, ws2):
+            for _ in range(5):
+                msg = ws.receive_json()
+                if msg["type"] == "simulation_tick":
+                    assert msg["events_run"] == 5
+                    break
+            else:
+                pytest.fail("client never received the simulation_tick broadcast")
+    client.post("/api/reset", headers=_auth(DEAN_TOKEN))
+
+
+def test_authorize_with_reason_returns_own_reason():
+    from security.authorize import authorize_with_reason
+    ok, reason = authorize_with_reason("no-such-principal", "QUERY", "occupant:0000102")
+    assert ok is False and reason == "unregistered_principal"

@@ -26,7 +26,7 @@ from nodelib.security_handler import SecureBuildingNodeHandler
 from pipeline.evaluate_pipeline import run_evaluation
 from pipeline.query import (
     build_engine, load_real_registry, register_real_registry,
-    run_demo, run_occupant_query, QueryEngine, track_answer,
+    run_demo, QueryEngine, track_answer,
     resolve_target_current_building
 )
 from security.authorize import (
@@ -34,8 +34,7 @@ from security.authorize import (
 )
 from security.campus_policy import (
     clear_campus_registry, evaluate_campus_query_policy,
-    DisclosureLevel, QueryPurpose, QueryContext, CampusRole,
-    is_visitor
+    QueryPurpose, QueryContext,
 )
 
 

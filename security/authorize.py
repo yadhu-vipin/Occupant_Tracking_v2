@@ -14,32 +14,21 @@ Roles:
 """
 
 import time
-import json
 from enum import Enum
 from typing import Optional, Dict, Set, Tuple
 
-# Re-export Layer-2 Campus Privacy Policy
+# Layer 2 (campus privacy policy) is optional: without it only Layer 1 is enforced.
 try:
     from security.campus_policy import (
-        CampusRole, DisclosureLevel, QueryPurpose, QueryContext,
-        AccessScope, LocationGranularity, PolicyDecision,
-        MAX_DISCLOSURE_MATRIX, POLICY_MATRIX, evaluate_campus_query_policy,
-        register_occupant_role, get_occupant_role, register_class_roster,
-        is_student_in_roster, clear_campus_registry,
-        register_designated_location, get_designated_location, check_office_presence,
+        clear_campus_registry, evaluate_campus_query_policy, get_occupant_role,
     )
 except ImportError:
     try:
         from .campus_policy import (
-            CampusRole, DisclosureLevel, QueryPurpose, QueryContext,
-            AccessScope, LocationGranularity, PolicyDecision,
-            MAX_DISCLOSURE_MATRIX, POLICY_MATRIX, evaluate_campus_query_policy,
-            register_occupant_role, get_occupant_role, register_class_roster,
-            is_student_in_roster, clear_campus_registry,
-            register_designated_location, get_designated_location, check_office_presence,
+            clear_campus_registry, evaluate_campus_query_policy, get_occupant_role,
         )
     except ImportError:
-        pass
+        clear_campus_registry = evaluate_campus_query_policy = get_occupant_role = None
 
 
 # ─── Role Definitions ─────────────────────────────────────────────────────────
@@ -92,8 +81,11 @@ _principal_precision: Dict[str, PrecisionLevel] = {}
 # Enforce policy (False = permit-all for backward compatibility)
 _enforce_policy = False
 
-# Audit log entries
-_audit_log = []
+# Audit log entries. Bounded so that a long run cannot grow it without limit; the oldest entries are dropped
+# first. Raise the limit with DSTS_AUDIT_MAX if the full trail of a long run is needed.
+import collections as _collections
+import os as _os
+_audit_log = _collections.deque(maxlen=int(_os.environ.get("DSTS_AUDIT_MAX", "100000")))
 
 
 # ─── Node Registration ────────────────────────────────────────────────────────
@@ -214,7 +206,23 @@ def authorize(
     target: str,
     building_id: str = "",
 ) -> bool:
+    """Boolean wrapper around :func:`authorize_with_reason`."""
+    return authorize_with_reason(principal, verb, target, building_id)[0]
+
+
+def authorize_with_reason(
+    principal: Optional[str],
+    verb: str,
+    target: str,
+    building_id: str = "",
+) -> Tuple[bool, str]:
     """
+    Same as :func:`authorize` but also returns the denial reason (``""`` on permit).
+
+    Callers must use this instead of reading ``get_audit_log()[-1]`` after a call to
+    ``authorize``: under concurrent requests the last audit entry can belong to a
+    different request.
+
     Target-aware authorization chokepoint.
 
     Called at every data-release point in node/store.py, queries.py, and
@@ -287,7 +295,7 @@ def authorize(
     }
     _audit_log.append(entry)
 
-    return decision == "PERMIT"
+    return decision == "PERMIT", reason
 
 
 
