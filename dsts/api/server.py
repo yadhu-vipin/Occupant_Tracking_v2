@@ -786,19 +786,27 @@ def _denied_response(q_type: str, template_fmt: str, caller_meta: dict, rule: st
     return out
 
 
-def _cached_exec(key: tuple, fn) -> tuple[dict, bool]:
+def _cached_exec(key: tuple, fn, audit_fn=None) -> tuple[dict, bool]:
     """Run `fn` (the already-authorized engine computation) through the result cache.
 
     The cache only ever sits *behind* the authorization decision: every request is
     authenticated, authorized and audited first, and `key` includes whatever the
     decision depends on, so a cached value can never be served across callers or
     disclosure levels.
+
+    ``audit_fn``, if provided, is called on *both* cache hits and misses so that
+    every query is recorded in the audit log regardless of whether it was served
+    from cache.  This prevents cache hits from silently bypassing the audit trail.
     """
     cached = _query_cache.get(key)
     if cached is not None:
+        if audit_fn is not None:
+            audit_fn(cache_hit=True)
         return cached, True
     value = fn()
     _query_cache.set(key, value)
+    if audit_fn is not None:
+        audit_fn(cache_hit=False)
     return value, False
 
 
@@ -905,14 +913,31 @@ def execute_query_endpoint(
                                     f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
 
         include_evidence = auth_inv  # only a Dean on an investigation/audit, in their own building
-        key = QueryCache.make_key(*base_key, caller_role=f"agg|evidence={include_evidence}")
+        # Key includes caller_id and caller_bld so Deans from different buildings never
+        # share a cache entry for the same building aggregate query.
+        key = QueryCache.make_key(*base_key,
+                                  caller_role=f"agg|{caller_id}|{caller_bld}|evidence={include_evidence}")
 
         def _run_building() -> dict:
             res = engine.Q1(building_id=building_id, after_time=at_time) if q_type == "Q1" \
                 else engine.Q2(building_id=building_id, at_time=at_time)
             return {"answer": res.answer, "evidence": res.evidence if include_evidence else []}
 
-        data, hit = _cached_exec(key, _run_building)
+        def _audit_building(cache_hit: bool) -> None:
+            """Write an audit entry for every building query, including cache hits.
+            Uses the public audit() API; deque.append is thread-safe so no explicit lock needed.
+            """
+            from security.authorize import audit as _sec_audit
+            _sec_audit(
+                "QUERY_AUDIT",
+                principal=caller_id,
+                query_type=q_type,
+                building_id=building_id,
+                purpose=parsed_purpose.value,
+                cache_hit=cache_hit,
+            )
+
+        data, hit = _cached_exec(key, _run_building, audit_fn=_audit_building)
         m.queries_executed_total.labels(query_type=q_type, status="success").inc()
         result = {
             "success": True,
@@ -1042,8 +1067,11 @@ def execute_query_endpoint(
             "error": f"{q_type} is a full trajectory query requiring L4_HISTORICAL_TRACK; caller only holds {decision.level.name}.",
         }
 
-    # Execute (cached behind the decision: the key carries the granted level and rule)
-    key = QueryCache.make_key(*base_key, caller_role=f"occ|{decision.level.name}|{decision.policy_rule}")
+    # Execute (cached behind the decision: the key carries the caller identity, granted
+    # disclosure level and the policy rule, so callers with different identities or
+    # different policy outcomes never share a cache entry even if all other parameters match).
+    key = QueryCache.make_key(*base_key,
+                              caller_role=f"occ|{caller_id}|{decision.level.name}|{decision.policy_rule}")
 
     def _run_occupant() -> dict:
         if q_type == "Q6":
@@ -1091,15 +1119,27 @@ def execute_query_endpoint(
 def metrics(request: Request, authorization: Optional[str] = Header(None)) -> Response:
     """Prometheus scrape endpoint.
 
-    Access: a Bearer token equal to DSTS_METRICS_TOKEN, or -- only when that variable is
-    unset -- a client on the loopback interface.
+    Access policy:
+    * When DSTS_METRICS_TOKEN is set: ONLY the bearer matching that token is admitted
+      (loopback address alone is NOT sufficient).
+    * When DSTS_METRICS_TOKEN is unset: loopback clients are admitted as a convenience
+      for local development; remote clients are always rejected.
+
+    This prevents a network-adjacent attacker from reading internal metrics even if
+    they somehow reach 127.0.0.1 (e.g. via SSRF), as long as the operator sets the token.
     """
     expected = os.environ.get("DSTS_METRICS_TOKEN", "")
     supplied = _strip_bearer(authorization) or ""
-    token_ok = bool(expected) and hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
     loopback = bool(request.client) and request.client.host in ("127.0.0.1", "::1", "localhost")
-    if not (token_ok or (not expected and loopback)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Metrics access denied.")
+    if expected:
+        # Token configured: ONLY a matching bearer is accepted; loopback alone is not enough.
+        token_ok = hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+        if not token_ok:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Metrics access denied.")
+    else:
+        # No token configured: fall back to loopback-only (local dev / CI convenience).
+        if not loopback:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Metrics access denied.")
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
