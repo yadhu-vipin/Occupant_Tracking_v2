@@ -22,6 +22,7 @@ import random
 import re
 import threading
 import time
+from datetime import datetime, time as dt_time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -465,6 +466,23 @@ def _quantize_hms(ts: str, minutes: int = 15) -> str:
     return f"{h:02d}:{(mi // minutes) * minutes:02d}"
 
 
+def determine_office_hours(query_time: Optional[str] = None) -> bool:
+    """Determine whether campus office hours (08:00:00 - 18:00:00) are active.
+
+    Supports dual-mode evaluation:
+      - Live policy mode (when DSTS_LIVE_POLICY=1): evaluates against real-world wall clock
+        (datetime.now()) to prevent off-hours callers from bypassing office-hour restrictions
+        on live endpoints by passing daytime timestamps.
+      - Replay mode (default for benchmark queries): evaluates against query_time (or at_time)
+        to faithfully reconstruct the privacy policy decision as of that historical event timestamp.
+    """
+    if os.environ.get("DSTS_LIVE_POLICY", "").lower() in ("1", "true", "yes"):
+        now_time = datetime.now().time()
+        return dt_time(8, 0, 0) <= now_time <= dt_time(18, 0, 0)
+    t = query_time or DEFAULT_AT_TIME
+    return "08:00:00" <= t <= "18:00:00"
+
+
 def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
     """Run every occupant in the snapshot through the persona/building policy for ``principal``.
 
@@ -477,7 +495,7 @@ def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str
         for row in rows:
             ts = row["timestamp"]
             ctx = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP,
-                               is_office_hours=("08:00:00" <= ts <= "18:00:00"),
+                               is_office_hours=determine_office_hours(ts),
                                authorized_investigation=False)
             d = evaluate_campus_query_policy(principal, row["occupant"], context=ctx, purpose=ctx.purpose,
                                              target_current_building=row["building_id"])
@@ -883,7 +901,7 @@ def execute_query_endpoint(
             detail=f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.",
         )
     auth_inv = (caller_role == "dean" and parsed_purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT))
-    is_office_hours = ("08:00:00" <= at_time <= "18:00:00")
+    is_office_hours = determine_office_hours(at_time)
 
     # 4. Target resolution
     target_id = (body.target_id or body.occupant_id or "").strip()

@@ -28,15 +28,21 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = Path(__file__).resolve().parent
-BUILDINGS_PROTOTYPE = HERE.parent.parent
+REPO_ROOT = HERE.parent.parent
 ZONES = ("z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8", "zT")
 
 
 def load_events() -> list[dict]:
-    path = BUILDINGS_PROTOTYPE / "dsts" / "output" / "phase4_results.json"
+    path = REPO_ROOT / "dsts" / "output" / "phase4_results.json"
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -112,7 +118,7 @@ def gather(event_id: str | None, candidates: int) -> dict:
     identified = event["identified_occupant_id"]
     occupants = list(occupant_probs)
 
-    db_path = BUILDINGS_PROTOTYPE / "nodes" / building / "state" / "visitor.db"
+    db_path = REPO_ROOT / "nodes" / building / "state" / "visitor.db"
     con = sqlite3.connect(str(db_path))
     cur = con.cursor()
 

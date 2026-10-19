@@ -55,7 +55,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -898,7 +898,7 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
         print(f"   {line}")
 
 
-def resolve_target_current_building(engine: QueryEngine, target_id: str, at_time: str) -> Optional[str]:
+def resolve_target_current_building(engine: QueryEngine, target_id: str, at_time: str) -> str | None:
     """Determine the target occupant's current building location at or before at_time."""
     home = engine._home_building(target_id)
     if engine.nodes_dir and home and (engine.nodes_dir / home).exists():

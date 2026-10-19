@@ -127,7 +127,7 @@ def build_event_rows(ground_truth, recognition_by_id, retrieval_by_id):
         row = {
             "event_id": event_id, "timestamp": truth["timestamp"],
             "occupant_id": truth["occupant_id"], "home_building": truth["home_building"],
-            "current_building": truth["current_building"], "current_zone": truth["current_zone"],
+            "current_building": truth["current_building"], "current_zone": truth.get("current_zone", "z1"),
             "event_type": "visitor" if visitor else "local",
         }
         if not visitor:
@@ -288,13 +288,24 @@ def run_evaluation(
     pointer_report = pointer_precision(n_dir, ground_truth)
     summary = summarize(rows, pointer_report)
 
-    # Incorporate phase4_results_path when present
+    # Incorporate and evaluate phase4_results when present
     p4_path = phase4_results_path or (ROOT / "dsts" / "output" / "phase4_results.json")
     if p4_path.exists():
         try:
             p4_data = json.loads(p4_path.read_text(encoding="utf-8"))
-            summary["phase4_events_count"] = len(p4_data) if isinstance(p4_data, list) else len(p4_data.keys())
-            summary["phase4_results_path"] = str(p4_path)
+            if isinstance(p4_data, list):
+                summary["phase4_events_count"] = len(p4_data)
+                summary["phase4_results_path"] = str(p4_path)
+                p4_by_id = {r["event_id"]: r for r in p4_data if "event_id" in r}
+                p4_correct = sum(
+                    1 for gt in ground_truth
+                    if p4_by_id.get(gt["event_id"], {}).get("identified_occupant_id") == gt["occupant_id"]
+                )
+                if ground_truth:
+                    summary["phase4_identification_accuracy"] = round(p4_correct / len(ground_truth), 4)
+            else:
+                summary["phase4_events_count"] = len(p4_data.keys())
+                summary["phase4_results_path"] = str(p4_path)
         except Exception:
             pass
 

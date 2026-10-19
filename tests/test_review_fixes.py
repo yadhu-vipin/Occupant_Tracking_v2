@@ -40,3 +40,89 @@ def test_audit_log_is_bounded():
 
 def test_identification_has_failures_list():
     assert Identification.__dataclass_fields__["failures"].default_factory is list
+
+
+def test_determine_office_hours_modes(monkeypatch):
+    from dsts.api.server import determine_office_hours
+
+    # 1. Replay mode (default): follows query timestamp
+    monkeypatch.delenv("DSTS_LIVE_POLICY", raising=False)
+    assert determine_office_hours("10:00:00") is True
+    assert determine_office_hours("14:30:00") is True
+    assert determine_office_hours("07:59:59") is False
+    assert determine_office_hours("19:00:00") is False
+
+    # 2. Live policy mode: uses wall clock
+    monkeypatch.setenv("DSTS_LIVE_POLICY", "1")
+    # Even if query says midnight, if wall clock is currently daytime it will match daytime
+    # Verify that query timestamp is ignored in live mode
+    from datetime import time as dt_time
+    # monkeypatch datetime to test deterministic wall clock
+    class FakeDateTime:
+        @classmethod
+        def now(cls):
+            class FakeNow:
+                @staticmethod
+                def time():
+                    return dt_time(11, 0, 0)
+            return FakeNow()
+
+    monkeypatch.setattr("dsts.api.server.datetime", FakeDateTime)
+    assert determine_office_hours("23:59:59") is True
+
+    class FakeDateTimeNight:
+        @classmethod
+        def now(cls):
+            class FakeNow:
+                @staticmethod
+                def time():
+                    return dt_time(22, 0, 0)
+            return FakeNow()
+
+    monkeypatch.setattr("dsts.api.server.datetime", FakeDateTimeNight)
+    assert determine_office_hours("12:00:00") is False
+
+
+def test_evaluate_pipeline_incorporates_phase4(tmp_path):
+    import json
+    from pipeline.evaluate_pipeline import run_evaluation
+
+    gt_file = tmp_path / "ground_truth.json"
+    rec_file = tmp_path / "recognition_results.json"
+    ret_file = tmp_path / "retrieval_attempts.json"
+    p4_file = tmp_path / "phase4_results.json"
+    out_dir = tmp_path / "output"
+
+    gt = [
+        {"event_id": "E1", "occupant_id": "0001", "home_building": "building_1", "current_building": "building_1", "current_zone": "z1", "timestamp": "08:00:00"},
+        {"event_id": "E2", "occupant_id": "0002", "home_building": "building_2", "current_building": "building_1", "current_zone": "z2", "timestamp": "08:05:00"},
+    ]
+    rec = [
+        {"event_id": "E1", "accepted": True, "predicted_occupant_id": "0001", "decision": "CORRECT_LOCAL", "score": 0.95},
+        {"event_id": "E2", "accepted": False, "predicted_occupant_id": None, "decision": "REJECT", "score": 0.2},
+    ]
+    ret = [
+        {"event_id": "E2", "shortlist": ["building_2"], "candidates_queried": 1, "verification_result": "CONFIRMED", "verified_building": "building_2", "verified_occupant_id": "0002"},
+    ]
+    p4 = [
+        {"event_id": "E1", "status": "IDENTIFIED", "identified_occupant_id": "0001"},
+        {"event_id": "E2", "status": "IDENTIFIED", "identified_occupant_id": "0002"},
+    ]
+
+    gt_file.write_text(json.dumps(gt), encoding="utf-8")
+    rec_file.write_text(json.dumps(rec), encoding="utf-8")
+    ret_file.write_text(json.dumps(ret), encoding="utf-8")
+    p4_file.write_text(json.dumps(p4), encoding="utf-8")
+
+    summary = run_evaluation(
+        ground_truth_path=gt_file,
+        recognition_results_path=rec_file,
+        retrieval_attempts_path=ret_file,
+        phase4_results_path=p4_file,
+        output_dir=out_dir,
+    )
+
+    assert summary["phase4_events_count"] == 2
+    assert summary["phase4_identification_accuracy"] == 1.0
+    assert "phase4_results_path" in summary
+

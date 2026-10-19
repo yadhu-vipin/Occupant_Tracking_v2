@@ -1,6 +1,6 @@
 """
-buildings_prototype/tests/test_secure_prototype.py — Security Integration Tests for Prototype Nodes
-==================================================================================================
+tests/test_secure_prototype.py — Security Integration Tests for Prototype Nodes
+==================================================================================
 Tests zero-trust security integration (X25519 ECDH, AES-128-GCM, Ed25519, Anti-Replay Guard, RBAC)
 for single & multi-building prototype nodes.
 """
@@ -10,11 +10,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PROTO_DIR = HERE.parent
-ROOT_DIR = PROTO_DIR.parent
+ROOT_DIR = HERE.parent
 
-if str(PROTO_DIR) not in sys.path:
-    sys.path.insert(0, str(PROTO_DIR))
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
