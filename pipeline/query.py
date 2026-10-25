@@ -1208,6 +1208,37 @@ def zone_disclosed_ids(caller_id: str, ids: list[str], context: QueryContext, bu
     return keep
 
 
+def aggregate_decision(q_type: str, *, include_evidence: bool, purpose: QueryPurpose,
+                       building_id: str = "", disclosed: int = 0) -> PolicyDecision:
+    """The decision behind a permitted building aggregate (Q1/Q2) or zone query (Q10/Q12/Q13).
+
+    These queries have no single target for the persona policy, so this
+    records what the access rules above granted: per-occupant evidence only
+    with investigation rights (``include_evidence``), counts otherwise.
+    Used for the response's decision block and to redact explanations.
+    """
+    context = QueryContext(purpose=purpose, authorized_investigation=include_evidence)
+    if q_type in ("Q1", "Q2"):
+        return PolicyDecision(
+            permitted=True,
+            level=DisclosureLevel.L4_HISTORICAL_TRACK if include_evidence else DisclosureLevel.L2_CURRENT_ZONE,
+            policy_rule="RULE_BUILDING_AGGREGATE",
+            reason="Building-level aggregate permitted; individual occupant IDs redacted unless an authorized investigation",
+            purpose=purpose, context=context, visitor_status="AGGREGATE",
+            exposed_fields=["building_id", "counts", "aggregate_metrics"],
+            redacted_fields=["individual_trajectories", "individual_occupant_ids", "biometric_data"],
+        )
+    return PolicyDecision(
+        permitted=True,
+        level=DisclosureLevel.L3_PRECISE_CURRENT if disclosed else DisclosureLevel.L2_CURRENT_ZONE,
+        policy_rule="RULE_ZONE_PER_OCCUPANT_FILTER",
+        reason=f"Zone query in {building_id}: each occupant filtered through persona/building policy (L3+ required to be listed)",
+        purpose=purpose, context=context, visitor_status="ZONE_MONITORING",
+        exposed_fields=["occupants (policy-permitted only)", "counts", "zone_id", "building_id"],
+        redacted_fields=["occupants (policy-denied)", "biometric_raw_gallery"],
+    )
+
+
 def _print_denied(rule: str, reason: str) -> None:
     print(f"  DENIED: {rule}")
     print(f"  Reason: {reason}")
