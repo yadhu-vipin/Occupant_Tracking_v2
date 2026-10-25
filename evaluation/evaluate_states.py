@@ -34,6 +34,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.paths import run_paths  # noqa: E402
+
 LEVELS = {
     "location": lambda building, zone: (building, zone),
     "building": lambda building, zone: building,
@@ -144,12 +146,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--ground-truth", type=Path, default=None,
                     help="default: events/output/state_truth.json if present, else ground_truth.json")
-    ap.add_argument("--phase4", type=Path, default=ROOT / "dsts" / "output" / "phase4_results.json")
-    ap.add_argument("--output-dir", type=Path, default=ROOT / "evaluate_pipeline" / "output")
+    ap.add_argument("--phase4", type=Path, default=run_paths().phase4_results)
+    ap.add_argument("--output-dir", type=Path, default=run_paths().results_dir)
     ap.add_argument("--dump-state", type=int, default=None, help="print one state's truth-vs-system table and exit")
     args = ap.parse_args(argv)
 
-    out = ROOT / "events" / "output"
+    out = run_paths().events_dir
     truth_path = args.ground_truth or (out / "state_truth.json" if (out / "state_truth.json").exists()
                                        else out / "ground_truth.json")
     gt = json.loads(truth_path.read_text(encoding="utf-8"))

@@ -62,6 +62,8 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.paths import run_paths  # noqa: E402
+
 VISITOR_BUCKETS = (
     "CORRECT",
     "PURE_ROUTING_MISS_ABSTAIN",
@@ -252,14 +254,14 @@ def summarize(rows, pointer_report):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ground-truth", type=Path, default=ROOT / "events" / "output" / "ground_truth.json")
+    ap.add_argument("--ground-truth", type=Path, default=run_paths().ground_truth)
     ap.add_argument("--recognition-results", type=Path,
-                    default=ROOT / "recognition" / "output" / "recognition_results.json")
+                    default=run_paths().recognition_results)
     ap.add_argument("--retrieval-attempts", type=Path,
-                    default=ROOT / "retrieval" / "output" / "retrieval_attempts.json")
-    ap.add_argument("--phase4-results", type=Path, default=ROOT / "dsts" / "output" / "phase4_results.json")
-    ap.add_argument("--nodes-dir", type=Path, default=ROOT / "nodes")
-    ap.add_argument("--output-dir", type=Path, default=ROOT / "evaluate_pipeline" / "output")
+                    default=run_paths().retrieval_attempts)
+    ap.add_argument("--phase4-results", type=Path, default=run_paths().phase4_results)
+    ap.add_argument("--nodes-dir", type=Path, default=run_paths().nodes_dir)
+    ap.add_argument("--output-dir", type=Path, default=run_paths().results_dir)
     return ap.parse_args(argv)
 
 
@@ -271,11 +273,11 @@ def run_evaluation(
     nodes_dir: Path | None = None,
     output_dir: Path | None = None,
 ) -> dict:
-    gt_path = ground_truth_path or (ROOT / "events" / "output" / "ground_truth.json")
-    rec_path = recognition_results_path or (ROOT / "recognition" / "output" / "recognition_results.json")
-    ret_path = retrieval_attempts_path or (ROOT / "retrieval" / "output" / "retrieval_attempts.json")
-    n_dir = nodes_dir or (ROOT / "nodes")
-    out_dir = output_dir or (ROOT / "evaluate_pipeline" / "output")
+    gt_path = ground_truth_path or (run_paths().ground_truth)
+    rec_path = recognition_results_path or (run_paths().recognition_results)
+    ret_path = retrieval_attempts_path or (run_paths().retrieval_attempts)
+    n_dir = nodes_dir or (run_paths().nodes_dir)
+    out_dir = output_dir or (run_paths().results_dir)
 
     ground_truth = json.loads(gt_path.read_text(encoding="utf-8"))
     recognition_results = json.loads(rec_path.read_text(encoding="utf-8"))
@@ -289,7 +291,7 @@ def run_evaluation(
     summary = summarize(rows, pointer_report)
 
     # Incorporate phase4_results_path when present
-    p4_path = phase4_results_path or (ROOT / "dsts" / "output" / "phase4_results.json")
+    p4_path = phase4_results_path or (run_paths().phase4_results)
     if p4_path.exists():
         try:
             p4_data = json.loads(p4_path.read_text(encoding="utf-8"))

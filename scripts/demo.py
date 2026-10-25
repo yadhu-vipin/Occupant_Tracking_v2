@@ -22,6 +22,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from shared.paths import run_paths  # noqa: E402
 from secure_transfer.handler import SecureBuildingNodeHandler
 from evaluation.evaluate_events import run_evaluation
 from pipeline.query import (
@@ -175,10 +176,10 @@ def stage4_demo_simulation_and_rbac(engine: QueryEngine) -> Dict[str, Any]:
     log_section("Stage 4: Demo Simulation & Building-Scoped Hierarchical RBAC (A > B > C)")
     
     print("[4.1] Running query battery demo simulation...")
-    run_demo(ROOT_DIR / "nodes")
+    run_demo(run_paths().nodes_dir)
 
     print("\n[4.2] Executing Targeted Explainable Query Scenarios...")
-    roles_dir = ROOT_DIR / "variants" / "rbac10"
+    roles_dir = run_paths().roles_dir
     deans_by_building = json.loads((roles_dir / "deans_by_building.json").read_text())
     roles, rosters = load_real_registry()
 
@@ -284,7 +285,7 @@ def stage4_demo_simulation_and_rbac(engine: QueryEngine) -> Dict[str, Any]:
 def stage5_generate_reports(sec_res: Dict[str, Any], eval_res: Dict[str, Any],
                            track_res: Dict[str, Any], rbac_res: Dict[str, Any]) -> None:
     log_section("Stage 5: Final Report Generation")
-    reports_dir = ROOT_DIR / "reports"
+    reports_dir = run_paths().reports_dir
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     json_report_path = reports_dir / "system_execution_report.json"
@@ -363,7 +364,7 @@ def execute_single_run(run_idx: int = 1, total_runs: int = 1) -> Dict[str, Any]:
     eval_results = stage2_evaluation_metrics()
 
     # Step 3: Setup Engine and Real Registry
-    engine = build_engine(ROOT_DIR / "nodes")
+    engine = build_engine(run_paths().nodes_dir)
     roles, rosters = load_real_registry()
     register_real_registry(roles, rosters, engine)
 
@@ -432,7 +433,7 @@ def main():
         print(f"  Critical Flaws Detected:   0 (Zero reliability issues detected)")
 
         # Update summary markdown with multi-run certification
-        summary_md = ROOT_DIR / "reports" / "system_execution_summary.md"
+        summary_md = run_paths().reports_dir / "system_execution_summary.md"
         if summary_md.exists():
             multi_run_appendix = f"""
 ---

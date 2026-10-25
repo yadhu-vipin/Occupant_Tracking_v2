@@ -9,15 +9,19 @@ from fastapi.testclient import TestClient
 
 import dsts.api.server as srv
 from dsts.api.server import app, _get_engine
+from access_control.personas import resolve_personas
+
+P = resolve_personas()
+pytestmark = pytest.mark.needs_run
 from access_control.campus_policy import get_occupant_building
 from access_control.tokens import issue_token, verify_token
 
 client = TestClient(app)
 
-DEAN5 = "0001738"       # Dean, building_5
-TEACHER5 = "0000362"    # Teacher, building_5
-STUDENT5 = "0000168"    # Student, building_5
-TARGET5 = "0000102"     # Student, building_5
+DEAN5 = P.dean       # Dean, building_5
+TEACHER5 = P.teacher    # Teacher, building_5
+STUDENT5 = P.student    # Student, building_5
+TARGET5 = P.target     # Student, building_5
 
 
 @pytest.fixture(autouse=True)
@@ -47,17 +51,17 @@ def q(pid, **body):
 # ───────────────────────── tokens ─────────────────────────
 
 def test_token_roundtrip_and_tamper_and_expiry():
-    t = issue_token("0001738", ttl_seconds=60)
-    assert verify_token(t) == "0001738"
+    t = issue_token(P.dean, ttl_seconds=60)
+    assert verify_token(t) == P.dean
     payload, sig = t.split(".")
     assert verify_token(payload + "." + sig[:-2] + "AA") is None          # bad signature
-    forged = issue_token("0000102").split(".")[0] + "." + sig               # payload swapped, old signature
+    forged = issue_token(P.target).split(".")[0] + "." + sig               # payload swapped, old signature
     assert verify_token(forged) is None
-    assert verify_token(issue_token("0001738", ttl_seconds=-1)) is None     # expired
+    assert verify_token(issue_token(P.dean, ttl_seconds=-1)) is None     # expired
     assert verify_token("garbage") is None and verify_token(None) is None
 
 
-@pytest.mark.parametrize("bad", ["0001738", "dsts-token-0001738", "token-0001738", "dsts-dean-token", "dean-token", "bearer-0001738"])
+@pytest.mark.parametrize("bad", [P.dean, "dsts-token-0001738", "token-0001738", "dsts-dean-token", "dean-token", "bearer-0001738"])
 def test_guessable_credentials_are_rejected(bad):
     """Previously an occupant ID or a preset string WAS the credential."""
     r = client.post("/api/query", headers={"Authorization": f"Bearer {bad}"}, json={"query_type": "Q6"})
@@ -270,7 +274,7 @@ def test_reset_keeps_audit_log():
 # ───────────────────────── websocket ─────────────────────────
 
 def test_websocket_rejects_unsigned_tokens():
-    for bad in ("0001738", "dsts-dean-token"):
+    for bad in (P.dean, "dsts-dean-token"):
         with pytest.raises(Exception):
             with client.websocket_connect(f"/ws/live?token={bad}"):
                 pass

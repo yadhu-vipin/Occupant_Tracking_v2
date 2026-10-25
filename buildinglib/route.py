@@ -74,13 +74,14 @@ if __name__ == "__main__":
 
     from buildinglib.artifact import load_building
     from buildinglib.params import load_params
+    from shared.paths import run_paths
 
     p = load_params()
     raw = np.load(cfg.EMB_FILE)
     meta = pd.read_csv(cfg.META_FILE)
 
     hyperplanes = random_hyperplanes(p.embed_dim, p.k, p.L, seed=p.seed)
-    filters = {f"building_{i}": load_building(HERE.parent / "out" / f"building_{i}.npz").bloom
+    filters = {f"building_{i}": load_building(run_paths().filters_dir / f"building_{i}.npz").bloom
                for i in range(1, 11)}
     names = list(filters)
 

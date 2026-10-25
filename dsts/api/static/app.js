@@ -28,7 +28,8 @@ const state = {
 
   persona: "dean",
 
-  tokens: {}
+  tokens: {},
+  principals: {}
 };
 
 
@@ -85,16 +86,48 @@ async function loginPersona(persona) {
 
   }
 
-  return (await response.json()).token;
+  return await response.json();
 
+}
+
+
+function applyPersonaIds() {
+  const p = state.principals;
+  const chip = (selector, attr, id, label) => {
+    const el = $(selector);
+    if (!el || !id) return;
+    el.dataset[attr] = id;
+    el.textContent = `${label} (${id})`;
+  };
+  chip("#chip-target", "target", p.target, "Student");
+  chip("#chip-teacher", "target", p.teacher, "Teacher");
+  chip("#chip-outsider", "target", p.outsider, "Other building");
+  chip("#caller-dean", "caller", p.dean, "Dean A");
+  chip("#caller-teacher", "caller", p.teacher, "Teacher B");
+  chip("#caller-student", "caller", p.student, "Student C");
+  if ($("#q-occupant") && !$("#q-occupant").value && p.target) $("#q-occupant").value = p.target;
+  if ($("#q-caller") && !$("#q-caller").value && p.dean) $("#q-caller").value = p.dean;
 }
 
 
 async function loginAllPersonas() {
 
   for (const persona of PERSONAS) {
-    state.tokens[persona] = await loginPersona(persona);
+    const login = await loginPersona(persona);
+    state.tokens[persona] = login.token;
+    state.principals[persona] = login.principal;
   }
+
+  // Ids of the demo target / an out-of-building student come from the active run's roles (nothing is hardcoded).
+  for (const extra of ["target", "outsider"]) {
+    try {
+      state.principals[extra] = (await loginPersona(extra)).principal;
+    } catch (error) {
+      /* optional quick pick */
+    }
+  }
+
+  applyPersonaIds();
 
   state.activeToken = state.tokens[state.persona] || null;
 
@@ -1458,9 +1491,6 @@ $all(".btn-chip").forEach((btn) => {
   btn.addEventListener("click", () => {
     if (btn.dataset.target && $("#q-occupant")) {
       $("#q-occupant").value = btn.dataset.target;
-      if (btn.dataset.target === "0000477" && $("#q-time")) {
-        $("#q-time").value = "08:30:05";
-      }
     }
     if (btn.dataset.caller && $("#q-caller")) {
       $("#q-caller").value = btn.dataset.caller;
@@ -1503,7 +1533,7 @@ if ($("#btn-query")) {
 
 function executeCurrentQuery() {
   const qType = $("#q-type") ? $("#q-type").value : "Q6";
-  const callerId = $("#q-caller") ? $("#q-caller").value.trim() : "0001738";
+  const callerId = $("#q-caller") ? $("#q-caller").value.trim() : (state.principals.dean || "");
   const targetId = $("#q-occupant") ? $("#q-occupant").value.trim() : "";
   const buildingId = $("#q-building") ? $("#q-building").value : "building_5";
   const zone = $("#q-zone") ? $("#q-zone").value : "z1";
@@ -2032,15 +2062,15 @@ function setupVoiceQuery() {
       if (parsed.role) {
         const rNorm = parsed.role.toLowerCase();
         if (rNorm === "dean") {
-          if ($("#q-caller")) $("#q-caller").value = "0001738";
+          if ($("#q-caller")) $("#q-caller").value = state.principals.dean || "";
           setPersona("dean");
           if ($("#header-role")) $("#header-role").textContent = "DEAN A";
         } else if (rNorm === "teacher") {
-          if ($("#q-caller")) $("#q-caller").value = "0000362";
+          if ($("#q-caller")) $("#q-caller").value = state.principals.teacher || "";
           setPersona("teacher");
           if ($("#header-role")) $("#header-role").textContent = "TEACHER B";
         } else if (rNorm === "student") {
-          if ($("#q-caller")) $("#q-caller").value = "0000168";
+          if ($("#q-caller")) $("#q-caller").value = state.principals.student || "";
           setPersona("student");
           if ($("#header-role")) $("#header-role").textContent = "STUDENT C";
         }
@@ -2061,8 +2091,8 @@ function setupVoiceQuery() {
 
       runQuery({
         query_type: "Q6",
-        caller_id: $("#q-caller") ? $("#q-caller").value.trim() : "0001738",
-        target_id: $("#q-occupant") ? $("#q-occupant").value.trim() : (parsed.occupant_id || "0000102"),
+        caller_id: $("#q-caller") ? $("#q-caller").value.trim() : (state.principals.dean || ""),
+        target_id: $("#q-occupant") ? $("#q-occupant").value.trim() : (parsed.occupant_id || state.principals.target || ""),
         zone: $("#q-zone") ? $("#q-zone").value.trim() : (parsed.zone || "z1"),
       });
     };

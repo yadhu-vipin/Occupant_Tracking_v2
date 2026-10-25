@@ -37,6 +37,7 @@ import sys                                          # noqa: E402
 if str(_BUILDINGS) not in sys.path:
     sys.path.insert(0, str(_BUILDINGS))
 
+from shared.paths import run_paths  # noqa: E402
 from buildinglib._vendored.lsh import encode_with_margins, preprocess, random_hyperplanes  # noqa: E402
 from buildinglib.artifact import load_building        # noqa: E402
 from buildinglib.node import (BuildingNode as RoutingNode, Identification, RoutingContract,  # noqa: E402
@@ -534,7 +535,7 @@ def list_building_dirs(nodes_dir):
 if __name__ == "__main__":
     import pandas as pd
 
-    nodes_dir = _BUILDINGS / "nodes"
+    nodes_dir = run_paths().nodes_dir
     ids = list_building_dirs(nodes_dir)
     if len(ids) < 2:
         raise SystemExit(

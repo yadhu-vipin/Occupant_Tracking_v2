@@ -1,0 +1,20 @@
+# One file for every knob of an experiment run. Anything not listed keeps the default in the code.
+
+population:
+  n_buildings: 10          # buildings on the campus
+  per_building: 50         # registered occupants per building (n_buildings * per_building = identities used)
+  default_seed: 42         # run used when no --seed / DSTS_SEED is given
+
+events:
+  n_days: 14               # simulated days (events carry a date)
+  start_date: "2026-01-05" # first simulated day
+  events_per_occupant_per_day: 4
+  visitor_ratio: 0.20      # share of an occupant's events spent as a visitor elsewhere
+  frequent_visitor_fraction: 0.25   # occupants who keep returning to one favourite other building
+
+visitor_pool:
+  # A visitor's 20 reference embeddings are cached for the whole simulated day. Once a visitor has
+  # entered a building often enough inside a window, his NEXT entry stores them permanently.
+  promote_when:
+    - {window_days: 7,  min_entries: 3}
+    - {window_days: 30, min_entries: 8}

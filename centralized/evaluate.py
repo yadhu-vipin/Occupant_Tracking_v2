@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from shared.paths import run_paths  # noqa: E402
 from buildinglib.split import default_emb_path, default_meta_path, normalise_occupant_ids
 from recognition.contract import load_local_recognition_contract
 from .baseline import CentralizedBaseline
@@ -62,12 +63,12 @@ def compare(central_rows, decentralized_rows):
 def main():
     here = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description="Run the centralized baseline and compare existing Phase 3 results.")
-    parser.add_argument("--events", type=Path, default=here / "events" / "output" / "generated_events.json")
-    parser.add_argument("--ground-truth", type=Path, default=here / "events" / "output" / "ground_truth.json")
-    parser.add_argument("--decentralized", type=Path, default=here / "retrieval" / "output" / "retrieval_results.json")
+    parser.add_argument("--events", type=Path, default=run_paths().generated_events)
+    parser.add_argument("--ground-truth", type=Path, default=run_paths().ground_truth)
+    parser.add_argument("--decentralized", type=Path, default=run_paths().retrieval_dir / "retrieval_results.json")
     parser.add_argument("--emb", type=Path, default=default_emb_path())
     parser.add_argument("--meta", type=Path, default=default_meta_path())
-    parser.add_argument("--output-dir", type=Path, default=here / "centralized" / "output")
+    parser.add_argument("--output-dir", type=Path, default=run_paths().results_dir / "centralized")
     args = parser.parse_args()
     decentralized = json.loads(args.decentralized.read_text(encoding="utf-8"))
     cohort_ids = {row["event_id"] for row in decentralized if row["event_type"] == "visitor"}

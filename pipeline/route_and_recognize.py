@@ -47,6 +47,7 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.paths import run_paths  # noqa: E402
 from buildinglib._vendored.lsh import encode_with_margins, preprocess          # noqa: E402
 from buildinglib.artifact import load_building                                  # noqa: E402
 from buildinglib.node import BuildingNode, load_routing_contract                # noqa: E402
@@ -261,18 +262,18 @@ def run_phase3_cli(args):
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--phase", type=int, choices=(2, 3), required=True)
-    ap.add_argument("--events", type=Path, default=ROOT / "events" / "output" / "generated_events.json")
+    ap.add_argument("--events", type=Path, default=run_paths().generated_events)
     ap.add_argument("--meta", type=Path, default=default_meta_path())
     ap.add_argument("--emb", type=Path, default=default_emb_path())
-    ap.add_argument("--recognition-output-dir", type=Path, default=ROOT / "recognition" / "output")
+    ap.add_argument("--recognition-output-dir", type=Path, default=run_paths().recognition_dir)
     ap.add_argument("--local-results", type=Path,
-                    default=ROOT / "recognition" / "output" / "recognition_results.json",
+                    default=run_paths().recognition_results,
                     help="phase 3: Phase 2's output to read local rejections from")
-    ap.add_argument("--artifacts", type=Path, default=ROOT / "out", help="phase 3: published Bloom filters")
-    ap.add_argument("--nodes-dir", type=Path, default=ROOT / "nodes",
+    ap.add_argument("--artifacts", type=Path, default=run_paths().filters_dir, help="phase 3: published Bloom filters")
+    ap.add_argument("--nodes-dir", type=Path, default=run_paths().nodes_dir,
                     help="phase 3: deployment folders, for pointer minting")
     ap.add_argument("--retrieval-output", type=Path,
-                    default=ROOT / "retrieval" / "output" / "retrieval_attempts.json")
+                    default=run_paths().retrieval_attempts)
     return ap.parse_args(argv)
 
 

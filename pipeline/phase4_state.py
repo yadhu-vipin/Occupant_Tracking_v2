@@ -80,6 +80,7 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.paths import run_paths  # noqa: E402
 from buildinglib._vendored.lsh import preprocess
 from buildinglib.node import load_routing_contract
 from buildinglib.refs import reference_tensor
@@ -363,13 +364,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="Phase 4: Definition 3.3 probability generation + BSTS state integration."
     )
-    parser.add_argument("--events", type=Path, default=here / "events" / "output" / "generated_events.json")
+    parser.add_argument("--events", type=Path, default=run_paths().generated_events)
     parser.add_argument("--recognition-results", type=Path,
-                        default=here / "recognition" / "output" / "recognition_results.json")
+                        default=run_paths().recognition_results)
     parser.add_argument("--retrieval-attempts", type=Path,
-                        default=here / "retrieval" / "output" / "retrieval_attempts.json")
-    parser.add_argument("--nodes-dir", type=Path, default=here / "nodes")
-    parser.add_argument("--output-dir", type=Path, default=here / "dsts" / "output")
+                        default=run_paths().retrieval_attempts)
+    parser.add_argument("--nodes-dir", type=Path, default=run_paths().nodes_dir)
+    parser.add_argument("--output-dir", type=Path, default=run_paths().state_dir)
     parser.add_argument("--emb", type=Path, default=default_emb_path())
     parser.add_argument("--meta", type=Path, default=default_meta_path())
     args = parser.parse_args()

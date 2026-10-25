@@ -23,11 +23,12 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.paths import run_paths  # noqa: E402
 from buildinglib.split import default_emb_path, default_meta_path        # noqa: E402
 from events.generator import EventGenerator, GenerationConfig, print_report  # noqa: E402
 from events.io import save_events                                          # noqa: E402
 
-DEFAULT_OUTPUT_DIR = ROOT / "events" / "output"
+DEFAULT_OUTPUT_DIR = run_paths().events_dir
 
 
 def _normalise_clock(value: str) -> str:

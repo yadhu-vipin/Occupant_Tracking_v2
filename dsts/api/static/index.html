@@ -620,14 +620,13 @@
                 <div id="field-target-container">
                   <label class="form-field">
                     <span>TARGET OCCUPANT ID</span>
-                    <input id="q-occupant" placeholder="e.g. 0000102, 0000477..." value="0000102" />
+                    <input id="q-occupant" placeholder="Target occupant ID (quick pick below)" value="" />
                   </label>
                   <div style="display: flex; gap: 6px; margin-top: -6px; margin-bottom: 12px; flex-wrap: wrap;">
                     <span style="font-size: 11px; color: var(--muted-2); align-self: center;">Quick pick:</span>
-                    <button type="button" class="btn-chip" data-target="0000102" title="Student in B5">0000102 (B5 Student)</button>
-                    <button type="button" class="btn-chip" data-target="0000477" title="Student in B4 visiting B5 at 08:30:05">0000477 (B5 Visitor)</button>
-                    <button type="button" class="btn-chip" data-target="0000362" title="Teacher in B5">0000362 (B5 Teacher)</button>
-                    <button type="button" class="btn-chip" data-target="0004741" title="Student in B3">0004741 (B3 External)</button>
+                    <button type="button" class="btn-chip" id="chip-target" data-target="" title="A student on the teacher's roster">Student</button>
+                    <button type="button" class="btn-chip" id="chip-teacher" data-target="" title="Teacher in the Dean's building">Teacher</button>
+                    <button type="button" class="btn-chip" id="chip-outsider" data-target="" title="Student registered in another building">Other building</button>
                   </div>
                 </div>
 
@@ -690,14 +689,14 @@
 
                   <label class="form-field" style="margin-top: 8px;">
                     <span>CALLER OCCUPANT ID</span>
-                    <input id="q-caller" placeholder="Caller ID (e.g. 0001738)" value="0001738" />
+                    <input id="q-caller" placeholder="Caller ID (quick pick below)" value="" />
                   </label>
 
                   <div style="display: flex; gap: 6px; margin-top: -6px; margin-bottom: 12px; flex-wrap: wrap;">
                     <span style="font-size: 11px; color: var(--muted-2); align-self: center;">Personas:</span>
-                    <button type="button" class="btn-chip" data-caller="0001738" data-role="dean" title="Dean of building_5">Dean A (0001738)</button>
-                    <button type="button" class="btn-chip" data-caller="0000362" data-role="teacher" title="Teacher in building_5">Teacher B (0000362)</button>
-                    <button type="button" class="btn-chip" data-caller="0000168" data-role="student" title="Student in building_5">Student C (0000168)</button>
+                    <button type="button" class="btn-chip" id="caller-dean" data-caller="" data-role="dean" title="Dean of the demo building">Dean A</button>
+                    <button type="button" class="btn-chip" id="caller-teacher" data-caller="" data-role="teacher" title="Teacher in the demo building">Teacher B</button>
+                    <button type="button" class="btn-chip" id="caller-student" data-caller="" data-role="student" title="Student in the demo building">Student C</button>
                   </div>
 
                   <label class="form-field">

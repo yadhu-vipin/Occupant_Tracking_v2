@@ -18,31 +18,18 @@ import pandas as pd
 BUILDING_COL = "building"
 OCCUPANT_COL = "occupant_id"
 
-_BUILDINGS_DIR = Path(__file__).resolve().parent.parent      # lane_a/buildings/
-_LANE_DIR = _BUILDINGS_DIR.parent                            # lane_a/
+from shared.paths import CORPUS_DIR, run_paths
 
 
 def default_emb_path():
-    """Where the CLIs look for ``emb_arcface.npy``.
-
-    ``buildings/corpus/`` first (the self-contained spot a teammate drops it),
-    then the full ``lane_a/`` pipeline layout for anyone who has that.
-    """
-    for p in (_BUILDINGS_DIR / "corpus" / "emb_arcface.npy",
-              _LANE_DIR / "embeddings_arcface" / "emb_arcface.npy"):
-        if p.exists():
-            return p
-    return _BUILDINGS_DIR / "corpus" / "emb_arcface.npy"     # the path to tell the user
+    """Where the CLIs look for ``emb_arcface.npy`` (the corpus is shared by every run)."""
+    return CORPUS_DIR / "emb_arcface.npy"
 
 
 def default_meta_path():
-    """Where the CLIs look for ``meta.csv`` -- either shipped copy works."""
-    for p in (_BUILDINGS_DIR / "corpus" / "meta.csv",
-              _LANE_DIR / "artifacts" / "meta.csv",
-              _LANE_DIR / "embeddings_arcface" / "meta.csv"):
-        if p.exists():
-            return p
-    return _BUILDINGS_DIR / "corpus" / "meta.csv"
+    """The active run's ``corpus_meta.csv`` (who is registered where) when it exists, else the raw corpus ``meta.csv``."""
+    run_meta = run_paths().corpus_meta
+    return run_meta if run_meta.exists() else CORPUS_DIR / "meta.csv"
 
 
 def normalise_occupant_ids(meta):

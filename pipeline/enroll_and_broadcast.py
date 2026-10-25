@@ -41,16 +41,13 @@ from buildinglib.artifact import load_building, save_building                  #
 from buildinglib.enroll import enroll_building                                  # noqa: E402
 from buildinglib.params import ContractMismatch, check_vendored, load_params   # noqa: E402
 from buildinglib.refs import reference_tensor                                   # noqa: E402
-from buildinglib.split import (default_emb_path, default_meta_path,            # noqa: E402
-                               list_buildings, split_building)
+from buildinglib.split import default_emb_path, list_buildings, split_building  # noqa: E402
 from dsts.state.store import FakeOccupantRegistry                       # noqa: E402
 from nodelib.deploy import DeployedBuilding, PointerStore, SplitSqliteStore, write_node_config  # noqa: E402
+from shared.paths import run_paths                                              # noqa: E402
 
 DEFAULT_EMB = default_emb_path()
-DEFAULT_META = default_meta_path()
 DEFAULT_SHARED = ROOT / "shared"
-DEFAULT_FILTERS_OUT = ROOT / "out"
-DEFAULT_NODES_OUT = ROOT / "nodes"
 
 
 def parse_args(argv=None):
@@ -60,15 +57,22 @@ def parse_args(argv=None):
     target.add_argument("--building-id", help="build just this building, e.g. building_3")
     target.add_argument("--all", action="store_true", help="build every building in the meta")
     ap.add_argument("--emb", type=Path, default=DEFAULT_EMB, help="full embeddings .npy")
-    ap.add_argument("--meta", type=Path, default=DEFAULT_META, help="full meta .csv")
+    ap.add_argument("--seed", type=int, default=None, help="population seed (run folder runs/seed_XX)")
+    ap.add_argument("--run-dir", type=Path, default=None, help="run folder (overrides --seed / $DSTS_RUN_DIR)")
+    ap.add_argument("--meta", type=Path, default=None, help="full meta .csv (default: the run's corpus_meta.csv)")
     ap.add_argument("--shared", type=Path, default=DEFAULT_SHARED, help="contract dir")
-    ap.add_argument("--filters-out", type=Path, default=DEFAULT_FILTERS_OUT,
-                    help="where published Bloom filter artifacts land (default ./out)")
-    ap.add_argument("--nodes-out", type=Path, default=DEFAULT_NODES_OUT,
-                    help="where deployment folders land (default ./nodes)")
+    ap.add_argument("--filters-out", type=Path, default=None,
+                    help="where published Bloom filter artifacts land (default: the run's filters/)")
+    ap.add_argument("--nodes-out", type=Path, default=None,
+                    help="where deployment folders land (default: the run's nodes/)")
     ap.add_argument("--force", action="store_true",
                     help="overwrite an existing artifact/folder")
-    return ap.parse_args(argv)
+    args = ap.parse_args(argv)
+    paths = run_paths(args.seed, args.run_dir)
+    args.meta = args.meta or paths.corpus_meta
+    args.filters_out = args.filters_out or paths.filters_dir
+    args.nodes_out = args.nodes_out or paths.nodes_dir
+    return args
 
 
 def enroll_one(raw, meta, building_id, params, filters_out, force):

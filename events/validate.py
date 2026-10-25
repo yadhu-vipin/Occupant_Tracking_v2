@@ -8,6 +8,7 @@ import pandas as pd
 
 from buildinglib.split import default_emb_path, default_meta_path, list_buildings, normalise_occupant_ids
 from dsts.state.zones import ZONE_ADJACENCY, ZONES
+from shared.paths import run_paths
 from .io import load_events
 
 
@@ -86,9 +87,8 @@ def validate_state_truth(states, ground_truth):
 def main():
     parser = argparse.ArgumentParser(description="Validate Stage 1 observable events and ground truth.")
     parser.add_argument("--state-truth", type=Path, default=None, help="also validate this state_truth.json")
-    here = Path(__file__).resolve().parent
-    parser.add_argument("--events", type=Path, default=here / "output" / "generated_events.json")
-    parser.add_argument("--ground-truth", type=Path, default=here / "output" / "ground_truth.json")
+    parser.add_argument("--events", type=Path, default=run_paths().generated_events)
+    parser.add_argument("--ground-truth", type=Path, default=run_paths().ground_truth)
     parser.add_argument("--meta", type=Path, default=default_meta_path())
     parser.add_argument("--emb", type=Path, default=default_emb_path())
     args = parser.parse_args()

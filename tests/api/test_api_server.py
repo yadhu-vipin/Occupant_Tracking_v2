@@ -20,14 +20,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dsts.api.server import app, _get_engine
+from access_control.personas import resolve_personas
+
+P = resolve_personas()
+pytestmark = pytest.mark.needs_run
 from access_control.tokens import issue_token
 
 client = TestClient(app)
 
 # Signed tokens (the server only accepts tokens it minted itself)
-DEAN_TOKEN = issue_token("0001738")      # Dean, building_5
-TEACHER_TOKEN = issue_token("0000362")   # Teacher, building_5
-STUDENT_TOKEN = issue_token("0000168")   # Student, building_5
+DEAN_TOKEN = issue_token(P.dean)      # Dean, building_5
+TEACHER_TOKEN = issue_token(P.teacher)   # Teacher, building_5
+STUDENT_TOKEN = issue_token(P.student)   # Student, building_5
 
 
 @pytest.fixture(autouse=True)
@@ -68,7 +72,7 @@ def test_query_spoofed_caller_id_returns_403():
     resp = client.post(
         "/api/query",
         headers={"Authorization": f"Bearer {STUDENT_TOKEN}"},
-        json={"query_type": "Q6", "caller_id": "0001738"},
+        json={"query_type": "Q6", "caller_id": P.dean},
     )
     assert resp.status_code == 403
     assert "Caller ID mismatch" in resp.json()["detail"]
@@ -79,7 +83,7 @@ def test_query_authenticated_dean_succeeds():
     resp = client.post(
         "/api/query",
         headers={"Authorization": f"Bearer {DEAN_TOKEN}"},
-        json={"query_type": "Q6", "target_id": "0000102"},
+        json={"query_type": "Q6", "target_id": P.target},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -98,7 +102,7 @@ def test_student_cannot_assert_security_investigation():
         headers={"Authorization": f"Bearer {STUDENT_TOKEN}"},
         json={
             "query_type": "Q6",
-            "target_id": "0000102",
+            "target_id": P.target,
             "purpose": "security_investigation",
         },
     )
@@ -113,7 +117,7 @@ def test_teacher_cannot_assert_security_investigation():
         headers={"Authorization": f"Bearer {TEACHER_TOKEN}"},
         json={
             "query_type": "Q6",
-            "target_id": "0000102",
+            "target_id": P.target,
             "purpose": "audit",
         },
     )
@@ -140,7 +144,7 @@ def test_occupancy_student_sees_no_peer_students():
     """Anti-stalking: a student's live view never lists another student, at any precision."""
     from pipeline.query import get_real_role
     for zone, r in _occupancy(STUDENT_TOKEN):
-        assert r["occupant"] == "0000168" or get_real_role(r["occupant"]) != "student", r
+        assert r["occupant"] == P.student or get_real_role(r["occupant"]) != "student", r
         assert r["building_id"] == "building_5" or r["home_building"] == "building_5"
 
 
@@ -264,7 +268,7 @@ def test_b1_student_peer_lookup_denied():
         headers={"Authorization": f"Bearer {STUDENT_TOKEN}"},
         json={
             "query_type": "Q6",
-            "target_id": "0000102",
+            "target_id": P.target,
         },
     )
     assert resp.status_code == 200
@@ -385,7 +389,7 @@ def test_query_cache_hit():
     """Consecutive identical authorized queries return cache hits."""
     params = {
         "query_type": "Q6",
-        "target_id": "0000102",
+        "target_id": P.target,
         "time_t": "12:00:00",
     }
     r1 = client.post("/api/query", headers={"Authorization": f"Bearer {DEAN_TOKEN}"}, json=params)
@@ -416,7 +420,7 @@ def test_b3_websocket_authenticated_snapshot():
     with client.websocket_connect(f"/ws/live?token={DEAN_TOKEN}") as ws:
         msg = ws.receive_json()
         assert msg["type"] == "connected"
-        assert msg["principal"] == "0001738"
+        assert msg["principal"] == P.dean
         assert "heatmap" in msg
 
 
@@ -453,9 +457,9 @@ def test_b8_concurrent_requests_state_integrity():
         )
 
     tasks = [
-        (DEAN_TOKEN, "Q6", "0000102"),
-        (STUDENT_TOKEN, "Q6", "0000102"),
-        (TEACHER_TOKEN, "Q6", "0000102"),
+        (DEAN_TOKEN, "Q6", P.target),
+        (STUDENT_TOKEN, "Q6", P.target),
+        (TEACHER_TOKEN, "Q6", P.target),
         (DEAN_TOKEN, "Q1", ""),
         (STUDENT_TOKEN, "Q1", ""),
     ] * 4

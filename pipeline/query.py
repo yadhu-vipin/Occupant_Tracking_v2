@@ -67,6 +67,7 @@ ROOT_DIR = HERE.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from shared.paths import run_paths  # noqa: E402
 from dsts.state.zones import ZONES, zone_label, zone_sector          # noqa: E402
 from nodelib.deploy import PointerStore                                      # noqa: E402
 from access_control.authorize import (                                            # noqa: E402
@@ -80,11 +81,11 @@ from access_control.campus_policy import (                                      
     register_occupant_current_building,
 )
 
-DEFAULT_PHASE4_RESULTS = ROOT_DIR / "dsts" / "output" / "phase4_results.json"
-DEFAULT_NODES_DIR = ROOT_DIR / "nodes"
+DEFAULT_PHASE4_RESULTS = run_paths().phase4_results
+DEFAULT_NODES_DIR = run_paths().nodes_dir
 INTERNAL_ZONES = frozenset(ZONES) - {"zT"}
 TRANSITION_ZONE = "zT"
-ROLES_DIR = ROOT_DIR / "variants" / "rbac10"
+ROLES_DIR = run_paths().roles_dir
 DEFAULT_AT_TIME = "23:59:59"   # "as of end of day" -> most recent known detection
 TRAJECTORY_QUERIES = {"Q3", "Q4", "Q5", "Q7", "Q8", "Q9", "Q11", "TRACK"}   # require L4 outright, no partial redaction
 

@@ -42,8 +42,9 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
     generate_latest,
 )
-import yaml
 
+
+from shared.paths import run_paths  # noqa: E402
 from dsts.api import metrics as m
 from dsts.state.zones import ZONES, zone_label, zone_sector
 from pipeline.query import (
@@ -60,6 +61,7 @@ from pipeline.query import (
     TRAJECTORY_QUERIES,
 )
 from pipeline.query_cache import QueryCache
+from access_control.personas import resolve_personas
 from access_control.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
 from access_control.campus_policy import (
     evaluate_campus_query_policy,
@@ -85,8 +87,7 @@ from access_control.authorize import (
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent.parent
 STATIC_DIR = BASE_DIR / "static"
-CONFIG_PATH = ROOT_DIR / "config" / "campus.yaml"
-NODES_DIR = ROOT_DIR / "nodes"
+NODES_DIR = run_paths().nodes_dir
 
 app = FastAPI(
     title="DSTS — Campus Command Center",
@@ -117,12 +118,9 @@ TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$")
 
 # Demo personas for the dashboard. They are NOT credentials: they only let POST /api/auth/login
 # mint a signed token for these accounts, and only when the operator sets DSTS_DEMO_MODE=1.
-DEMO_PERSONAS = {
-    "dean": "0001738",      # Dean, building_5
-    "teacher": "0000362",   # Teacher, building_5
-    "student": "0000168",   # Student, building_5 (distinct from the default target)
-    "target": "0000102",    # Student, building_5 (default query target)
-}
+def _demo_personas() -> Dict[str, str]:
+    """Dean / Teacher / Student / default target of the active run, picked from its roles (not hardcoded)."""
+    return resolve_personas(run_paths()).as_login_map()
 
 # Query Templates according to system specification: Q1 through Q13 and TRACK
 TEMPLATE_QUERIES = {
@@ -305,9 +303,6 @@ def validate_purpose(val: Optional[str]) -> QueryPurpose:
 # ================================================================
 
 def _load_layout() -> dict:
-    if CONFIG_PATH.exists():
-        with CONFIG_PATH.open("r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
     buildings = []
     if NODES_DIR.exists():
         for b_dir in sorted(NODES_DIR.iterdir(), key=lambda p: int(p.name.split("_")[1]) if "_" in p.name else 0):
@@ -401,10 +396,11 @@ def login(body: LoginBody) -> dict:
         if not _demo_mode():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="Persona login is disabled. Set DSTS_DEMO_MODE=1 to enable it for demos.")
-        pid = DEMO_PERSONAS.get(body.persona.strip().lower())
+        personas = _demo_personas()
+        pid = personas.get(body.persona.strip().lower())
         if pid is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                detail=f"Unknown persona. Valid: {sorted(DEMO_PERSONAS)}.")
+                                detail=f"Unknown persona. Valid: {sorted(personas)}.")
     else:
         expected = os.environ.get("DSTS_LOGIN_KEY", "")
         supplied = body.key or ""
@@ -880,7 +876,7 @@ def execute_query_endpoint(
     # 4. Target resolution
     target_id = (body.target_id or body.occupant_id or "").strip()
     if not target_id and q_type in _OCCUPANT_QUERIES:
-        target_id = "0000102"
+        target_id = _demo_personas()["target"]
     if target_id:
         target_role = get_occupant_role(target_id)
         if target_role is None and target_id not in _roles and target_id not in engine.registered.get(building_id, []):
