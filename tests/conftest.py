@@ -24,7 +24,7 @@ def _ensure_run() -> bool:
     if not (CORPUS_DIR / "emb_arcface.npy").exists() or not (CORPUS_DIR / "meta.csv").exists():
         return False
     seed = run_paths().seed
-    cmd = [sys.executable, "manage.py", "pipeline"] + (["--seed", str(seed)] if seed is not None else [])
+    cmd = [sys.executable, "manage.py", "pipeline", "--days", "1"] + (["--seed", str(seed)] if seed is not None else [])
     print(f"\n[tests] generating the default run: {' '.join(cmd[1:])}", flush=True)
     subprocess.check_call(cmd, cwd=REPO, stdout=subprocess.DEVNULL)
     return _run_ready()

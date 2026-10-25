@@ -57,6 +57,14 @@ def parse_args(argv=None):
     parser.add_argument("--end-time", default="17:00:00", help="Inclusive HH:MM[:SS] simulation end.")
     parser.add_argument("--events-per-occupant", type=int, default=20)
     parser.add_argument("--occupant-limit", type=int, default=None)
+    parser.add_argument("--days", type=int, default=1,
+                        help="simulated days (default 1 = the original single-day model; >1 adds dates, "
+                             "--events-per-occupant becomes per day and --visitor-ratio the share of visitor days).")
+    parser.add_argument("--start-date", default=None, help="first simulated day, YYYY-MM-DD (multi-day runs).")
+    parser.add_argument("--frequent-visitor-fraction", type=float, default=0.0,
+                        help="share of occupants who keep returning to one favourite other building (multi-day).")
+    parser.add_argument("--frequent-visit-probability", type=float, default=0.6,
+                        help="chance a frequent visitor goes to the favourite building on a given day.")
     parser.add_argument("--schedule", choices=("spread", "burst"), default="spread",
                         help="spread: moves spread over the day with dwell time (default); burst: the original short bursts.")
     return parser.parse_args(argv)
@@ -69,7 +77,10 @@ def main(argv=None):
                               start_time=_normalise_clock(args.start_time),
                               end_time=_normalise_clock(args.end_time),
                               events_per_occupant=args.events_per_occupant,
-                              occupant_limit=args.occupant_limit, schedule=args.schedule)
+                              occupant_limit=args.occupant_limit, schedule=args.schedule,
+                              n_days=args.days, start_date=args.start_date,
+                              frequent_visitor_fraction=args.frequent_visitor_fraction,
+                              frequent_visit_probability=args.frequent_visit_probability)
     events, truth, states = EventGenerator.from_corpus(args.meta, args.emb, config).generate_with_states()
     save_events(events, truth, args.output_dir, states)
     print_report(events, truth, config)

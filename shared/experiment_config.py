@@ -23,7 +23,7 @@ class PopulationConfig:
 class EventsConfig:
     n_days: int = 14
     start_date: str = "2026-01-05"
-    events_per_occupant_per_day: int = 4
+    events_per_occupant_per_day: int = 8
     visitor_ratio: float = 0.20
     frequent_visitor_fraction: float = 0.25
 

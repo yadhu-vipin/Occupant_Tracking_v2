@@ -8,7 +8,7 @@ population:
 events:
   n_days: 14               # simulated days (events carry a date)
   start_date: "2026-01-05" # first simulated day
-  events_per_occupant_per_day: 4
+  events_per_occupant_per_day: 8   # >= 7 so a visitor trip fits in a day
   visitor_ratio: 0.20      # share of an occupant's events spent as a visitor elsewhere
   frequent_visitor_fraction: 0.25   # occupants who keep returning to one favourite other building
 

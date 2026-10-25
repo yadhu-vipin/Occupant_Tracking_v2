@@ -81,6 +81,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.paths import run_paths  # noqa: E402
+from shared.timeutil import to_seconds  # noqa: E402
 from buildinglib._vendored.lsh import preprocess
 from buildinglib.node import load_routing_contract
 from buildinglib.refs import reference_tensor
@@ -252,7 +253,7 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         if current_building not in contexts:
             contexts[current_building] = BuildingContext(current_building, nodes_dir)
         context = contexts[current_building]
-        now_s = _hms_to_seconds(event["timestamp"])
+        now_s = to_seconds(event["timestamp"])
         _expire_present_visitors(context, now_s, nodes_dir, event["timestamp"])
 
         if local is not None:

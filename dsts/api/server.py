@@ -62,6 +62,7 @@ from pipeline.query import (
 )
 from pipeline.query_cache import QueryCache
 from access_control.personas import resolve_personas
+from shared.timeutil import is_office_hours, quantize
 from access_control.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
 from access_control.campus_policy import (
     evaluate_campus_query_policy,
@@ -114,7 +115,7 @@ _query_cache: QueryCache = QueryCache(capacity=256, ttl_seconds=30.0)
 # Known building set: derived from the loaded deployment (see _known_buildings()).
 
 # Time validation regex: HH:MM:SS where HH: 00..23, MM: 00..59, SS: 00..59
-TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$")
+TIME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} )?([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$")
 
 # Demo personas for the dashboard. They are NOT credentials: they only let POST /api/auth/login
 # mint a signed token for these accounts, and only when the operator sets DSTS_DEMO_MODE=1.
@@ -246,7 +247,7 @@ def validate_hms_time(val: Any, field_name: str = "time") -> str:
     if not TIME_RE.match(s):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {field_name} format: '{val}'. Expected valid HH:MM:SS (00:00:00 to 23:59:59).",
+            detail=f"Invalid {field_name} format: '{val}'. Expected HH:MM:SS (00:00:00 to 23:59:59), optionally prefixed by a YYYY-MM-DD date.",
         )
     return s
 
@@ -457,8 +458,7 @@ def get_cache_stats(principal: str = Depends(get_current_principal)) -> dict:
 
 def _quantize_hms(ts: str, minutes: int = 15) -> str:
     """Round an HH:MM:SS time down to a ``minutes`` bucket (L2 discloses an approximate time only)."""
-    h, mi, _ = (int(x) for x in str(ts).split(":"))
-    return f"{h:02d}:{(mi // minutes) * minutes:02d}"
+    return quantize(ts, minutes)[:-3]
 
 
 def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
@@ -473,7 +473,7 @@ def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str
         for row in rows:
             ts = row["timestamp"]
             ctx = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP,
-                               is_office_hours=("08:00:00" <= ts <= "18:00:00"),
+                               is_office_hours=is_office_hours(ts),
                                authorized_investigation=False)
             d = evaluate_campus_query_policy(principal, row["occupant"], context=ctx, purpose=ctx.purpose,
                                              target_current_building=row["building_id"])
@@ -871,7 +871,7 @@ def execute_query_endpoint(
             detail=f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.",
         )
     auth_inv = (caller_role == "dean" and parsed_purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT))
-    is_office_hours = ("08:00:00" <= at_time <= "18:00:00")
+    is_office_hours_now = is_office_hours(at_time)
 
     # 4. Target resolution
     target_id = (body.target_id or body.occupant_id or "").strip()
@@ -945,8 +945,8 @@ def execute_query_endpoint(
             return _denied_response(q_type, template_fmt, caller_meta, "RULE_INFRA_RBAC_DENIED",
                                     f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
 
-        ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours, authorized_investigation=auth_inv)
-        key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}|{is_office_hours}")
+        ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours_now, authorized_investigation=auth_inv)
+        key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}|{is_office_hours_now}")
 
         def _run_zone() -> dict:
             if q_type == "Q10":
@@ -1015,7 +1015,7 @@ def execute_query_endpoint(
                                 f"Infrastructure RBAC denied: {last_reason}", target_meta, metric_kind="rbac_infra")
 
     # Layer 2: building-scoped persona ReBAC
-    ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours, authorized_investigation=auth_inv)
+    ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours_now, authorized_investigation=auth_inv)
     decision = evaluate_campus_query_policy(
         caller_id, target_id, context=ctx, purpose=ctx.purpose, target_current_building=target_curr_b,
     )

@@ -10,6 +10,13 @@ Schedules (``GenerationConfig.schedule``):
   * ``"burst"``: the original model, all of an occupant's moves inside one short burst (30-180 s apart).
     Kept because the paper's experiments were run with it.
 
+Multi-day runs (``GenerationConfig.n_days > 1``): every occupant gets an independent day each day. Timestamps
+become ``"YYYY-MM-DD HH:MM:SS"`` (see ``shared/timeutil.py``), ``events_per_occupant`` is *per day*, and a day is
+a visitor day with probability ``visitor_ratio`` (a closed trip to another building). A ``frequent_visitor_fraction``
+of occupants have one favourite destination building they visit on ``frequent_visit_probability`` of days, which is
+what lets a visitor cross the permanent-pool entry threshold within a couple of weeks. Everybody leaves campus at
+night, so the campus state resets every morning. ``n_days == 1`` is the original single-day model, unchanged.
+
 This module is the library: ``GenerationConfig`` + ``EventGenerator``. The
 CLI entry point lives in ``pipeline/generate_events.py``.
 """
@@ -17,7 +24,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date as _date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +33,7 @@ import pandas as pd
 from buildinglib.split import default_emb_path, default_meta_path, list_buildings, normalise_occupant_ids
 from dsts.state.zones import ZONE_ADJACENCY
 from .ground_truth import make_ground_truth, make_state_transition
+from shared.timeutil import add_days
 from .models import Event, OccupantState
 
 
@@ -41,8 +49,20 @@ class GenerationConfig:
     events_per_occupant: int = 20
     occupant_limit: int | None = None
     schedule: str = "spread"
+    n_days: int = 1
+    start_date: str | None = None
+    frequent_visitor_fraction: float = 0.0
+    frequent_visit_probability: float = 0.6
 
     def __post_init__(self):
+        if self.n_days < 1:
+            raise ValueError("n_days must be at least 1")
+        if self.n_days > 1 and not self.start_date:
+            object.__setattr__(self, "start_date", "2026-01-05")
+        if self.start_date:
+            _date.fromisoformat(self.start_date)
+        if not 0 <= self.frequent_visitor_fraction <= 1 or not 0 <= self.frequent_visit_probability <= 1:
+            raise ValueError("frequent visitor fractions must be between 0 and 1")
         if self.schedule not in ("spread", "burst"):
             raise ValueError("schedule must be 'spread' or 'burst'")
         if not 0 <= self.visitor_ratio <= 1:
@@ -89,7 +109,13 @@ class EventGenerator:
         events, truth, _states = self.generate_with_states()
         return events, truth
 
+    @property
+    def multi_day(self) -> bool:
+        return self.config.n_days > 1 or bool(self.config.start_date)
+
     def generate_with_states(self):
+        if self.multi_day:
+            return self._generate_multi_day()
         tests = self.meta[self.meta["split"].astype(str).str.lower() == "test"]
         groups = list(tests.groupby(["occupant_id", "building"], sort=True))
         if self.config.occupant_limit:
@@ -130,6 +156,63 @@ class EventGenerator:
             last_location[state.occupant_id] = (state.current_building, state.current_zone)
         return events, truth, states
 
+    def _generate_multi_day(self):
+        """n_days independent days per occupant; see the module docstring. Returns (events, truth, states)."""
+        cfg = self.config
+        tests = self.meta[self.meta["split"].astype(str).str.lower() == "test"]
+        groups = list(tests.groupby(["occupant_id", "building"], sort=True))
+        if cfg.occupant_limit:
+            groups = groups[:cfg.occupant_limit]
+        rows_by_occupant = {key: list(group.index) for key, group in groups}
+        if any(len(rows) < cfg.events_per_occupant for rows in rows_by_occupant.values()):
+            raise ValueError("each simulated occupant needs enough TEST embeddings")
+        keys = list(rows_by_occupant)
+        start = datetime.strptime(cfg.start_time, "%H:%M:%S")
+        end = datetime.strptime(cfg.end_time, "%H:%M:%S")
+
+        favourite = {}                       # frequent visitors: occupant -> the one building they keep returning to
+        n_frequent = round(cfg.frequent_visitor_fraction * len(keys))
+        for index in sorted(self.rng.sample(range(len(keys)), n_frequent)):
+            occupant_id, home = keys[index]
+            favourite[str(occupant_id)] = self.rng.choice([b for b in self.buildings if b != str(home)])
+        self.frequent_visitors = dict(favourite)
+
+        pending = []                         # (day, when, state, row)
+        for day in range(cfg.n_days):
+            for (occupant_id, home), rows in rows_by_occupant.items():
+                occupant_id, home = str(occupant_id), str(home)
+                p_visit = cfg.frequent_visit_probability if occupant_id in favourite else cfg.visitor_ratio
+                visitor_day = self.rng.random() < p_visit
+                path = self._occupant_path(occupant_id, home, 3 if visitor_day else 0,
+                                           destination=favourite.get(occupant_id))
+                chosen = self.rng.sample(rows, len(path))
+                if cfg.schedule == "spread":
+                    times = self._spread_times(start, end, len(path))
+                else:
+                    latest = end - timedelta(seconds=cfg.max_interval * len(path))
+                    cursor = start + timedelta(seconds=self.rng.randint(0, max(0, int((latest - start).total_seconds()))))
+                    times = []
+                    for _ in path:
+                        cursor += timedelta(seconds=self.rng.randint(cfg.min_interval, cfg.max_interval))
+                        times.append(cursor)
+                for when, row, state in zip(times, chosen, path):
+                    pending.append((day, when, state, int(row)))
+
+        events, truth, states = [], [], []
+        last_location, current_day = {}, None
+        for number, (day, when, state, row) in enumerate(sorted(pending, key=lambda item: (item[0], item[1])), 1):
+            if day != current_day:
+                last_location.clear()        # everybody left campus overnight
+                current_day = day
+            stamp = f"{add_days(cfg.start_date, day)} {when.strftime('%H:%M:%S')}"
+            event = Event(f"E{number:06d}", stamp, state.current_building, state.current_zone, row)
+            events.append(event)
+            truth.append(make_ground_truth(event, state.occupant_id, state.home_building))
+            before = last_location.get(state.occupant_id, (None, None))
+            states.append(make_state_transition(number - 1, event, state.occupant_id, state.home_building, *before))
+            last_location[state.occupant_id] = (state.current_building, state.current_zone)
+        return events, truth, states
+
     def _spread_times(self, start, end, count):
         """``count`` move times over the whole day, at least ``min_interval`` seconds apart (dwell in between)."""
         total = int((end - start).total_seconds())
@@ -160,7 +243,7 @@ class EventGenerator:
             target -= 2
         return counts
 
-    def _occupant_path(self, occupant_id, home, visitor_count):
+    def _occupant_path(self, occupant_id, home, visitor_count, destination=None):
         state = OccupantState(occupant_id, home, home)
         path = []
         self._record(path, state)  # local observation at the gateway
@@ -168,7 +251,8 @@ class EventGenerator:
             # Exit only from home/zT; first observation after entry is destination/zT.
             self._move(state, "z8"); self._record(path, state)
             self._move(state, "zT"); self._record(path, state)
-            destination = self.rng.choice([building for building in self.buildings if building != home])
+            if destination is None:
+                destination = self.rng.choice([building for building in self.buildings if building != home])
             self._transfer_building(state, destination); self._record(path, state)
             self._move(state, "z8"); self._record(path, state)
             for _ in range((visitor_count - 3) // 2):

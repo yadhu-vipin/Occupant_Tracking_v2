@@ -9,6 +9,7 @@ import pandas as pd
 from buildinglib.split import default_emb_path, default_meta_path, list_buildings, normalise_occupant_ids
 from dsts.state.zones import ZONE_ADJACENCY, ZONES
 from shared.paths import run_paths
+from shared.timeutil import clock_of, day_of, to_seconds
 from .io import load_events
 
 
@@ -30,8 +31,9 @@ def validate_events(events, ground_truth, meta, start_time="08:00:00", end_time=
         raise ValueError("event schemas do not match the Stage 1 contract")
     lower, upper = (datetime.strptime(start_time, "%H:%M:%S"),
                     datetime.strptime(end_time, "%H:%M:%S"))
-    parsed_times = [datetime.strptime(item["timestamp"], "%H:%M:%S") for item in events]
-    if any(not lower <= value <= upper for value in parsed_times) or parsed_times != sorted(parsed_times):
+    clocks = [datetime.strptime(clock_of(item["timestamp"]), "%H:%M:%S") for item in events]
+    absolute = [to_seconds(item["timestamp"]) for item in events]
+    if any(not lower <= value <= upper for value in clocks) or absolute != sorted(absolute):
         raise ValueError("timestamps are outside bounds or not ordered")
     buildings = set(list_buildings(meta))
     corpus_rows = set(meta.index)
@@ -57,6 +59,8 @@ def validate_events(events, ground_truth, meta, start_time="08:00:00", end_time=
         histories.setdefault(truth["occupant_id"], []).append(truth)
     for history in histories.values():
         for previous, current in zip(history, history[1:]):
+            if day_of(previous["timestamp"]) != day_of(current["timestamp"]):
+                continue                     # overnight: everybody leaves campus and starts at the gateway again
             if previous["current_building"] == current["current_building"]:
                 if current["current_zone"] not in ZONE_ADJACENCY[previous["current_zone"]]:
                     raise ValueError("internal movement violates ZONE_ADJACENCY")
@@ -71,7 +75,11 @@ def validate_state_truth(states, ground_truth):
     if len(states) != len(ground_truth):
         raise ValueError("state_truth and ground_truth have different lengths")
     where = {}
+    previous_day = None
     for k, (state, truth) in enumerate(zip(states, ground_truth)):
+        if day_of(state["timestamp"]) != previous_day:
+            where.clear()                    # a new day: everybody is off campus again
+            previous_day = day_of(state["timestamp"])
         if state["state"] != k or state["event_id"] != truth["event_id"]:
             raise ValueError(f"state {k} is not aligned with event {truth['event_id']}")
         for key in ("timestamp", "occupant_id", "home_building", "current_building", "current_zone"):
@@ -94,7 +102,9 @@ def main():
     args = parser.parse_args()
     raw = np.load(args.emb, mmap_mode="r")
     events, truth = load_events(args.events, args.ground_truth)
-    validate_events(events, truth, pd.read_csv(args.meta), embedding_count=raw.shape[0])
+    multi_day = len({day_of(item["timestamp"]) for item in events}) > 1
+    validate_events(events, truth, pd.read_csv(args.meta), embedding_count=raw.shape[0],
+                    allow_embedding_reuse=multi_day)
     print(f"VALID: {len(events)} events; all probes are unique TEST rows and ground truth is separate.")
     states_path = args.state_truth or Path(args.ground_truth).with_name("state_truth.json")
     if states_path.exists():

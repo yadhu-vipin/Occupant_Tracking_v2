@@ -37,6 +37,19 @@ def run(*cmd, seed=None, env=None):
         sys.exit(code)
 
 
+def event_args(days=None, occupant_limit=None):
+    """generate_events.py flags: the multi-day model from config/experiment.yaml, or the original single day."""
+    ev = load_experiment_config().events
+    days = ev.n_days if days is None else int(days)
+    args = ["--days", days]
+    if days > 1:
+        args += ["--start-date", ev.start_date, "--events-per-occupant", ev.events_per_occupant_per_day,
+                 "--visitor-ratio", ev.visitor_ratio, "--frequent-visitor-fraction", ev.frequent_visitor_fraction]
+    if occupant_limit is not None:
+        args += ["--occupant-limit", occupant_limit]
+    return args
+
+
 def pipeline(seed, extra_events=()):
     """Population -> enroll -> events -> Phase 2 -> Phase 3 -> Phase 4 -> evaluation, all inside runs/seed_XX/."""
     steps = [
@@ -78,15 +91,11 @@ def main(argv):
         run("-m", "pytest", "-q", *rest)
     elif task == "run":
         seeds = parse_seeds(pop_option(rest, "--seeds", str(default_seed)))
-        extra = []
-        for flag in ("--days", "--occupant-limit"):
-            v = pop_option(rest, flag)
-            if v is not None:
-                extra += [flag, v]
+        extra = event_args(pop_option(rest, "--days"), pop_option(rest, "--occupant-limit"))
         for s in seeds:
             pipeline(s, extra)
     elif task == "pipeline":
-        pipeline(seed)
+        pipeline(seed, event_args(pop_option(rest, "--days"), pop_option(rest, "--occupant-limit")))
     elif task == "states":
         run("evaluation/evaluate_states.py", *rest, seed=seed)
     elif task == "demo":

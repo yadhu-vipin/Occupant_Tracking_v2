@@ -68,6 +68,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from shared.paths import run_paths  # noqa: E402
+from shared.timeutil import day_of, quantize, with_date  # noqa: E402
 from dsts.state.zones import ZONES, zone_label, zone_sector          # noqa: E402
 from nodelib.deploy import PointerStore                                      # noqa: E402
 from access_control.authorize import (                                            # noqa: E402
@@ -233,6 +234,8 @@ class QueryEngine:
         self.principal = principal
         self.enforce_rbac = enforce_rbac
         self.nodes_dir = Path(nodes_dir) if nodes_dir else None
+        # Multi-day logs carry "YYYY-MM-DD HH:MM:SS"; a bare HH:MM:SS from a user means "on the latest day".
+        self.default_date = day_of(events[-1].timestamp) if events else None
         if enforce_rbac:
             set_enforce_policy(True)
             register_node(principal, Role.QUERY_CLIENT)
@@ -243,6 +246,10 @@ class QueryEngine:
         nodes_dir = Path(nodes_dir) if nodes_dir else DEFAULT_NODES_DIR
         return cls(load_event_log(phase4_results), load_registered_occupants(nodes_dir),
                    nodes_dir=nodes_dir, **kwargs)
+
+    def _t(self, value: str) -> str:
+        """Normalise a user-supplied time to the timestamp format of the event log."""
+        return with_date(value, self.default_date)
 
     def _authorize(self, query_id: str, target: str) -> None:
         if self.enforce_rbac and not authorize(self.principal, "QUERY", target):
@@ -262,6 +269,7 @@ class QueryEngine:
 
     # ─── Q1: Did any occupant stay in building b after time t? ────────────
     def Q1(self, building_id: str, after_time: str) -> QueryResult:
+        after_time = self._t(after_time)
         query_text = f"Did any occupant stay in {building_id} after t={after_time}?"
         parameters = {"building_id": building_id, "after_time": after_time}
         self._authorize("Q1", f"building:{building_id}")
@@ -283,6 +291,7 @@ class QueryEngine:
 
     # ─── Q2: Was #visitors > #registered in building b at time t? ─────────
     def Q2(self, building_id: str, at_time: str) -> QueryResult:
+        at_time = self._t(at_time)
         query_text = f"Was #visitors > #registered in {building_id} at t={at_time}?"
         parameters = {"building_id": building_id, "at_time": at_time}
         self._authorize("Q2", f"building:{building_id}")
@@ -307,6 +316,7 @@ class QueryEngine:
 
     # ─── Q3: Did occupant o leave building b before time t? ───────────────
     def Q3(self, occupant_id: str, building_id: str, before_time: str) -> QueryResult:
+        before_time = self._t(before_time)
         query_text = f"Did {occupant_id} leave {building_id} before t={before_time}?"
         parameters = {"occupant_id": occupant_id, "building_id": building_id, "before_time": before_time}
         self._authorize("Q3", f"occupant:{occupant_id}@{building_id}")
@@ -338,6 +348,8 @@ class QueryEngine:
 
     # ─── Q4: Did occupant o enter building b between t1 and t2? ───────────
     def Q4(self, occupant_id: str, building_id: str, t1: str, t2: str) -> QueryResult:
+        t1 = self._t(t1)
+        t2 = self._t(t2)
         query_text = f"Did {occupant_id} enter {building_id} between t1={t1} and t2={t2}?"
         parameters = {"occupant_id": occupant_id, "building_id": building_id, "t1": t1, "t2": t2}
         self._authorize("Q4", f"occupant:{occupant_id}@{building_id}")
@@ -384,6 +396,8 @@ class QueryEngine:
 
     # ─── Q7: How many zones did occupant o visit during [t1, t2]? ─────────
     def Q7(self, occupant_id: str, t1: str, t2: str) -> QueryResult:
+        t1 = self._t(t1)
+        t2 = self._t(t2)
         query_text = f"How many zones did {occupant_id} visit during [{t1}, {t2}]?"
         parameters = {"occupant_id": occupant_id, "t1": t1, "t2": t2}
         self._authorize("Q7", f"occupant:{occupant_id}")
@@ -434,6 +448,7 @@ class QueryEngine:
         return QueryResult(query_id="Q6", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
 
     def Q6(self, occupant_id: str, at_time: str) -> QueryResult:
+        at_time = self._t(at_time)
         query_text = f"Where was {occupant_id} at t={at_time}?"
         parameters = {"occupant_id": occupant_id, "at_time": at_time}
         self._authorize("Q6", f"occupant:{occupant_id}")
@@ -584,6 +599,7 @@ class QueryEngine:
 
     # ─── Q10: Who was there in zone z at time t? ──────────────────────────
     def Q10(self, zone: str, at_time: str, building_id: str | None = None) -> QueryResult:
+        at_time = self._t(at_time)
         query_text = f"Who was there in zone {zone} at t={at_time}?"
         parameters = {"zone": zone, "at_time": at_time, "building_id": building_id}
         target_auth = f"building:{building_id}" if building_id else f"zone:{zone}"
@@ -624,6 +640,8 @@ class QueryEngine:
 
     # ─── Q11: Where was the occupant o during [t1, t2]? ───────────────────
     def Q11(self, occupant_id: str, t1: str, t2: str) -> QueryResult:
+        t1 = self._t(t1)
+        t2 = self._t(t2)
         query_text = f"Where was {occupant_id} during [{t1}, {t2}]?"
         parameters = {"occupant_id": occupant_id, "t1": t1, "t2": t2}
         self._authorize("Q11", f"occupant:{occupant_id}")
@@ -678,6 +696,8 @@ class QueryEngine:
 
     # ─── Q12: Who was there in zone z from t1 to t2? ──────────────────────
     def Q12(self, zone: str, t1: str, t2: str, building_id: str | None = None) -> QueryResult:
+        t1 = self._t(t1)
+        t2 = self._t(t2)
         query_text = f"Who was there in zone {zone} from t1={t1} to t2={t2}?"
         parameters = {"zone": zone, "t1": t1, "t2": t2, "building_id": building_id}
         target_auth = f"building:{building_id}" if building_id else f"zone:{zone}"
@@ -852,7 +872,7 @@ def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: Disclos
             "home_building": current.answer.get("home_building"),
             "current_building": building,
             "status": f"In {building}",
-            "approx_time": ts[:2] + ":00:00" if len(ts) == 8 else ts,
+            "approx_time": quantize(ts, 60),
         }
     if decision and decision.policy_rule in ("RULE_A_VISITOR_IN_OWN_BUILDING", "RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION"):
         return {
@@ -866,7 +886,7 @@ def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: Disclos
         }
     if level == DisclosureLevel.L2_CURRENT_ZONE:
         return {"building": building, "sector": zone_sector(zone) if zone else "Unknown",
-                "approx_time": ts[:2] + ":00:00" if len(ts) == 8 else ts, "confidence": _confidence_band(prob)}
+                "approx_time": quantize(ts, 60), "confidence": _confidence_band(prob)}
     return {"building": building, "zone": zone, "zone_label": zone_label(zone) if zone else "Unknown",
            "time": ts, "probability": prob}
 
