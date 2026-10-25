@@ -274,7 +274,7 @@ Secure mode is the default in both `nodelib.deploy.identify` and `RetrievalRunti
 | ID | Question |
 |---|---|
 | Q1 | Did anyone stay in building b after time t? |
-| Q2 | Were there more visitors than registered occupants in b at t? |
+| Q2 | Were more visitors than registered occupants present in b at t? (present = last sighting at or before t is in b and is not a zT departure) |
 | Q3 | Did occupant o leave b before t? |
 | Q4 | Did o enter between t1 and t2? |
 | Q5 | Did o visit all zones of b? |
@@ -283,7 +283,36 @@ Secure mode is the default in both `nodelib.deploy.identify` and `RetrievalRunti
 | Q10–Q13 | Zone-level occupancy/visitor lists (per-occupant filtering at L3+, otherwise counts) |
 | TRACK | Full trajectory, merged with closed pointer history |
 
-CLI: `python manage.py query --caller <id> --target <id> --query Q6 [--explain]`. The engine runs over `dsts/output/phase4_results.json` and `nodes/*/building.json`.
+CLI: `python manage.py query --caller <id> --target <id> --query Q6 [--explain]`. The engine runs over `dsts/output/phase4_results.json` and `nodes/*/building.json`. Building (Q1, Q2) and zone (Q10, Q12, Q13) queries follow the same rules on the CLI as in the API: own building only, no zone queries for students, occupant IDs only for a Dean on `security_investigation`/`audit`, counts for everyone else.
+
+### Explanations
+
+Every answer comes with the reasoning behind it (`pipeline/explain.py`). Each query builds its explanation from the same events it answered from: the rule it applied, the evidence with its role (`decisive`, `last_before_t`, `carry_in_state`, `zone_visit`, ...), what it looked for and did not find (`absence`), and uncertainty flags. The flags come from the identification provenance that Phase 4 now stores on every identified row (`provenance`: votes, routing rank, Bloom margin, whether the vote winner was also the nearest candidate). `identity_probability` is not used, because it is close to 1.0 for most misidentifications too.
+
+| Flag | Raised when |
+|---|---|
+| `vote_winner_not_nearest` | the accepted occupant was not also the nearest candidate (strongest error signal) |
+| `low_votes` | fewer than 16 votes (the threshold is 12) |
+| `verified_by_lower_ranked_building` | the confirming building was not first on the shortlist |
+| `narrow_routing_margin` | the Bloom score gap between the top two buildings is below 5 |
+| `stale_observation` | a point-in-time answer rests on a sighting more than 60 minutes old |
+| `pointer_based` | the answer comes from a visit pointer (about 83% precise) |
+
+Explanations are redacted to the caller's disclosure level before they leave the engine (`redact()`), so they never show more than the answer: nothing at L0, only an availability sentence at L1, the current position with sector and hour-rounded time and no routing details at L2, exact zone without history at L3, everything at L4 (minus a visitor's history outside the Dean's building). Aggregates and zone queries show per-person evidence only to an investigating Dean; others get counts. `withheld` lists what was removed and why. `--explain` on the CLI prints the access decision and then the reasoning; `POST /api/query` returns it as `explanation`; the dashboard shows it under the answer.
+
+```
+$ python manage.py query --caller 0000362 --target 0000102 --query Q6 --purpose academic_roster --at-time 12:00:00 --explain
+  ...
+  Disclosed (L2_CURRENT_ZONE): {'building': 'building_7', 'sector': 'Circulation & Access Hub', 'approx_time': '11:00:00', 'confidence': 'High (p>=0.8)'}
+  Reasoning (L2_CURRENT_ZONE):
+    Rule:        location at t is the last identified sighting at or before t
+    Evidence:    1 item(s)
+      - [last_before_t] 11:00:00 building_7 Circulation & Access Hub -- present_visitor_pool
+    Uncertainty: none
+    Withheld:    event IDs; exact times: rounded to the hour; exact zone: functional sector only; identification details (votes, shortlist, verifying building, margins): the routing ones reveal the home building
+```
+
+`python paper/explain_overhead.py` measures the cost (`reports/explanation_overhead.json`) and how well the flags catch wrong identifications against ground truth (`reports/explanation_flags.json`).
 
 ---
 

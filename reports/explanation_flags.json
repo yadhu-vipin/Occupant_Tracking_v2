@@ -1,0 +1,121 @@
+{
+  "identifications": {
+    "identified_events": 9616,
+    "wrong_identifications": 184,
+    "wrong_with_flag": 154,
+    "share_of_wrong_flagged": 0.837,
+    "correct_with_flag": 215,
+    "share_of_correct_flagged": 0.0228,
+    "flagged_events": 369,
+    "share_of_flagged_that_are_wrong": 0.4173,
+    "by_mode": {
+      "local": {
+        "identified_events": 7751,
+        "wrong_identifications": 110,
+        "wrong_with_flag": 87,
+        "share_of_wrong_flagged": 0.7909,
+        "correct_with_flag": 68,
+        "share_of_correct_flagged": 0.0089,
+        "flagged_events": 155,
+        "share_of_flagged_that_are_wrong": 0.5613
+      },
+      "present_visitor_pool": {
+        "identified_events": 1297,
+        "wrong_identifications": 3,
+        "wrong_with_flag": 3,
+        "share_of_wrong_flagged": 1.0,
+        "correct_with_flag": 0,
+        "share_of_correct_flagged": 0.0,
+        "flagged_events": 3,
+        "share_of_flagged_that_are_wrong": 1.0
+      },
+      "routed": {
+        "identified_events": 568,
+        "wrong_identifications": 71,
+        "wrong_with_flag": 64,
+        "share_of_wrong_flagged": 0.9014,
+        "correct_with_flag": 147,
+        "share_of_correct_flagged": 0.2958,
+        "flagged_events": 211,
+        "share_of_flagged_that_are_wrong": 0.3033
+      }
+    },
+    "per_flag": {
+      "vote_winner_not_nearest": {
+        "events": 52,
+        "wrong": 52,
+        "share_wrong": 1.0
+      },
+      "low_votes": {
+        "events": 166,
+        "wrong": 93,
+        "share_wrong": 0.5602
+      },
+      "verified_by_lower_ranked_building": {
+        "events": 100,
+        "wrong": 40,
+        "share_wrong": 0.4
+      },
+      "narrow_routing_margin": {
+        "events": 194,
+        "wrong": 56,
+        "share_wrong": 0.2887
+      }
+    }
+  },
+  "answers": {
+    "grid": "Q6 at every hour 09:00-17:00, Q7 over four 2-hour windows, TRACK, for every identified occupant",
+    "per_query": {
+      "Q6": {
+        "answers": 4449,
+        "flagged": 579,
+        "share_flagged": 0.1301,
+        "share_flagged_by_identification_flags": 0.0402,
+        "answers_resting_on_a_wrong_identification": 74,
+        "of_those_flagged": 65,
+        "flag_counts": {
+          "vote_winner_not_nearest": 23,
+          "low_votes": 79,
+          "verified_by_lower_ranked_building": 47,
+          "narrow_routing_margin": 94,
+          "stale_observation": 415,
+          "pointer_based": 24
+        }
+      },
+      "Q7": {
+        "answers": 1998,
+        "flagged": 371,
+        "share_flagged": 0.1857,
+        "share_flagged_by_identification_flags": 0.1857,
+        "answers_resting_on_a_wrong_identification": 175,
+        "of_those_flagged": 153,
+        "flag_counts": {
+          "vote_winner_not_nearest": 44,
+          "low_votes": 156,
+          "verified_by_lower_ranked_building": 114,
+          "narrow_routing_margin": 232
+        }
+      },
+      "TRACK": {
+        "answers": 500,
+        "flagged": 496,
+        "share_flagged": 0.992,
+        "share_flagged_by_identification_flags": 0.51,
+        "answers_resting_on_a_wrong_identification": 136,
+        "of_those_flagged": 136,
+        "flag_counts": {
+          "vote_winner_not_nearest": 40,
+          "low_votes": 108,
+          "verified_by_lower_ranked_building": 94,
+          "narrow_routing_margin": 181,
+          "pointer_based": 494
+        }
+      }
+    },
+    "overall": {
+      "answers": 6947,
+      "flagged": 1446,
+      "share_flagged": 0.2081
+    }
+  }
+}

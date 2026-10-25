@@ -398,7 +398,8 @@ class QueryEngine:
                       for o in registered_present]
             explanation = self._explanation(
                 "Q2", f"a person counts as present in {building_id} at {at_time} if their last identified sighting "
-                      "at or before then is in the building and is not a zT departure; yes if more visitors "
+                      "at or before then is in the building and is not a departure through the transition zone; "
+                      "yes if more visitors "
                       "than registered occupants are present", items, at_time=at_time,
                 absence=None if present else f"nobody is present in {building_id} at {at_time}",
                 details={"visitors_present": n_visitors, "registered_present": n_registered,
@@ -549,7 +550,8 @@ class QueryEngine:
         # (distinct_zones_visited/zone_visit_counts) -- same aggregation over
         # the same event log, just scoped to an interval instead of the whole
         # history. No new data source, no schema change.
-        window = [e for e in self.events if e.occupant_id == occupant_id and t1 <= e.timestamp <= t2]
+        mine = [e for e in self.events if e.occupant_id == occupant_id]
+        window = [e for e in mine if t1 <= e.timestamp <= t2]
         zones_visited = sorted({e.zone for e in window})
         answer = len(zones_visited)
 
@@ -562,7 +564,7 @@ class QueryEngine:
         explanation = None
         if self.explain:
             ordered = _sorted_by_time(window)
-            prior = [e for e in self.events if e.occupant_id == occupant_id and e.timestamp < t1]
+            prior = [e for e in mine if e.timestamp < t1]
             carry = max(prior, key=lambda e: e.timestamp) if prior else None
             items = ([EvidenceItem.from_event(carry, "carry_in_state")] if carry else [])
             items += [EvidenceItem.from_event(e, "supporting") for e in ordered]
@@ -873,11 +875,11 @@ class QueryEngine:
         rule = (f"the trajectory is every identified sighting with {t1} <= time <= {t2}, in time order; the "
                 "carry-in state is where the occupant already was when the window opened")
 
-        window = sorted([e for e in self.events if e.occupant_id == occupant_id and t1 <= e.timestamp <= t2],
-                        key=lambda e: e.timestamp)
+        mine = [e for e in self.events if e.occupant_id == occupant_id]
+        window = sorted([e for e in mine if t1 <= e.timestamp <= t2], key=lambda e: e.timestamp)
         last_prior = None
         if self.explain or not window:
-            prior = [e for e in self.events if e.occupant_id == occupant_id and e.timestamp < t1]
+            prior = [e for e in mine if e.timestamp < t1]
             last_prior = max(prior, key=lambda e: e.timestamp) if prior else None
         carry = [EvidenceItem.from_event(last_prior, "carry_in_state")] if (last_prior and self.explain) else []
 
@@ -1278,12 +1280,22 @@ def _print_denied(rule: str, reason: str) -> None:
     print(f"  Reason: {reason}")
 
 
+def _refused(q_type: str, explain: bool) -> dict:
+    outcome = {"answer": None, "evidence": [], "decision": None, "explanation": refused_explanation(q_type)}
+    if explain:
+        print_reasoning(outcome["explanation"])
+    return outcome
+
+
 def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, building_id: str, *,
-                       purpose: str = "general_lookup", explain: bool = False, **params) -> None:
+                       purpose: str = "general_lookup", explain: bool = False, **params) -> dict:
     """Q1/Q2 -- building-wide queries, under the same rules as POST /api/query:
     the caller must be in their own building, Layer 1 must permit, and
     per-occupant evidence (IDs) is shown only to a Dean on an investigation
-    or audit; everyone else gets the aggregate answer only."""
+    or audit; everyone else gets the aggregate answer only.
+
+    Prints the outcome and returns what was shown: answer, evidence,
+    decision and the redacted explanation (as every run_*_query does)."""
     target_resource = f"building:{building_id}"
     print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {building_id}  params={params}  purpose={purpose}")
     caller_role, caller_bld = get_real_role(caller_id), get_occupant_building(caller_id)
@@ -1291,20 +1303,16 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
     if parsed_purpose in INVESTIGATION_PURPOSES and caller_role != "dean":
         _print_denied("RULE_INVESTIGATION_REQUIRES_DEAN",
                       f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.")
-        if explain:
-            print_reasoning(refused_explanation(q_type))
-        return
+        return _refused(q_type, explain)
     denial = building_scope_denial(caller_role, caller_bld, building_id)
     if denial:
         _print_denied(*denial)
-        if explain:
-            print_reasoning(refused_explanation(q_type))
-        return
+        return _refused(q_type, explain)
     permitted = authorize(caller_id, "QUERY", target_resource)
     reason = get_audit_log()[-1]["reason"]
     print(f"  Layer 1 (infra RBAC): {'PERMIT' if permitted else 'DENY'}  (reason={reason or 'registered QUERY_CLIENT'})")
     if not permitted:
-        return
+        return _refused(q_type, explain)
     include_evidence = investigation_rights(caller_role, parsed_purpose)
     print(f"  Layer 2 (building aggregate): PERMIT  "
           f"({'per-occupant evidence: investigation/audit' if include_evidence else 'aggregate only, occupant IDs redacted'})")
@@ -1312,16 +1320,19 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
         res = engine.Q1(building_id=building_id, after_time=params["after_time"])
     else:
         res = engine.Q2(building_id=building_id, at_time=params["at_time"])
+    shown_evidence = res.evidence if include_evidence else []
     print(f"  Query:  {res.query_text}")
     print(f"  Answer: {res.answer}")
-    if include_evidence:
-        for line in res.evidence[:3]:
-            print(f"   {line}")
+    for line in shown_evidence[:3]:
+        print(f"   {line}")
+    decision = aggregate_decision(q_type, include_evidence=include_evidence, purpose=parsed_purpose,
+                                  building_id=building_id)
+    outcome = {"query_text": res.query_text, "answer": res.answer, "evidence": shown_evidence,
+               "decision": decision, "explanation": redact(res.explanation, decision)}
     if explain:
-        decision = aggregate_decision(q_type, include_evidence=include_evidence, purpose=parsed_purpose,
-                                      building_id=building_id)
         print(f"  Explainability Metadata:\n{json.dumps(decision.to_dict(), indent=4)}")
-        print_reasoning(redact(res.explanation, decision))
+        print_reasoning(outcome["explanation"])
+    return outcome
 
 
 def resolve_target_current_building(engine: QueryEngine, target_id: str, at_time: str) -> str | None:
@@ -1343,8 +1354,9 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
                        is_office_hours: bool, authorized_investigation: bool, at_time: str,
                        building_id: str | None = None, before_time: str | None = None,
                        t1: str | None = None, t2: str | None = None, zone: str | None = None,
-                       explain: bool = False) -> None:
-    """Q3/Q4/Q5/Q6/Q7/Q8/Q9/Q11/TRACK -- queries about ONE target occupant. Both RBAC layers apply."""
+                       explain: bool = False) -> dict:
+    """Q3/Q4/Q5/Q6/Q7/Q8/Q9/Q11/TRACK -- queries about ONE target occupant. Both RBAC layers apply.
+    Returns what was shown (see run_building_query)."""
     print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {target_id}  "
          f"(purpose={purpose}, office_hours={is_office_hours}, authorized={authorized_investigation})")
 
@@ -1361,7 +1373,7 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         if last_reason.startswith("target_occupant_denied_by_policy"):
             print("  (^ a Layer-2 persona-policy denial surfacing through the Layer-1 check --"
                  " see the module docstring)")
-        return
+        return _refused(q_type, explain)
     print(f"  Layer 1 (infra RBAC):  PERMIT  (reason={last_reason or 'registered QUERY_CLIENT'})")
 
     caller_role, target_role = get_real_role(caller_id), get_real_role(target_id)
@@ -1389,44 +1401,46 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         print(f"  Explainability Metadata:\n{json.dumps(decision.to_dict(), indent=4)}")
 
     if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
-        if explain:
-            print_reasoning(refused_explanation(q_type))
-        return
+        return _refused(q_type, explain)
     if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L4_HISTORICAL_TRACK:
         print(f"  DENIED (temporal scope): {q_type} is a trajectory query requiring L4_HISTORICAL_TRACK outright; "
              f"caller only holds {decision.level.name}")
-        if explain:
-            print_reasoning(refused_explanation(q_type))
-        return
+        return _refused(q_type, explain)
 
+    evidence: list[str] = []
     if q_type == "Q6":
-        disclosed, res = q6_disclosed(engine, target_id, decision.level, at_time, decision)
-        explanation = res.explanation
-        print(f"  Query:  Where was {target_id} at t={at_time}?")
-        print(f"  Disclosed ({decision.level.name}): {disclosed}")
+        answer, res = q6_disclosed(engine, target_id, decision.level, at_time, decision)
+        explanation, query_text = res.explanation, f"Where was {target_id} at t={at_time}?"
+        print(f"  Query:  {query_text}")
+        print(f"  Disclosed ({decision.level.name}): {answer}")
     elif q_type == "TRACK":
         answer, explanation = engine.track_explained(target_id)
-        print(f"  Query:  Full historical trajectory for {target_id}")
+        query_text = f"Full historical trajectory for {target_id}"
+        print(f"  Query:  {query_text}")
         print(f"  Disclosed (L4_HISTORICAL_TRACK): {answer}")
     else:
         res = occupant_query_result(engine, q_type, target_id, building_id=building_id, before_time=before_time,
                                     t1=t1, t2=t2, zone=zone)
-        explanation = res.explanation
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+        answer, evidence, explanation, query_text = res.answer, res.evidence, res.explanation, res.query_text
+        print(f"  Query:  {query_text}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={answer}  evidence={evidence}")
+    outcome = {"query_text": query_text, "answer": answer, "evidence": evidence, "decision": decision,
+               "explanation": redact(explanation, decision, caller_building=get_occupant_building(caller_id))}
     if explain:
-        print_reasoning(redact(explanation, decision, caller_building=get_occupant_building(caller_id)))
+        print_reasoning(outcome["explanation"])
+    return outcome
 
 
 def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
                    building_id: str | None = None, at_time: str = DEFAULT_AT_TIME,
                    t1: str = "08:00:00", t2: str = "18:00:00", *, purpose: str = "general_lookup",
-                   is_office_hours: bool = True, explain: bool = False) -> None:
+                   is_office_hours: bool = True, explain: bool = False) -> dict:
     """Q10/Q12/Q13 -- zone queries, under the same rules as POST /api/query:
     students are denied outright, the caller must be in their own building,
     and each listed occupant must pass the persona policy at L3+ (in practice
     a Dean on an investigation or audit); everyone else gets counts only.
-    Without --building the query is scoped to the caller's own building."""
+    Without --building the query is scoped to the caller's own building.
+    Returns what was shown (see run_building_query)."""
     caller_role, caller_bld = get_real_role(caller_id), get_occupant_building(caller_id)
     building_id = building_id or caller_bld
     target_resource = f"building:{building_id}"
@@ -1435,29 +1449,23 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
     if caller_role == "student":
         _print_denied("RULE_C_PEER_ZONE_SURVEILLANCE_DENIED",
                       "Student role cannot perform zone-level occupant surveillance (anti-stalking peer isolation).")
-        if explain:
-            print_reasoning(refused_explanation(q_type))
-        return
+        return _refused(q_type, explain)
     parsed_purpose = QueryPurpose.from_str(purpose)
     if parsed_purpose in INVESTIGATION_PURPOSES and caller_role != "dean":
         _print_denied("RULE_INVESTIGATION_REQUIRES_DEAN",
                       f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.")
-        if explain:
-            print_reasoning(refused_explanation(q_type))
-        return
+        return _refused(q_type, explain)
     denial = building_scope_denial(caller_role, caller_bld, building_id) if building_id else \
         ("RULE_CALLER_BUILDING_UNRESOLVED", "Caller's home building is unresolved; building-scoped queries are denied.")
     if denial:
         _print_denied(*denial)
-        if explain:
-            print_reasoning(refused_explanation(q_type))
-        return
+        return _refused(q_type, explain)
 
     permitted = authorize(caller_id, "QUERY", target_resource)
     last_reason = get_audit_log()[-1]["reason"] if get_audit_log() else ""
     if not permitted:
         print(f"  Layer 1 (infra RBAC) DENIED: {last_reason}")
-        return
+        return _refused(q_type, explain)
     print(f"  Layer 1 (infra RBAC): PERMIT (reason={last_reason or 'registered QUERY_CLIENT'})")
 
     if q_type == "Q10":
@@ -1473,14 +1481,20 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
     keep = zone_disclosed_ids(caller_id, ids, context, building_id)
     print(f"  Layer 2 (per-occupant persona filter): {len(keep)} of {len(ids)} occupant(s) disclosed "
           f"(L3+ required to be listed)")
+    answer = filter_zone_answer(q_type, res.answer, keep)
+    shown_evidence = [f"{len(keep)} of {len(ids)} occupant(s) disclosed; "
+                      f"{len(ids) - len(keep)} withheld by persona/building policy"]
     print(f"  Query:  {res.query_text}")
-    print(f"  Answer: {filter_zone_answer(q_type, res.answer, keep)}")
-    print(f"   {len(keep)} of {len(ids)} occupant(s) disclosed; {len(ids) - len(keep)} withheld by persona/building policy")
+    print(f"  Answer: {answer}")
+    print(f"   {shown_evidence[0]}")
+    decision = aggregate_decision(q_type, include_evidence=context.authorized_investigation,
+                                  purpose=parsed_purpose, building_id=building_id, disclosed=len(keep))
+    outcome = {"query_text": res.query_text, "answer": answer, "evidence": shown_evidence, "decision": decision,
+               "explanation": redact(res.explanation, decision, disclosed_occupants=keep)}
     if explain:
-        decision = aggregate_decision(q_type, include_evidence=context.authorized_investigation,
-                                      purpose=parsed_purpose, building_id=building_id, disclosed=len(keep))
         print(f"  Explainability Metadata:\n{json.dumps(decision.to_dict(), indent=4)}")
-        print_reasoning(redact(res.explanation, decision, disclosed_occupants=keep))
+        print_reasoning(outcome["explanation"])
+    return outcome
 
 
 def print_role_capabilities() -> None:
@@ -1505,14 +1519,17 @@ def print_role_capabilities() -> None:
     print("  CANNOT: query Staff outside office hours (drops to L0).")
 
 
-def run_demo(nodes_dir: Path | None = None) -> None:
-    roles, rosters = load_real_registry()
-    deans_by_building = json.loads((ROLES_DIR / "deans_by_building.json").read_text())
-    engine = build_engine(nodes_dir)
-    register_real_registry(roles, rosters, engine)
+def demo_scenarios(engine: QueryEngine, roles: dict[str, str], rosters: dict[str, list[str]],
+                   deans_by_building: dict[str, str]) -> tuple[dict[str, str | None], list[tuple]]:
+    """The demo's actors and its caller x target x query battery.
 
+    Each scenario is ``("section", title)`` or ``(kind, args, kwargs)`` with
+    kind one of building / occupant / zone, run as
+    ``run_<kind>_query(engine, *args, **kwargs)``. tests/test_explanations.py
+    replays the same list to check that no explanation leaks.
+    """
     def students_in(building: str):
-        return (o for o in engine.registered[building] if roles.get(o) == "student")
+        return (o for o in sorted(engine.registered[building]) if roles.get(o) == "student")
 
     # Per-building registry: 1 dean + 10 teachers + 39 students PER building
     # (10 deans + 100 teachers + 390 students = 500 total). Primary demo
@@ -1535,101 +1552,93 @@ def run_demo(nodes_dir: Path | None = None) -> None:
     visiting_student = b5_visitors[0].occupant_id if b5_visitors else None
     visiting_time = b5_visitors[0].timestamp if b5_visitors else "08:30:05"
 
-    print("Registry: 10 deans + 100 teachers + 390 students (1+10+39 per building x 10 buildings)")
-    print(f"Demo building: {home_building}  dean={dean_id}  teacher_a={teacher_a}  teacher_b={teacher_b}")
-    print(f"Scenario actors: roster_student={roster_student}  non_roster_student={non_roster_student}  "
-         f"peer_student={peer_student}  other_building={other_building}  other_dean={other_dean}  "
-         f"cross_building_student={cross_building_student}  visiting_student={visiting_student}")
+    actors = {"home_building": home_building, "dean": dean_id, "teacher_a": teacher_a, "teacher_b": teacher_b,
+              "roster_student": roster_student, "non_roster_student": non_roster_student,
+              "peer_student": peer_student, "other_building": other_building, "other_dean": other_dean,
+              "cross_building_student": cross_building_student, "visiting_student": visiting_student}
 
-    print_role_capabilities()
+    def occ(caller, target, q_type, purpose, office_hours, authorized, at_time=DEFAULT_AT_TIME, **kw):
+        return ("occupant", (caller, target, q_type),
+                dict(purpose=purpose, is_office_hours=office_hours, authorized_investigation=authorized,
+                     at_time=at_time, **kw))
 
-    print(f"\n{'=' * 78}\nSIX QUERY TYPES ON REAL DATA (Q1, Q2 -- building-wide; Q3, Q5, Q6, TRACK -- per-occupant)\n")
+    inv = ("security_investigation", True, True)
+    scenarios: list[tuple] = [
+        ("section", "SIX QUERY TYPES ON REAL DATA (Q1, Q2 -- building-wide; Q3, Q5, Q6, TRACK -- per-occupant)"),
+        ("building", (dean_id, "Q1", home_building), dict(purpose="security_investigation", after_time="09:00:00")),
+        ("building", (teacher_a, "Q2", home_building), dict(at_time="12:00:00")),
+        occ(dean_id, roster_student, "Q6", *inv),
+        occ(dean_id, roster_student, "Q3", *inv, building_id=home_building, before_time="23:59:59"),
+        occ(roster_student, roster_student, "Q5", "self_inspection", True, False, building_id=home_building),
+        occ(dean_id, roster_student, "TRACK", *inv),
+        occ(teacher_a, roster_student, "TRACK", "academic_roster", True, False),
 
-    run_building_query(engine, dean_id, "Q1", home_building, purpose="security_investigation", after_time="09:00:00")
-    run_building_query(engine, teacher_a, "Q2", home_building, at_time="12:00:00")
+        ("section", "COMPLETE SUITE OF 13 SPATIO-TEMPORAL QUERIES (Q1 - Q13)"),
+        occ(dean_id, roster_student, "Q4", *inv, building_id=home_building, t1="08:00:00", t2="18:00:00"),
+        occ(dean_id, roster_student, "Q7", *inv, t1="08:00:00", t2="18:00:00"),
+        occ(dean_id, roster_student, "Q8", *inv, zone="z1", building_id=home_building),
+        occ(dean_id, roster_student, "Q9", *inv, zone="z1", building_id=home_building),
+        ("zone", (dean_id, "Q10"), dict(zone="z1", building_id=home_building, at_time="12:00:00",
+                                        purpose="security_investigation")),
+        occ(dean_id, roster_student, "Q11", *inv, t1="08:00:00", t2="18:00:00"),
+        ("zone", (dean_id, "Q12"), dict(zone="z1", building_id=home_building, t1="08:00:00", t2="18:00:00",
+                                        purpose="security_investigation")),
+        ("zone", (dean_id, "Q13"), dict(zone="z1", building_id=home_building, purpose="security_investigation")),
 
-    run_occupant_query(engine, dean_id, roster_student, "Q6", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME)
-
-    run_occupant_query(engine, dean_id, roster_student, "Q3", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
-                       building_id=home_building, before_time="23:59:59")
-    run_occupant_query(engine, roster_student, roster_student, "Q5", purpose="self_inspection",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME,
-                       building_id=home_building)
-    run_occupant_query(engine, dean_id, roster_student, "TRACK", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME)
-    run_occupant_query(engine, teacher_a, roster_student, "TRACK", purpose="academic_roster",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
-
-    print(f"\n{'=' * 78}\nCOMPLETE SUITE OF 13 SPATIO-TEMPORAL QUERIES (Q1 - Q13)\n")
-    # Q4: Did occupant o enter building b between t1 and t2?
-    run_occupant_query(engine, dean_id, roster_student, "Q4", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
-                       building_id=home_building, t1="08:00:00", t2="18:00:00")
-    # Q7: How many zones did occupant o visit during interval t1 to t2?
-    run_occupant_query(engine, dean_id, roster_student, "Q7", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
-                       t1="08:00:00", t2="18:00:00")
-    # Q8: At what time did occupant o visit zone z for the first time?
-    run_occupant_query(engine, dean_id, roster_student, "Q8", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
-                       zone="z1", building_id=home_building)
-    # Q9: How long did occupant o spend at zone z during his first visit?
-    run_occupant_query(engine, dean_id, roster_student, "Q9", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
-                       zone="z1", building_id=home_building)
-    # Q10: Who was there in zone z at time t?
-    run_zone_query(engine, dean_id, "Q10", zone="z1", building_id=home_building, at_time="12:00:00",
-                   purpose="security_investigation")
-    # Q11: Where was occupant o during time interval from t1 to t2?
-    run_occupant_query(engine, dean_id, roster_student, "Q11", purpose="security_investigation",
-                       is_office_hours=True, authorized_investigation=True, at_time=DEFAULT_AT_TIME,
-                       t1="08:00:00", t2="18:00:00")
-    # Q12: Who was there in zone z from time t1 to t2?
-    run_zone_query(engine, dean_id, "Q12", zone="z1", building_id=home_building, t1="08:00:00", t2="18:00:00",
-                   purpose="security_investigation")
-    # Q13: Who all visited zone z?
-    run_zone_query(engine, dean_id, "Q13", zone="z1", building_id=home_building, purpose="security_investigation")
-
-    print(f"\n{'=' * 78}\nBUILDING-SCOPED HIERARCHICAL RBAC (A > B > C & Visitor Predicate)\n")
-
-    # Local student in own building -> PERMITTED
-    run_occupant_query(engine, teacher_a, roster_student, "Q6", purpose="academic_roster",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
-
-    # Dean querying external student in other building -> DENIED under scoped RBAC
-    run_occupant_query(engine, dean_id, cross_building_student, "Q6", purpose="general_lookup",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
-
+        ("section", "BUILDING-SCOPED HIERARCHICAL RBAC (A > B > C & Visitor Predicate)"),
+        # Local student in own building -> PERMITTED
+        occ(teacher_a, roster_student, "Q6", "academic_roster", True, False),
+        # Dean querying external student in other building -> DENIED under scoped RBAC
+        occ(dean_id, cross_building_student, "Q6", "general_lookup", True, False),
+    ]
     # Dean querying visitor currently detected in Dean's building -> PERMITTED under Visitor Predicate
     if visiting_student:
-        run_occupant_query(engine, dean_id, visiting_student, "Q6", purpose="general_lookup",
-                           is_office_hours=True, authorized_investigation=False, at_time=visiting_time)
+        scenarios.append(occ(dean_id, visiting_student, "Q6", "general_lookup", True, False, at_time=visiting_time))
+    scenarios += [
+        # Teacher querying student in another building -> DENIED
+        occ(teacher_a, cross_building_student, "Q6", "general_lookup", True, False),
+        # Student querying student in another building -> DENIED
+        occ(roster_student, cross_building_student, "Q6", "general_lookup", True, False),
+        # Dean querying peer Dean in other building -> PERMITTED at coarse L2 status
+        occ(dean_id, other_dean, "Q6", "admin_consultation", True, False),
 
-    # Teacher querying student in another building -> DENIED
-    run_occupant_query(engine, teacher_a, cross_building_student, "Q6", purpose="general_lookup",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
+        ("section", "OTHER PERSONA RULES"),
+        occ(teacher_a, non_roster_student, "Q6", "general_lookup", True, False),
+        occ(roster_student, teacher_a, "Q6", "office_hours", True, False),
+        occ(roster_student, teacher_a, "Q6", "office_hours", False, False),
+        occ(roster_student, peer_student, "Q6", "general_lookup", True, False),
+        occ(roster_student, roster_student, "Q6", "self_inspection", True, False),
+    ]
+    return actors, scenarios
 
-    # Student querying student in another building -> DENIED
-    run_occupant_query(engine, roster_student, cross_building_student, "Q6", purpose="general_lookup",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
 
-    # Dean querying peer Dean in other building -> PERMITTED at coarse L2 status
-    run_occupant_query(engine, dean_id, other_dean, "Q6", purpose="admin_consultation",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
+DEMO_RUNNERS = {"building": "run_building_query", "occupant": "run_occupant_query", "zone": "run_zone_query"}
 
-    print(f"\n{'=' * 78}\nOTHER PERSONA RULES\n")
-    run_occupant_query(engine, teacher_a, non_roster_student, "Q6", purpose="general_lookup",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
-    run_occupant_query(engine, roster_student, teacher_a, "Q6", purpose="office_hours",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
-    run_occupant_query(engine, roster_student, teacher_a, "Q6", purpose="office_hours",
-                       is_office_hours=False, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
-    run_occupant_query(engine, roster_student, peer_student, "Q6", purpose="general_lookup",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
-    run_occupant_query(engine, roster_student, roster_student, "Q6", purpose="self_inspection",
-                       is_office_hours=True, authorized_investigation=False, at_time=DEFAULT_AT_TIME)
+
+def run_demo_scenario(engine: QueryEngine, scenario: tuple, explain: bool = False) -> dict | None:
+    if scenario[0] == "section":
+        print(f"\n{'=' * 78}\n{scenario[1]}\n")
+        return None
+    kind, args, kwargs = scenario
+    return globals()[DEMO_RUNNERS[kind]](engine, *args, explain=explain, **kwargs)
+
+
+def run_demo(nodes_dir: Path | None = None, explain: bool = False) -> None:
+    roles, rosters = load_real_registry()
+    deans_by_building = json.loads((ROLES_DIR / "deans_by_building.json").read_text())
+    engine = build_engine(nodes_dir)
+    register_real_registry(roles, rosters, engine)
+    a, scenarios = demo_scenarios(engine, roles, rosters, deans_by_building)
+
+    print("Registry: 10 deans + 100 teachers + 390 students (1+10+39 per building x 10 buildings)")
+    print(f"Demo building: {a['home_building']}  dean={a['dean']}  teacher_a={a['teacher_a']}  teacher_b={a['teacher_b']}")
+    print(f"Scenario actors: roster_student={a['roster_student']}  non_roster_student={a['non_roster_student']}  "
+         f"peer_student={a['peer_student']}  other_building={a['other_building']}  other_dean={a['other_dean']}  "
+         f"cross_building_student={a['cross_building_student']}  visiting_student={a['visiting_student']}")
+
+    print_role_capabilities()
+    for scenario in scenarios:
+        run_demo_scenario(engine, scenario, explain=explain)
 
 
 def parse_args(argv=None):
@@ -1660,7 +1669,7 @@ def main(argv=None) -> None:
     set_enforce_policy(True)
     try:
         if args.demo:
-            run_demo(args.nodes_dir)
+            run_demo(args.nodes_dir, explain=args.explain)
         else:
             if not args.caller:
                 raise SystemExit("--caller is required unless --demo is given")

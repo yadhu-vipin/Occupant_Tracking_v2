@@ -1,0 +1,147 @@
+{
+  "runs_per_query": 200,
+  "parameters": {
+    "target": "0000102",
+    "building": "building_5",
+    "zone": "z8",
+    "t": "12:00:00",
+    "t1": "10:00:00",
+    "t2": "14:00:00"
+  },
+  "note": "json_bytes_with uses the full L4 explanation, the largest any caller can receive",
+  "queries": {
+    "Q1": {
+      "latency_ms_without": 0.6122,
+      "latency_ms_with": 0.8267,
+      "latency_overhead_pct": 35.0,
+      "redact_and_encode_ms": 0.4049,
+      "json_bytes_without": 4480,
+      "json_bytes_with": 19962,
+      "evidence_items": 56
+    },
+    "Q2": {
+      "latency_ms_without": 1.6773,
+      "latency_ms_with": 1.9055,
+      "latency_overhead_pct": 13.6,
+      "redact_and_encode_ms": 0.1499,
+      "json_bytes_without": 202,
+      "json_bytes_with": 8159,
+      "evidence_items": 27
+    },
+    "Q3": {
+      "latency_ms_without": 0.5396,
+      "latency_ms_with": 0.5601,
+      "latency_overhead_pct": 3.8,
+      "redact_and_encode_ms": 0.0237,
+      "json_bytes_without": 132,
+      "json_bytes_with": 1074,
+      "evidence_items": 2
+    },
+    "Q4": {
+      "latency_ms_without": 0.4463,
+      "latency_ms_with": 0.4511,
+      "latency_overhead_pct": 1.1,
+      "redact_and_encode_ms": 0.0162,
+      "json_bytes_without": 241,
+      "json_bytes_with": 1082,
+      "evidence_items": 2
+    },
+    "Q5": {
+      "latency_ms_without": 0.4453,
+      "latency_ms_with": 0.4675,
+      "latency_overhead_pct": 5.0,
+      "redact_and_encode_ms": 0.0243,
+      "json_bytes_without": 193,
+      "json_bytes_with": 1535,
+      "evidence_items": 3
+    },
+    "Q6": {
+      "latency_ms_without": 1.5722,
+      "latency_ms_with": 1.6189,
+      "latency_overhead_pct": 3.0,
+      "redact_and_encode_ms": 0.0101,
+      "json_bytes_without": 559,
+      "json_bytes_with": 1091,
+      "evidence_items": 1
+    },
+    "Q7": {
+      "latency_ms_without": 0.4577,
+      "latency_ms_with": 0.4909,
+      "latency_overhead_pct": 7.2,
+      "redact_and_encode_ms": 0.0432,
+      "json_bytes_without": 144,
+      "json_bytes_with": 2587,
+      "evidence_items": 7
+    },
+    "Q8": {
+      "latency_ms_without": 0.4159,
+      "latency_ms_with": 0.4183,
+      "latency_overhead_pct": 0.6,
+      "redact_and_encode_ms": 0.011,
+      "json_bytes_without": 195,
+      "json_bytes_with": 776,
+      "evidence_items": 1
+    },
+    "Q9": {
+      "latency_ms_without": 0.4216,
+      "latency_ms_with": 0.4256,
+      "latency_overhead_pct": 1.0,
+      "redact_and_encode_ms": 0.021,
+      "json_bytes_without": 354,
+      "json_bytes_with": 1373,
+      "evidence_items": 2
+    },
+    "Q10": {
+      "latency_ms_without": 1.1392,
+      "latency_ms_with": 1.2214,
+      "latency_overhead_pct": 7.2,
+      "redact_and_encode_ms": 0.0619,
+      "json_bytes_without": 913,
+      "json_bytes_with": 4208,
+      "evidence_items": 11
+    },
+    "Q11": {
+      "latency_ms_without": 0.497,
+      "latency_ms_with": 0.5346,
+      "latency_overhead_pct": 7.6,
+      "redact_and_encode_ms": 0.0458,
+      "json_bytes_without": 1323,
+      "json_bytes_with": 3673,
+      "evidence_items": 7
+    },
+    "Q12": {
+      "latency_ms_without": 1.5723,
+      "latency_ms_with": 1.8137,
+      "latency_overhead_pct": 15.4,
+      "redact_and_encode_ms": 0.4574,
+      "json_bytes_without": 1319,
+      "json_bytes_with": 24490,
+      "evidence_items": 86
+    },
+    "Q13": {
+      "latency_ms_without": 0.7247,
+      "latency_ms_with": 1.0293,
+      "latency_overhead_pct": 42.0,
+      "redact_and_encode_ms": 0.5875,
+      "json_bytes_without": 1906,
+      "json_bytes_with": 29495,
+      "evidence_items": 98
+    },
+    "TRACK": {
+      "latency_ms_without": 1.6124,
+      "latency_ms_with": 1.6409,
+      "latency_overhead_pct": 1.8,
+      "redact_and_encode_ms": 0.1112,
+      "json_bytes_without": 2549,
+      "json_bytes_with": 8321,
+      "evidence_items": 19
+    }
+  },
+  "totals": {
+    "latency_ms_without": 12.1337,
+    "latency_ms_with": 13.4045,
+    "json_bytes_without": 14510,
+    "json_bytes_with": 107826,
+    "latency_overhead_pct": 10.5
+  }
+}
