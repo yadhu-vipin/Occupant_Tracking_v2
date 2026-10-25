@@ -300,3 +300,91 @@ def test_present_visitor_pool_requires_a_corpus(tmp_path):
         assert "CorpusContext" in row["error"]
     finally:
         close_all(contexts)
+
+
+# ─── provenance (query explanations) ───────────────────────────────────────
+
+def test_local_row_carries_local_provenance(tmp_path):
+    make_building(tmp_path, "building_1", ["0000001", "0000002", "0000003"])
+    recognition = accepted_recognition()
+    recognition["votes"], recognition["minimum_votes"] = 18, 12
+    recognition["candidate_evidence"][1]["votes"] = 7
+    recognition["candidate_evidence"][2]["votes"] = 3
+    contexts = {}
+    try:
+        row = process_event(event(), recognition, None, contexts, tmp_path)
+    finally:
+        close_all(contexts)
+    assert row["provenance"] == {"mode": "local", "votes": 18, "min_votes": 12,
+                                 "vote_winner_is_nearest": True, "runner_up_votes": 7}
+
+
+def test_local_provenance_flags_a_vote_winner_that_is_not_nearest(tmp_path):
+    make_building(tmp_path, "building_1", ["0000001", "0000002"])
+    recognition = accepted_recognition(others=("0000002",))
+    recognition["candidate_evidence"][1]["min_angle_deg"] = 5.0   # someone else is closer
+    contexts = {}
+    try:
+        row = process_event(event(), recognition, None, contexts, tmp_path)
+    finally:
+        close_all(contexts)
+    assert row["provenance"]["vote_winner_is_nearest"] is False
+
+
+def test_routed_row_carries_routing_provenance(tmp_path):
+    make_building(tmp_path, "building_1", ["0000001"])
+    attempt = confirmed_retrieval()
+    attempt.update({"shortlist": ["building_4", "building_2", "building_7"],
+                    "bloom_scores": {"building_4": 30, "building_2": 27, "building_7": 10},
+                    "candidates_queried": 2, "verification_votes": 14})
+    contexts = {}
+    try:
+        row = process_event(event(), rejected_recognition(), attempt, contexts, tmp_path, routing_min_votes=12)
+    finally:
+        close_all(contexts)
+    assert row["provenance"] == {
+        "mode": "routed", "shortlist": ["building_4", "building_2", "building_7"],
+        "verifying_building": "building_2", "rank_of_verifier": 2, "buildings_asked": 2,
+        "bloom_score_gap": 3, "votes": 14, "min_votes": 12, "vote_winner_is_nearest": True,
+    }
+
+
+def test_present_pool_row_carries_pool_provenance(tmp_path):
+    make_building(tmp_path, "building_1", ["0000001"])
+    corpus = make_corpus()
+    contexts = {}
+    try:
+        process_event(visitor_event("E1", "zT", embedding_row=0), rejected_recognition(),
+                      confirmed_retrieval(occupant="0000009", home="building_2", others=()),
+                      contexts, tmp_path, corpus)
+        process_event(visitor_event("E2", "zT", embedding_row=2), rejected_recognition(),
+                      confirmed_retrieval(occupant="0000020", home="building_3", others=()),
+                      contexts, tmp_path, corpus)
+        row = process_event(visitor_event("E3", "z8", embedding_row=1), rejected_recognition(),
+                            confirmed_retrieval(occupant="0000009", home="building_2", others=()),
+                            contexts, tmp_path, corpus)
+    finally:
+        close_all(contexts)
+    assert row["provenance"]["mode"] == "present_visitor_pool"
+    assert row["provenance"]["pool_size"] == 2
+    assert row["provenance"]["vote_winner_is_nearest"] is True
+
+
+def test_unidentified_row_has_no_provenance(tmp_path):
+    row = process_event(event(), rejected_recognition(), unresolved_retrieval(), {}, tmp_path)
+    assert row["provenance"] is None
+
+
+def test_query_loader_reads_provenance_and_accepts_old_files(tmp_path):
+    from pipeline.query import load_event_log
+    base = {"timestamp": "08:00:00", "current_building": "building_1", "current_zone": "z1",
+            "identity_source": "local_registered_gallery", "identified_occupant_id": "0000001",
+            "verified_building": None, "occupant_probabilities": {"0000001": 1.0},
+            "bsts_state_after_update": None, "status": "IDENTIFIED"}
+    rows = [{**base, "event_id": "E1"},                                       # pre-provenance file row
+            {**base, "event_id": "E2", "provenance": {"mode": "local", "votes": 20}}]
+    path = tmp_path / "phase4_results.json"
+    path.write_text(json.dumps(rows), encoding="utf-8")
+    events = {e.event_id: e for e in load_event_log(path)}
+    assert events["E1"].provenance is None
+    assert events["E2"].provenance == {"mode": "local", "votes": 20}

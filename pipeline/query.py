@@ -106,6 +106,8 @@ class IdentifiedEvent:
     identity_probability: float | None   # Definition 3.3 confidence in *who*
     zone_distribution: dict[str, float] | None   # BSTS belief of *where*, post-update
     source: str                          # "local_registered_gallery" | "remote_verification"
+    # How the identity was reached (phase4_state.py); None for result files that predate it.
+    provenance: dict | None = field(default=None, compare=False, hash=False)
 
 
 def load_event_log(path: Path | None = None) -> list[IdentifiedEvent]:
@@ -134,6 +136,7 @@ def load_event_log(path: Path | None = None) -> list[IdentifiedEvent]:
             identity_probability=probabilities.get(occupant_id),
             zone_distribution=row.get("bsts_state_after_update"),
             source=row["identity_source"],
+            provenance=row.get("provenance"),
         ))
     return sorted(events, key=lambda e: e.timestamp)
 
