@@ -289,15 +289,19 @@ class EventGenerator:
         state.inside_building = True
 
 
-def print_report(events, truth, config):
-    print("\nGENERATED EVENTS\n" + "=" * 78)
-    print(f"{'Event':<10} {'Time':<10} {'Building':<14} {'Zone':<6} Embedding")
-    for event in events:
-        print(f"{event.event_id:<10} {event.timestamp:<10} {event.current_building:<14} {event.current_zone:<6} {event.embedding_row}")
-    print("\nGROUND TRUTH\n" + "=" * 78)
-    print(f"{'Event':<10} {'Occupant':<10} {'Home':<14} {'Current':<14} Zone")
-    for item in truth:
-        print(f"{item.event_id:<10} {item.occupant_id:<10} {item.home_building:<14} {item.current_building:<14} {item.current_zone}")
+def print_report(events, truth, config, max_listed=2000):
+    """Per-event listings only for small runs; a multi-day run would print tens of thousands of lines."""
+    if len(events) <= max_listed:
+        print("\nGENERATED EVENTS\n" + "=" * 78)
+        print(f"{'Event':<10} {'Time':<19} {'Building':<14} {'Zone':<6} Embedding")
+        for event in events:
+            print(f"{event.event_id:<10} {event.timestamp:<19} {event.current_building:<14} {event.current_zone:<6} {event.embedding_row}")
+        print("\nGROUND TRUTH\n" + "=" * 78)
+        print(f"{'Event':<10} {'Occupant':<10} {'Home':<14} {'Current':<14} Zone")
+        for item in truth:
+            print(f"{item.event_id:<10} {item.occupant_id:<10} {item.home_building:<14} {item.current_building:<14} {item.current_zone}")
+    else:
+        print(f"\n{len(events)} events generated (per-event listing suppressed above {max_listed}; see the JSON files)")
     visitors = sum(item.home_building != item.current_building for item in truth)
     print("\nSUMMARY\n" + "=" * 78)
     print(f"total events: {len(events)}\ntotal occupants: {len(set(item.occupant_id for item in truth))}\nlocal events: {len(events) - visitors}\nvisitor events: {visitors}\nvisitor percentage: {100 * visitors / len(events):.2f}%\nbuildings involved: {len(set(item.current_building for item in truth))}\nunique test embeddings: {len(set(event.embedding_row for event in events))}\nstart timestamp: {events[0].timestamp}\nend timestamp: {events[-1].timestamp}\nrandom seed: {config.seed}")

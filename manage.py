@@ -94,6 +94,7 @@ def main(argv):
         extra = event_args(pop_option(rest, "--days"), pop_option(rest, "--occupant-limit"))
         for s in seeds:
             pipeline(s, extra)
+        run("-m", "evaluation.summarize_runs", "--seeds", *seeds)
     elif task == "pipeline":
         pipeline(seed, event_args(pop_option(rest, "--days"), pop_option(rest, "--occupant-limit")))
     elif task == "states":

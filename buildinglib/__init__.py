@@ -10,7 +10,9 @@ ROUTING -- a captured face -> an identification (local, cached, or routed)
     refs     : rebuild one building's per-occupant reference tensor from the corpus
     verify   : vote() -- does the capture match a set of occupants?
     route    : score the capture's LSH codes against the published filters
-    node     : RoutingContract, BuildingNode, VisitorPool -- the query-time runtime
+    node     : RoutingContract, BuildingNode, VisitorPool (interactive cascade) -- the query-time runtime
+    visitor_pool : VisitorDB -- the building's dynamic visitor database (presence, day cache, entry
+                   history, permanent pool) used by the batch pipeline
 
     _vendored/ : byte-for-byte copies of lane_a/core/{lsh,bloom}.py so this
                  package runs standalone. Never edit these -- edit lane_a/core/
