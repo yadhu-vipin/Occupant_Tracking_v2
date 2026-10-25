@@ -69,7 +69,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from dsts.legacy_state.zones import ZONES, zone_label, zone_sector          # noqa: E402
 from pipeline.explain import (                                               # noqa: E402
-    QUERY_CLASS, EvidenceItem, Explanation, flag_counts, uncertainty_flags,
+    QUERY_CLASS, EvidenceItem, Explanation, flag_counts, format_explanation, redact,
+    refused_explanation, uncertainty_flags,
 )
 from nodelib.deploy import PointerStore                                      # noqa: E402
 from security.authorize import (                                            # noqa: E402
@@ -1115,13 +1116,19 @@ def track_answer(engine: QueryEngine, target_id: str) -> dict:
 def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: DisclosureLevel, at_time: str,
                              decision: PolicyDecision | None = None) -> dict:
     """Real Q6 (point-in-time location), redacted to match `level` and policy rule."""
+    return q6_disclosed(engine, target_id, level, at_time, decision)[0]
+
+
+def q6_disclosed(engine: QueryEngine, target_id: str, level: DisclosureLevel, at_time: str,
+                 decision: PolicyDecision | None = None) -> tuple[dict, QueryResult]:
+    """q6_answer_for_disclosure plus the underlying QueryResult (for its explanation)."""
     current = engine.Q6(occupant_id=target_id, at_time=at_time)
     if not current.success:
-        return {"error": f"no real detection of {target_id} at or before t={at_time}"}
+        return {"error": f"no real detection of {target_id} at or before t={at_time}"}, current
     zone, building, ts, prob = (current.answer["zone"], current.answer["building"],
                                current.answer["time"], current.answer["identity_probability"])
     if level == DisclosureLevel.L1_PRESENCE:
-        return check_office_presence(target_id, zone)
+        return check_office_presence(target_id, zone), current
     if decision and decision.policy_rule == "RULE_A_PEER_DEAN_COARSE":
         return {
             "occupant_id": target_id,
@@ -1130,7 +1137,7 @@ def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: Disclos
             "current_building": building,
             "status": f"In {building}",
             "approx_time": ts[:2] + ":00:00" if len(ts) == 8 else ts,
-        }
+        }, current
     if decision and decision.policy_rule in ("RULE_A_VISITOR_IN_OWN_BUILDING", "RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION"):
         return {
             "occupant_id": target_id,
@@ -1140,12 +1147,39 @@ def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: Disclos
             "sector": zone_sector(zone) if zone else "Unknown",
             "arrival_time": ts,
             "confidence": _confidence_band(prob),
-        }
+        }, current
     if level == DisclosureLevel.L2_CURRENT_ZONE:
         return {"building": building, "sector": zone_sector(zone) if zone else "Unknown",
-                "approx_time": ts[:2] + ":00:00" if len(ts) == 8 else ts, "confidence": _confidence_band(prob)}
+                "approx_time": ts[:2] + ":00:00" if len(ts) == 8 else ts,
+                "confidence": _confidence_band(prob)}, current
     return {"building": building, "zone": zone, "zone_label": zone_label(zone) if zone else "Unknown",
-           "time": ts, "probability": prob}
+            "time": ts, "probability": prob}, current
+
+
+def occupant_query_result(engine: QueryEngine, q_type: str, target_id: str, *, building_id: str | None,
+                          before_time: str | None, t1: str | None, t2: str | None,
+                          zone: str | None) -> QueryResult:
+    """Q3/Q4/Q5/Q7/Q8/Q9/Q11 for one target -- the trajectory queries behind L4."""
+    if q_type == "Q3":
+        return engine.Q3(occupant_id=target_id, building_id=building_id, before_time=before_time)
+    if q_type == "Q4":
+        return engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
+    if q_type == "Q5":
+        return engine.Q5(occupant_id=target_id, building_id=building_id)
+    if q_type == "Q7":
+        return engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
+    if q_type == "Q8":
+        return engine.Q8(occupant_id=target_id, zone=zone or "z1", building_id=building_id)
+    if q_type == "Q9":
+        return engine.Q9(occupant_id=target_id, zone=zone or "z1", building_id=building_id)
+    if q_type == "Q11":
+        return engine.Q11(occupant_id=target_id, t1=t1 or "08:00:00", t2=t2 or "18:00:00")
+    raise ValueError(f"not a single-occupant trajectory query: {q_type}")
+
+
+def print_reasoning(redacted: dict) -> None:
+    for line in format_explanation(redacted):
+        print(line)
 
 
 def get_real_role(occupant_id: str) -> str:
@@ -1257,10 +1291,14 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
     if parsed_purpose in INVESTIGATION_PURPOSES and caller_role != "dean":
         _print_denied("RULE_INVESTIGATION_REQUIRES_DEAN",
                       f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.")
+        if explain:
+            print_reasoning(refused_explanation(q_type))
         return
     denial = building_scope_denial(caller_role, caller_bld, building_id)
     if denial:
         _print_denied(*denial)
+        if explain:
+            print_reasoning(refused_explanation(q_type))
         return
     permitted = authorize(caller_id, "QUERY", target_resource)
     reason = get_audit_log()[-1]["reason"]
@@ -1279,6 +1317,11 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
     if include_evidence:
         for line in res.evidence[:3]:
             print(f"   {line}")
+    if explain:
+        decision = aggregate_decision(q_type, include_evidence=include_evidence, purpose=parsed_purpose,
+                                      building_id=building_id)
+        print(f"  Explainability Metadata:\n{json.dumps(decision.to_dict(), indent=4)}")
+        print_reasoning(redact(res.explanation, decision))
 
 
 def resolve_target_current_building(engine: QueryEngine, target_id: str, at_time: str) -> str | None:
@@ -1346,48 +1389,33 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         print(f"  Explainability Metadata:\n{json.dumps(decision.to_dict(), indent=4)}")
 
     if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
+        if explain:
+            print_reasoning(refused_explanation(q_type))
         return
     if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L4_HISTORICAL_TRACK:
         print(f"  DENIED (temporal scope): {q_type} is a trajectory query requiring L4_HISTORICAL_TRACK outright; "
              f"caller only holds {decision.level.name}")
+        if explain:
+            print_reasoning(refused_explanation(q_type))
         return
 
     if q_type == "Q6":
+        disclosed, res = q6_disclosed(engine, target_id, decision.level, at_time, decision)
+        explanation = res.explanation
         print(f"  Query:  Where was {target_id} at t={at_time}?")
-        print(f"  Disclosed ({decision.level.name}): {q6_answer_for_disclosure(engine, target_id, decision.level, at_time, decision)}")
-    elif q_type == "Q3":
-        res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=before_time)
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
-    elif q_type == "Q4":
-        res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
-    elif q_type == "Q5":
-        res = engine.Q5(occupant_id=target_id, building_id=building_id)
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
-    elif q_type == "Q7":
-        res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
-    elif q_type == "Q8":
-        target_zone = zone or "z1"
-        res = engine.Q8(occupant_id=target_id, zone=target_zone, building_id=building_id)
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
-    elif q_type == "Q9":
-        target_zone = zone or "z1"
-        res = engine.Q9(occupant_id=target_id, zone=target_zone, building_id=building_id)
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
-    elif q_type == "Q11":
-        res = engine.Q11(occupant_id=target_id, t1=t1 or "08:00:00", t2=t2 or "18:00:00")
-        print(f"  Query:  {res.query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+        print(f"  Disclosed ({decision.level.name}): {disclosed}")
     elif q_type == "TRACK":
+        answer, explanation = engine.track_explained(target_id)
         print(f"  Query:  Full historical trajectory for {target_id}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): {track_answer(engine, target_id)}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): {answer}")
+    else:
+        res = occupant_query_result(engine, q_type, target_id, building_id=building_id, before_time=before_time,
+                                    t1=t1, t2=t2, zone=zone)
+        explanation = res.explanation
+        print(f"  Query:  {res.query_text}")
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={res.answer}  evidence={res.evidence}")
+    if explain:
+        print_reasoning(redact(explanation, decision, caller_building=get_occupant_building(caller_id)))
 
 
 def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
@@ -1407,16 +1435,22 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
     if caller_role == "student":
         _print_denied("RULE_C_PEER_ZONE_SURVEILLANCE_DENIED",
                       "Student role cannot perform zone-level occupant surveillance (anti-stalking peer isolation).")
+        if explain:
+            print_reasoning(refused_explanation(q_type))
         return
     parsed_purpose = QueryPurpose.from_str(purpose)
     if parsed_purpose in INVESTIGATION_PURPOSES and caller_role != "dean":
         _print_denied("RULE_INVESTIGATION_REQUIRES_DEAN",
                       f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.")
+        if explain:
+            print_reasoning(refused_explanation(q_type))
         return
     denial = building_scope_denial(caller_role, caller_bld, building_id) if building_id else \
         ("RULE_CALLER_BUILDING_UNRESOLVED", "Caller's home building is unresolved; building-scoped queries are denied.")
     if denial:
         _print_denied(*denial)
+        if explain:
+            print_reasoning(refused_explanation(q_type))
         return
 
     permitted = authorize(caller_id, "QUERY", target_resource)
@@ -1442,6 +1476,11 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
     print(f"  Query:  {res.query_text}")
     print(f"  Answer: {filter_zone_answer(q_type, res.answer, keep)}")
     print(f"   {len(keep)} of {len(ids)} occupant(s) disclosed; {len(ids) - len(keep)} withheld by persona/building policy")
+    if explain:
+        decision = aggregate_decision(q_type, include_evidence=context.authorized_investigation,
+                                      purpose=parsed_purpose, building_id=building_id, disclosed=len(keep))
+        print(f"  Explainability Metadata:\n{json.dumps(decision.to_dict(), indent=4)}")
+        print_reasoning(redact(res.explanation, decision, disclosed_occupants=keep))
 
 
 def print_role_capabilities() -> None:

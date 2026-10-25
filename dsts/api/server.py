@@ -53,18 +53,20 @@ from pipeline.query import (
     load_real_registry,
     register_real_registry,
     QueryEngine,
-    track_answer,
     resolve_target_current_building,
-    q6_answer_for_disclosure,
     get_real_role,
     DEFAULT_AT_TIME,
     TRAJECTORY_QUERIES,
+    aggregate_decision,
     building_scope_denial as _building_scope_denial,
     filter_zone_answer as _filter_zone_answer,
     investigation_rights,
+    occupant_query_result,
+    q6_disclosed,
     zone_disclosed_ids,
     zone_ids as _zone_ids,
 )
+from pipeline.explain import redact, refused_explanation
 from pipeline.query_cache import QueryCache
 from security.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
 from security.campus_policy import (
@@ -799,6 +801,7 @@ def _denied_response(q_type: str, template_fmt: str, caller_meta: dict, rule: st
         },
         "answer": None,
         "evidence": [],
+        "explanation": refused_explanation(q_type),
         "error": reason,
     }
     if target_meta is not None:
@@ -908,15 +911,20 @@ def execute_query_endpoint(
                                     f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
 
         include_evidence = auth_inv  # only a Dean on an investigation/audit, in their own building
+        decision = aggregate_decision(q_type, include_evidence=include_evidence, purpose=parsed_purpose,
+                                      building_id=building_id)
         # Key includes caller_id and caller_bld so Deans from different buildings never
-        # share a cache entry for the same building aggregate query.
+        # share a cache entry, and the disclosure level so a redacted explanation is
+        # never served at another level.
         key = QueryCache.make_key(*base_key,
-                                  caller_role=f"agg|{caller_id}|{caller_bld}|evidence={include_evidence}")
+                                  caller_role=f"agg|{caller_id}|{caller_bld}|evidence={include_evidence}"
+                                              f"|{decision.level.name}")
 
         def _run_building() -> dict:
             res = engine.Q1(building_id=building_id, after_time=at_time) if q_type == "Q1" \
                 else engine.Q2(building_id=building_id, at_time=at_time)
-            return {"answer": res.answer, "evidence": res.evidence if include_evidence else []}
+            return {"answer": res.answer, "evidence": res.evidence if include_evidence else [],
+                    "explanation": redact(res.explanation, decision)}
 
         def _audit_building(cache_hit: bool) -> None:
             """Write an audit entry for every building query, including cache hits.
@@ -939,17 +947,10 @@ def execute_query_endpoint(
             "query_type": q_type,
             "template_query": template_fmt,
             "caller": caller_meta,
-            "decision": {
-                "permitted": True,
-                "disclosure_level": "L4_HISTORICAL_TRACK" if include_evidence else "L2_CURRENT_ZONE",
-                "policy_rule": "RULE_BUILDING_AGGREGATE",
-                "reason": "Building-level aggregate permitted; individual occupant IDs redacted unless an authorized investigation",
-                "visitor_status": "AGGREGATE",
-                "exposed_fields": ["building_id", "counts", "aggregate_metrics"],
-                "redacted_fields": ["individual_trajectories", "individual_occupant_ids", "biometric_data"],
-            },
+            "decision": decision.to_dict(),
             "answer": data["answer"],
             "evidence": data["evidence"],
+            "explanation": data["explanation"],
         }
         if hit:
             result["_cache_hit"] = True
@@ -970,7 +971,11 @@ def execute_query_endpoint(
                                     f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
 
         ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours, authorized_investigation=auth_inv)
-        key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}|{is_office_hours}")
+        # The per-occupant disclosure levels are fixed by (caller, purpose, investigation
+        # rights, office hours); the grant is spelled out so levels never share an entry.
+        grant = "L4_INVESTIGATION" if auth_inv else "L2_COUNTS"
+        key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}"
+                                                         f"|{is_office_hours}|{grant}")
 
         def _run_zone() -> dict:
             if q_type == "Q10":
@@ -982,11 +987,14 @@ def execute_query_endpoint(
             ids = _zone_ids(q_type, res.answer)
             keep = zone_disclosed_ids(caller_id, ids, ctx, building_id)
             filtered = _filter_zone_answer(q_type, res.answer, keep)
+            zone_decision = aggregate_decision(q_type, include_evidence=auth_inv, purpose=parsed_purpose,
+                                               building_id=building_id, disclosed=len(keep))
             return {
                 "answer": filtered,
                 "evidence": [f"  {len(keep)} of {len(ids)} occupant(s) disclosed; "
                              f"{len(ids) - len(keep)} withheld by persona/building policy"],
                 "disclosed": len(keep),
+                "explanation": redact(res.explanation, zone_decision, disclosed_occupants=keep),
             }
 
         data, hit = _cached_exec(key, _run_zone)
@@ -996,17 +1004,11 @@ def execute_query_endpoint(
             "query_type": q_type,
             "template_query": template_fmt,
             "caller": caller_meta,
-            "decision": {
-                "permitted": True,
-                "disclosure_level": "L3_PRECISE_CURRENT" if data["disclosed"] else "L2_CURRENT_ZONE",
-                "policy_rule": "RULE_ZONE_PER_OCCUPANT_FILTER",
-                "reason": f"Zone query in {building_id}: each occupant filtered through persona/building policy (L3+ required to be listed)",
-                "visitor_status": "ZONE_MONITORING",
-                "exposed_fields": ["occupants (policy-permitted only)", "counts", "zone_id", "building_id"],
-                "redacted_fields": ["occupants (policy-denied)", "biometric_raw_gallery"],
-            },
+            "decision": aggregate_decision(q_type, include_evidence=auth_inv, purpose=parsed_purpose,
+                                           building_id=building_id, disclosed=data["disclosed"]).to_dict(),
             "answer": data["answer"],
             "evidence": data["evidence"],
+            "explanation": data["explanation"],
         }
         if hit:
             result["_cache_hit"] = True
@@ -1051,6 +1053,7 @@ def execute_query_endpoint(
             "decision": decision.to_dict(),
             "answer": None,
             "evidence": [],
+            "explanation": refused_explanation(q_type),
             "error": f"{q_type} is a full trajectory query requiring L4_HISTORICAL_TRACK; caller only holds {decision.level.name}.",
         }
 
@@ -1062,24 +1065,16 @@ def execute_query_endpoint(
 
     def _run_occupant() -> dict:
         if q_type == "Q6":
-            return {"answer": q6_answer_for_disclosure(engine, target_id, decision.level, at_time, decision), "evidence": []}
-        if q_type == "TRACK":
-            return {"answer": track_answer(engine, target_id), "evidence": []}
-        if q_type == "Q3":
-            res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=at_time)
-        elif q_type == "Q4":
-            res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
-        elif q_type == "Q5":
-            res = engine.Q5(occupant_id=target_id, building_id=building_id)
-        elif q_type == "Q7":
-            res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
-        elif q_type == "Q8":
-            res = engine.Q8(occupant_id=target_id, zone=zone, building_id=building_id)
-        elif q_type == "Q9":
-            res = engine.Q9(occupant_id=target_id, zone=zone, building_id=building_id)
-        else:  # Q11
-            res = engine.Q11(occupant_id=target_id, t1=t1, t2=t2)
-        return {"answer": res.answer, "evidence": res.evidence}
+            answer, res = q6_disclosed(engine, target_id, decision.level, at_time, decision)
+            answer, evidence, explanation = answer, [], res.explanation
+        elif q_type == "TRACK":
+            (answer, explanation), evidence = engine.track_explained(target_id), []
+        else:   # Q3 reads its cut-off from time_t
+            res = occupant_query_result(engine, q_type, target_id, building_id=building_id, before_time=at_time,
+                                        t1=t1, t2=t2, zone=zone)
+            answer, evidence, explanation = res.answer, res.evidence, res.explanation
+        return {"answer": answer, "evidence": evidence,
+                "explanation": redact(explanation, decision, caller_building=caller_bld)}
 
     data, hit = _cached_exec(key, _run_occupant)
     m.queries_executed_total.labels(query_type=q_type, status="success").inc()
@@ -1092,6 +1087,7 @@ def execute_query_endpoint(
         "decision": decision.to_dict(),
         "answer": data["answer"],
         "evidence": data["evidence"],
+        "explanation": data["explanation"],
     }
     if hit:
         result["_cache_hit"] = True

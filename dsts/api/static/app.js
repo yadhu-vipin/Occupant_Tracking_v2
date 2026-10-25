@@ -1529,6 +1529,51 @@ function executeCurrentQuery() {
   });
 }
 
+// Rule / Evidence / Absence / Uncertainty / Withheld, as redacted by the server.
+function renderReasoning(expl) {
+  const card = $("#reasoning-card");
+  const body = $("#reasoning-body");
+  if (!card || !body) return;
+  if (!expl) {
+    card.style.display = "none";
+    return;
+  }
+  card.style.display = "block";
+  const level = $("#reasoning-level");
+  if (level) level.textContent = expl.disclosure_level || "";
+
+  const row = (label, html) =>
+    `<div style="margin-bottom:6px;"><span style="font-weight:700;color:var(--muted);display:inline-block;min-width:96px;">${label}</span>${html}</div>`;
+  const parts = [];
+  if (expl.rule) parts.push(row("Rule", escapeHTML(expl.rule)));
+
+  const evidence = expl.evidence || [];
+  if (evidence.length) {
+    const items = evidence.slice(0, 12).map(e => {
+      const bits = [e.time, e.building, e.zone, e.occupant_id ? `occupant ${e.occupant_id}` : null,
+                    e.event_id ? `(${e.event_id})` : null, e.provenance?.mode ? `via ${e.provenance.mode}` : null,
+                    e.note].filter(Boolean).map(escapeHTML).join(" · ");
+      return `<li><span class="badge-level" style="margin-right:6px;">${escapeHTML(e.role)}</span>${bits}</li>`;
+    }).join("");
+    const more = evidence.length > 12 ? `<li>… and ${evidence.length - 12} more</li>` : "";
+    parts.push(row("Evidence", `<ul style="margin:4px 0 0 0;padding-left:18px;font-family:var(--mono);">${items}${more}</ul>`));
+  } else if ("evidence" in expl) {
+    parts.push(row("Evidence", "none shown"));
+  }
+  if (expl.pointer_used) parts.push(row("Pointer", escapeHTML(JSON.stringify(expl.pointer_used))));
+  if (expl.details && Object.keys(expl.details).length) parts.push(row("Details", escapeHTML(JSON.stringify(expl.details))));
+  if (expl.absence) parts.push(row("Absence", escapeHTML(expl.absence)));
+  if ("uncertainty" in expl) {
+    parts.push(row("Uncertainty", (expl.uncertainty || []).length
+      ? expl.uncertainty.map(f => `<span class="tag-redacted">${escapeHTML(f)}</span>`).join(" ")
+      : "none"));
+  }
+  parts.push(row("Withheld", (expl.withheld || []).length
+    ? expl.withheld.map(escapeHTML).join("; ")
+    : "nothing"));
+  body.innerHTML = parts.join("");
+}
+
 async function runQuery(body) {
   const button = $("#btn-query");
   try {
@@ -1607,6 +1652,9 @@ async function runQuery(body) {
         }
       }
     }
+
+    // 2b. Answer reasoning: the server sends it already redacted for this caller.
+    renderReasoning(data.explanation);
 
     // 3. Update Explainability Card
     const explainCard = $("#explain-card");

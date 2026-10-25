@@ -225,6 +225,12 @@ def _redact_many_people(explanation: Explanation, decision, disclosed_occupants)
     return out
 
 
+def refused_explanation(query_id: str | None) -> dict:
+    """L0: nothing about how an answer would have been derived."""
+    return {"query_id": query_id, "disclosure_level": "L0_NONE",
+            "withheld": ["entire explanation: the query was refused"]}
+
+
 def redact(explanation: Explanation | None, decision, *, caller_building: str | None = None,
            disclosed_occupants=None) -> dict:
     """The explanation as ``decision`` (a PolicyDecision) lets the caller see it.
@@ -235,10 +241,8 @@ def redact(explanation: Explanation | None, decision, *, caller_building: str | 
     view of a visitor (VISITOR_IN_BUILDING) to the Dean's own building.
     ``withheld`` always says what was removed and why, never the values.
     """
-    query_id = explanation.query_id if explanation else None
     if decision is None or not decision.permitted or decision.level <= DisclosureLevel.L0_NONE:
-        return {"query_id": query_id, "disclosure_level": "L0_NONE",
-                "withheld": ["entire explanation: the query was refused"]}
+        return refused_explanation(explanation.query_id if explanation else None)
     if explanation is None:
         return {"query_id": None, "disclosure_level": decision.level.name, "withheld": ["no explanation was built"]}
     if explanation.query_id in AGGREGATE_QUERIES + ZONE_QUERIES:
