@@ -98,6 +98,51 @@ def test_q2_no_visitors_when_only_home_occupants_seen():
     assert qr.answer is False  # A and B are both registered at building_1
 
 
+def _q2_engine():
+    """building_1 roster has 4 people, only R1 is present at 10:00; two visitors are present."""
+    events = [
+        _event("R1a", "08:00:00", "building_1", "zT", "R1", "building_1"),
+        _event("R1b", "08:05:00", "building_1", "z3", "R1", "building_1"),
+        _event("R2a", "08:00:00", "building_1", "z1", "R2", "building_1"),
+        _event("R2b", "08:30:00", "building_1", "z8", "R2", "building_1"),
+        _event("R2c", "08:31:00", "building_1", "zT", "R2", "building_1"),     # R2 departs via zT
+        _event("R3a", "08:00:00", "building_1", "z1", "R3", "building_1"),
+        _event("R3b", "09:00:00", "building_2", "zT", "R3", "building_1", source="remote_verification"),
+        _event("V1a", "09:00:00", "building_1", "zT", "V1", "building_2", source="remote_verification"),
+        _event("V1b", "09:10:00", "building_1", "z8", "V1", "building_2", source="remote_verification"),
+        _event("V2a", "09:30:00", "building_1", "zT", "V2", "building_2", source="remote_verification"),
+        _event("V3a", "08:00:00", "building_1", "zT", "V3", "building_2", source="remote_verification"),
+        _event("V3b", "08:10:00", "building_1", "z8", "V3", "building_2", source="remote_verification"),
+        _event("V3c", "08:20:00", "building_1", "zT", "V3", "building_2", source="remote_verification"),
+    ]
+    registry = {"building_1": {"R1", "R2", "R3", "R4"}, "building_2": {"V1", "V2", "V3"}}
+    return QueryEngine(sorted(events, key=lambda e: e.timestamp), registry, enforce_rbac=False)
+
+
+def test_q2_compares_present_visitors_with_present_registered_not_roster_size():
+    # Present at 10:00: R1 (registered) and V1, V2 (visitors). The old rule compared
+    # visitors seen so far (3) with the roster size (4) and answered False.
+    qr = _q2_engine().Q2("building_1", "10:00:00")
+    assert qr.answer is True
+    assert "(2) > #registered (1)" in qr.query_text
+
+
+def test_q2_zt_departures_and_building_changes_are_not_present():
+    engine = _q2_engine()
+    present = engine._present_at("building_1", "10:00:00")
+    assert set(present) == {"R1", "V1", "V2"}   # R2, V3 left via zT; R3 is in building_2
+    assert "R3" in engine._present_at("building_2", "10:00:00")
+
+
+def test_q2_zt_arrival_counts_as_present():
+    # V2's only event is a zT arrival, so V2 is present right away.
+    assert "V2" in _q2_engine()._present_at("building_1", "09:30:00")
+
+
+def test_q2_before_anyone_arrives_is_false():
+    assert _q2_engine().Q2("building_1", "07:00:00").answer is False
+
+
 def test_q3_occupant_left_building():
     engine = _fixture_engine()
     qr = engine.Q3("A", "building_1", "23:59:59")

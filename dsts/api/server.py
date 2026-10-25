@@ -59,6 +59,11 @@ from pipeline.query import (
     get_real_role,
     DEFAULT_AT_TIME,
     TRAJECTORY_QUERIES,
+    building_scope_denial as _building_scope_denial,
+    filter_zone_answer as _filter_zone_answer,
+    investigation_rights,
+    zone_disclosed_ids,
+    zone_ids as _zone_ids,
 )
 from pipeline.query_cache import QueryCache
 from security.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
@@ -770,11 +775,8 @@ class QueryRequestBody(BaseModel):
 _BUILDING_QUERIES = ("Q1", "Q2")
 _ZONE_QUERIES = ("Q10", "Q12", "Q13")
 _OCCUPANT_QUERIES = ("Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q11", "TRACK")
-_SCOPE_RULE_BY_ROLE = {
-    "dean": "RULE_A_CROSS_BUILDING_DENIED",
-    "teacher": "RULE_B_CROSS_BUILDING_DENIED",
-    "student": "RULE_C_CROSS_BUILDING_DENIED",
-}
+# Building- and zone-query access helpers (_building_scope_denial, _filter_zone_answer,
+# _zone_ids) live in pipeline/query.py so the CLI applies exactly the same rules.
 
 
 def _denied_response(q_type: str, template_fmt: str, caller_meta: dict, rule: str, reason: str,
@@ -828,31 +830,6 @@ def _cached_exec(key: tuple, fn, audit_fn=None) -> tuple[dict, bool]:
     return value, False
 
 
-def _building_scope_denial(caller_role: str, caller_bld: Optional[str], building_id: str) -> Optional[tuple[str, str]]:
-    """Every role is confined to its own home building for building- and zone-level queries."""
-    if caller_bld is None:
-        return "RULE_CALLER_BUILDING_UNRESOLVED", "Caller's home building is unresolved; building-scoped queries are denied."
-    if caller_bld != building_id:
-        return (_SCOPE_RULE_BY_ROLE.get(caller_role, "RULE_CROSS_BUILDING_DENIED"),
-                f"{caller_role.capitalize()} of {caller_bld} cannot query external building {building_id}.")
-    return None
-
-
-def _filter_zone_answer(q_type: str, answer: Any, keep: set) -> Any:
-    if q_type == "Q13":
-        return {
-            "total_visitors": answer["total_visitors"],
-            "disclosed_visitors": len(keep),
-            "occupants": sorted(o for o in answer["occupants"] if o in keep),
-            "top_visitors": [t for t in answer["top_visitors"] if t["occupant_id"] in keep],
-        }
-    return [o for o in answer if o in keep]
-
-
-def _zone_ids(q_type: str, answer: Any) -> list[str]:
-    return list(answer["occupants"]) if q_type == "Q13" else list(answer)
-
-
 @app.post("/api/query")
 def execute_query_endpoint(
     body: QueryRequestBody,
@@ -900,7 +877,7 @@ def execute_query_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.",
         )
-    auth_inv = (caller_role == "dean" and parsed_purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT))
+    auth_inv = investigation_rights(caller_role, parsed_purpose)
     is_office_hours = determine_office_hours(at_time)
 
     # 4. Target resolution
@@ -1003,15 +980,7 @@ def execute_query_endpoint(
             else:
                 res = engine.Q13(zone=zone, building_id=building_id)
             ids = _zone_ids(q_type, res.answer)
-            # A zone answer reveals an exact zone per occupant, i.e. L3 disclosure about each of them.
-            # Each occupant is therefore run through the same persona/building policy as a point
-            # query; only those the caller may see at L3+ are disclosed, the rest are counted.
-            keep = set()
-            for occ in ids:
-                d = evaluate_campus_query_policy(
-                    caller_id, occ, context=ctx, purpose=ctx.purpose, target_current_building=building_id)
-                if d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT:
-                    keep.add(occ)
+            keep = zone_disclosed_ids(caller_id, ids, ctx, building_id)
             filtered = _filter_zone_answer(q_type, res.answer, keep)
             return {
                 "answer": filtered,
