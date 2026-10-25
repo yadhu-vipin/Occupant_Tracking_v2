@@ -65,21 +65,49 @@ function renderZones(){
  if(!S.b&&B().length)S.b=B()[0].id;
  const sel=$("#heatmap-building");if(!sel.options.length)sel.innerHTML='<option value="all">All Buildings</option>'+B().map(b=>`<option>${b.id}</option>`).join("");sel.value=S.b;
  $("#bcards").innerHTML=B().map(b=>`<button class="bc ${S.b===b.id?"on":""}" data-b="${b.id}"><b>${b.id}</b><span>${b.occupants.length} occupants</span></button>`).join("");
- $$(".bc").forEach(x=>x.onclick=()=>{S.b=x.dataset.b;S.z=null;renderZones()});
- const c=counts(S.b),m=Math.max(1,...Object.values(c));
+ $$(".bc").forEach(x=>x.onclick=()=>{S.b=x.dataset.b;S.z=null;S.win?applyWindow():renderZones()});
+ const win=S.win&&S.win.building===S.b,c=win?winCounts():counts(S.b),m=Math.max(1,...Object.values(c));
  $("#zmap-title").textContent=S.b==="all"?"All buildings · zones":`${S.b} Zones`;
- $("#plane").innerHTML=ZONES.map(([z,l])=>{const n=c[z]||0,h=8+Math.round(n/m*26),col=heat(n,m);return `<button class="tile ${S.z===z?"sel":""}" data-z="${z}" style="--c:${col};--h:${h}px" title="${l}: ${n} tracked"><span class="f1"></span><span class="f2"></span><span class="t"><em>${z}<br><small>${n}</small></em></span></button>`}).join("");
+ $("#plane").innerHTML=ZONES.map(([z,l])=>{const n=c[z]||0,h=8+Math.round(n/m*26),col=heat(n,m);return `<button class="tile ${S.z===z?"sel":""}" data-z="${z}" style="--c:${col};--h:${h}px" title="${l}: ${n} ${win?"in the time frame":"tracked"}"><span class="f1"></span><span class="f2"></span><span class="t"><em>${z}<br><small>${n}</small></em></span></button>`}).join("");
  $$(".tile").forEach(t=>t.onclick=()=>{S.z=t.dataset.z;renderZones()});
- zoneDetail(c,m);
+ zoneDetail(c,m);renderZoneTable();
 }
-function zoneDetail(c,m){
+function zoneDetail(c,m){if(S.win&&S.win.building===S.b)return windowDetail(S.z||"z1");
  const z=S.z||"z1",lab=(ZONES.find(x=>x[0]===z)||[])[1],n=c[z]||0,t=n/m,lvl=!n?["lo","Empty"]:t>.66?["hi","High Occupancy"]:t>.33?["md","Medium Occupancy"]:["lo","Low Occupancy"];
  const rows=rowsFrom(S.occ).filter(r=>(S.b==="all"||r.building_id===S.b)&&r.zone===z),ev=S.hist.filter(r=>(S.b==="all"||r.building_id===S.b)&&r.zone===z).map(r=>r.timestamp);
  const bk=Array(10).fill(0);if(ev.length){const lo=Math.min(...ev),sp=Math.max(...ev)-lo||1;ev.forEach(x=>bk[Math.min(9,Math.floor((x-lo)/sp*10))]++)}const mx=Math.max(1,...bk);
  const cf=rows.map(r=>r.probability).filter(p=>p!=null);
  $("#zone-detail").innerHTML=`<div class="ch"><h3>Zone Details</h3></div><div class="ch"><div><h2>${safe(S.b==="all"?"All":S.b)} · ${z}</h2><span class="muted">${safe(lab)}</span></div><span class="badge ${lvl[0]}">${lvl[1]}</span></div><div class="stat2"><div><small>Tracked Occupants</small><b>${n}</b></div><div><small>Avg Confidence</small><b>${cf.length?avg(cf).toFixed(2):"—"}</b></div></div><h3>Recent Activity</h3><div class="bars">${bk.map(v=>`<i style="height:${v/mx*100}%" title="${v} events"></i>`).join("")}</div><div class="chips">${rows.length?rows.map(r=>`<span class="chip">${safe(r.occupant)}</span>`).join(""):'<span class="muted">No current occupant records for this zone.</span>'}</div>`;
 }
-$("#heatmap-building").onchange=e=>{S.b=e.target.value;S.z=null;renderZones()};
+$("#heatmap-building").onchange=e=>{S.b=e.target.value;S.z=null;if(S.win&&S.b==="all")clearWindow();else S.win?applyWindow():renderZones()};
+/* time-frame filter: who was in each zone of the selected building between two moments */
+const winCounts=()=>Object.fromEntries(ZONES.map(([z])=>[z,S.win?.zones?.[z]?.count||0]));
+const fmtW=t=>t?String(t).replace("T"," "):"—";
+async function applyWindow(){
+ if(S.b==="all"||!S.b)S.b=B()[0]?.id;
+ const role=$("#zf-role").value,q=new URLSearchParams({building:S.b});
+ if($("#zf-start").value)q.set(INTEG?"start":"start",$("#zf-start").value);if($("#zf-end").value)q.set("end",$("#zf-end").value);
+ if(INTEG)q.set("purpose",$("#zf-purpose").value);else q.set("role",role);
+ try{S.win=await api("/api/zone-presence?"+q.toString(),{},role);
+  $("#zf-note").textContent=`${S.win.building}: ${S.win.total} different people between ${fmtW(S.win.start)} and ${fmtW(S.win.end)}`+(S.win.withheld?` — ${S.win.withheld} not named for this role.`:".")}
+ catch(e){S.win=null;$("#zf-note").textContent="Time frame failed: "+e.message}
+ renderZones();
+}
+function clearWindow(){S.win=null;$("#zf-note").textContent="";renderZones()}
+function windowDetail(z){
+ const w=S.win.zones[z]||{count:0,disclosed:0,occupants:[]},lab=(ZONES.find(x=>x[0]===z)||[])[1];
+ $("#zone-detail").innerHTML=`<div class="ch"><h3>Zone Details</h3></div><div class="ch"><div><h2>${safe(S.b)} · ${z}</h2><span class="muted">${safe(lab)}</span></div><span class="badge ${w.count?"md":"lo"}">${w.count} in time frame</span></div><div class="stat2"><div><small>People in window</small><b>${w.count}</b></div><div><small>Named for you</small><b>${w.disclosed}</b></div></div><h3>${fmtW(S.win.start)} → ${fmtW(S.win.end)}</h3><div class="chips">${w.occupants.length?w.occupants.map(o=>`<span class="chip" title="first ${safe(o.first_seen)} · last ${safe(o.last_seen)}${o.visitor?" · visitor from "+safe(o.home_building):""}">${safe(o.occupant)}${o.visitor?" ↗":""}</span>`).join(""):`<span class="muted">${w.count?"Present, but your role may not see who.":"Nobody was in this zone in the time frame."}</span>`}</div>`;
+}
+function renderZoneTable(){
+ const box=$("#zone-table");if(!(S.win&&S.win.building===S.b)){box.style.display="none";return}
+ box.style.display="";
+ const rows=ZONES.map(([z,l])=>{const w=S.win.zones[z]||{count:0,disclosed:0,occupants:[]};
+  const who=w.occupants.map(o=>`<span class="chip" title="first ${safe(o.first_seen)} · last ${safe(o.last_seen)}">${safe(o.occupant)}${o.visitor?" ↗":""}</span>`).join("")||(w.count?'<span class="muted">not named for this role</span>':'<span class="muted">—</span>');
+  return `<tr><td>${z} · ${safe(l)}</td><td>${w.count}</td><td><div class="chips">${who}</div></td></tr>`}).join("");
+ box.innerHTML=`<div class="ch"><h3>${safe(S.b)} — who was where, ${fmtW(S.win.start)} → ${fmtW(S.win.end)}</h3><span class="pill">${S.win.total} people</span></div><div class="table-wrap"><table><thead><tr><th>Zone</th><th>People</th><th>Who (↗ = visitor; hover for first / last seen)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+$("#zf-apply").onclick=applyWindow;$("#zf-clear").onclick=clearWindow;
+if(!INTEG&&$("#zf-purpose-field"))$("#zf-purpose-field").style.display="none";
 /* security */
 let secTab="logs",SEC=null;
 const ROLES=INTEG?[["officer","Acts as the Dean of the demo building: local occupants at sector level (L2), exact detail and trajectories only on an authorised investigation or audit; visitors in the building while present"],["analyst","Acts as a Teacher of the demo building: rostered and local students at sector level (L2) in office hours; nothing about other buildings"],["self","Acts as a Student of the demo building: only their own data (L4 self-query); staff availability (L1) in office hours; never other students"]]:[["officer","Full detail: time, zone, occupant, probability"],["analyst","Aggregated: pseudonymised occupant handle, no raw probability"],["self","Only rows that belong to the requesting occupant"]];
@@ -125,6 +153,7 @@ async function connectLive(){let q="";if(INTEG){try{const r=await fetch("/api/ws
  try{
   if(INTEG)await login();
   S.layout=await api("/api/layout");
+  $("#zf-start").value=`${dayD()}T08:00`;$("#zf-end").value=`${dayD()}T18:00`;
   const b0=B()[0];PH.building=S.layout.home_building||b0?.id;PH.occupant=S.layout.default_target||b0?.occupants?.[0];initQueries();showAs();
   await refresh();
  }catch(e){console.error(e);initQueries();$("#campus").innerHTML='<p class="muted">Could not load project API: '+safe(e.message)+(INTEG?' — start the server with DSTS_DEMO_MODE=1 and build a run first (python manage.py run --seeds 42 --days 1).':'')+'</p>'}

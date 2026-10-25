@@ -37,10 +37,17 @@
 
 <section id="v-zones" class="view">
  <div class="ch pad"><div><h2>Building &amp; Zone Map</h2><p class="muted">Every configured zone is shown for every building with real-time occupancy.</p></div><label class="field">Building<select id="heatmap-building"></select></label></div>
- <div class="bcards" id="bcards"></div>
+ <div class="card pad" id="zone-filter"><div class="ch"><div><h3>Time frame</h3><p class="muted">Pick a building below, set a window and see who was in each of its zones. Clear it to return to the live view.</p></div></div>
+ <div class="row"><label class="field">From<input type="datetime-local" id="zf-start"></label><label class="field">To<input type="datetime-local" id="zf-end"></label>
+ <label class="field">View as<select id="zf-role"><option value="officer">Officer</option><option value="analyst">Analyst</option><option value="self">Self</option></select></label>
+ <label class="field" id="zf-purpose-field">Purpose<select id="zf-purpose"><option value="general_lookup">General lookup</option><option value="security_investigation">Security investigation</option><option value="audit">Audit</option></select></label>
+ <button id="zf-apply">Show who was there</button><button id="zf-clear" class="ghost">Live view</button></div>
+ <p class="small muted" id="zf-note" aria-live="polite"></p></div>
+<div class="bcards" id="bcards"></div>
  <div class="grid2 z"><div class="card"><div class="ch"><h3 id="zmap-title">Zones</h3></div><div class="stage"><div class="plane" id="plane"></div></div>
   <div class="legend"><span>Low</span><i></i><span>High</span></div></div>
  <div class="card" id="zone-detail"></div></div>
+ <div class="card" id="zone-table" style="display:none"></div>
 </section>
 
 <section id="v-query" class="view"><div class="card"><div class="ch"><div><h3>Research-paper query templates</h3><p class="muted">Choose one of the 13 query types, enter its parameters, and execute it against available tracking records.</p></div></div>

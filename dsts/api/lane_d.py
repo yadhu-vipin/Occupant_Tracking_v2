@@ -122,6 +122,75 @@ def recent_events(limit: int = 200, who: str = Depends(principal)) -> List[dict]
     return out[::-1]
 
 
+@router.get("/api/zone-presence")
+def zone_presence(building: str, start: Optional[str] = None, end: Optional[str] = None,
+                  purpose: str = "general_lookup", who: str = Depends(principal)) -> dict:
+    """Who was in each zone of ``building`` at any time between ``start`` and ``end`` (default: the whole latest day).
+
+    Counts per zone are aggregates and are shown to every signed-in role, like the heat map. The *names* are disclosed
+    occupant by occupant through the persona policy: only those the caller may see at L3+ (exact zone) are listed, the
+    rest are counted as withheld. A Dean sees names of local occupants (and visitors in the building) for a
+    ``security_investigation`` or ``audit`` purpose; a Student sees only themselves."""
+    from access_control.authorize import audit_policy_decision
+    from access_control.campus_policy import DisclosureLevel, QueryContext, QueryPurpose, evaluate_campus_query_policy
+    from dsts.presence import DAY, presence_in_window
+    from dsts.state.zones import ZONES, zone_label
+    from shared.timeutil import with_date
+
+    srv = _srv()
+    engine = srv._get_engine()
+    bid = _building_id(building)
+    if bid not in engine.registered:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown building: {building}")
+    parsed = srv.validate_purpose(purpose)
+    role = srv.get_real_role(who)
+    investigation = parsed in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT)
+    if investigation and role != "dean":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Caller role '{role}' is not authorized to initiate security investigation or audit.")
+
+    multi_day = bool(engine.default_date)
+    start_text = _timestamp(start, multi_day) or "00:00:00"
+    end_text = _timestamp(end, multi_day) or "23:59:59"
+    try:
+        t0, t1 = to_seconds(with_date(start_text, engine.default_date)), to_seconds(with_date(end_text, engine.default_date))
+        if t1 < t0:
+            raise ValueError("the end of the time frame is before its start")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    floor = int(t0 // DAY) * DAY                       # earlier days cannot overlap: nobody stays on campus overnight
+    rows = ((e.occupant_id, e.building, e.zone, t, e.timestamp, e.home_building)
+            for e in engine.events if floor <= (t := to_seconds(e.timestamp)) <= t1)
+    found = presence_in_window(rows, bid, t0, t1)
+
+    ctx = QueryContext(purpose=parsed, is_office_hours=is_office_hours(with_date(start_text, engine.default_date)),
+                       authorized_investigation=(role == "dean" and investigation))
+    verdict: Dict[str, bool] = {}
+
+    def may_name(occupant: str) -> bool:
+        if occupant not in verdict:
+            d = evaluate_campus_query_policy(who, occupant, context=ctx, purpose=parsed, target_current_building=bid)
+            verdict[occupant] = bool(d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT)
+        return verdict[occupant]
+
+    zones: Dict[str, dict] = {}
+    everyone, named = set(), set()
+    for z in ZONES:
+        people = found.get(z, {})
+        listed = [{"occupant": o, **info, "visitor": info["home_building"] != bid}
+                  for o, info in sorted(people.items()) if may_name(o)]
+        everyone.update(people)
+        named.update(r["occupant"] for r in listed)
+        zones[z] = {"label": zone_label(z), "count": len(people), "disclosed": len(listed), "occupants": listed}
+    audit_policy_decision(who, f"building:{bid}", True, "RULE_ZONE_PRESENCE_WINDOW", "L3_PRECISE_CURRENT",
+                          f"zone presence {start_text} .. {end_text}")
+    return {"building": bid, "start": start_text, "end": end_text, "purpose": parsed.value, "zones": zones,
+            "total": len(everyone), "named": len(named), "withheld": len(everyone) - len(named),
+            "note": ("Counts are aggregates; names appear only where your role may see an exact zone."
+                     if len(everyone) > len(named) else "")}
+
+
 # ------------------------------------------------------------------ security
 def _decisions(who: str) -> List[dict]:
     from access_control.authorize import get_audit_log

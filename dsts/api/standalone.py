@@ -141,6 +141,31 @@ def get_heatmap() -> dict:
     return campus.heatmap()
 
 
+@app.get("/api/zone-presence")
+def zone_presence(building: str, start: str | None = None, end: str | None = None, role: str = "officer") -> dict:
+    """Who was in each zone of ``building`` between ``start`` and ``end`` (ISO ``YYYY-MM-DDTHH:MM``; default: all
+    retained events). Officer: names; analyst: pseudonymised handles; self: nobody (no requester in the demo)."""
+    from dsts.presence import presence_in_window
+    from dsts.security.access import ROLES, _pseudonymise
+    from dsts.state.zones import ZONES, zone_label
+
+    t0, t1 = _parse_time(start) or float("-inf"), _parse_time(end) or float("inf")
+    rows = [(r["occupant"], r["building_id"], r["zone"], r["timestamp"], r["time"], r["building_id"])
+            for r in _event_history if r.get("occupant")]
+    found = presence_in_window(rows, building, t0, t1)
+    zones, everyone = {}, set()
+    for z in ZONES:
+        people = found.get(z, {})
+        everyone.update(people)
+        listed = [] if role not in ROLES or role == "self" else [
+            {"occupant": o if role == "officer" else _pseudonymise(o), **info, "visitor": False}
+            for o, info in sorted(people.items())]
+        zones[z] = {"label": zone_label(z), "count": len(people), "disclosed": len(listed), "occupants": listed}
+    named = len({o["occupant"] for z in zones.values() for o in z["occupants"]})
+    return {"building": building, "start": start, "end": end, "zones": zones, "total": len(everyone),
+            "named": named, "withheld": len(everyone) - named, "note": ""}
+
+
 @app.get("/api/events")
 def get_events(limit: int = 200) -> list[dict]:
     """Recent recognised events, newest last (same shape the real server's /lane-d/api/events returns)."""

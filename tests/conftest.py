@@ -10,7 +10,7 @@ import sys
 
 from shared.paths import CORPUS_DIR, REPO, run_paths
 
-NEEDS_RUN = ["access_control/test_rbac_security.py", "api/test_api_server.py", "api/test_lane_d_integrated.py"]
+NEEDS_RUN = ["access_control/test_rbac_security.py", "api/test_api_server.py", "api/test_lane_d_integrated.py", "api/test_zone_presence_integrated.py"]
 
 
 def _run_ready() -> bool:

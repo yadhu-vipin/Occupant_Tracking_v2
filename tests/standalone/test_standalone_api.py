@@ -52,3 +52,16 @@ def test_simulation_adds_events_and_reset_clears_them():
     assert client.get("/api/events").json()
     client.post("/api/reset")
     assert client.get("/api/events").json() == []
+
+
+def test_zone_presence_by_time_frame_and_role():
+    client.post("/api/demo-walk")
+    window = {"building": "B1", "start": "2026-01-01T08:00", "end": "2026-01-01T09:00"}
+    officer = client.get("/api/zone-presence", params={**window, "role": "officer"}).json()
+    assert officer["zones"]["z1"]["occupants"][0]["occupant"] == "O217" and officer["zones"]["zT"]["count"] == 1
+    analyst = client.get("/api/zone-presence", params={**window, "role": "analyst"}).json()
+    assert analyst["zones"]["z1"]["occupants"][0]["occupant"].startswith("occ_")
+    own = client.get("/api/zone-presence", params={**window, "role": "self"}).json()
+    assert own["total"] == officer["total"] and own["named"] == 0
+    later = client.get("/api/zone-presence", params={**window, "start": "2026-01-01T12:00", "end": "2026-01-01T13:00"}).json()
+    assert later["zones"]["z1"]["count"] == 0

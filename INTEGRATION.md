@@ -127,6 +127,16 @@ The page asks `POST /api/ws-ticket` (a single-use, 30-second ticket) and opens `
 
 `dsts/api/standalone.py` is the zip's server, kept as the **offline fallback** the hand-over describes ("the scripted walk must work even if the dashboard gets dropped"): `Campus` boots four fake buildings from `config/campus.yaml`, an `InProcessTransport` signs and replay-checks the messages between them, and `access.py` applies the officer / analyst / self views. It needs no corpus, no pipeline run and no login, so it works on any machine. `python manage.py walk` runs the same walk in the terminal.
 
+### 3.6 Time-frame filter on Building & Zones (added after the first integration)
+
+In **Building & Zones**, pick a building, set *From* / *To*, choose *View as* (Officer / Analyst / Self) and, for the Officer, a *Purpose*, then **Show who was there**. The zone tiles are recoloured by how many people were in each zone at any time in the window, the detail panel lists who was in the selected zone, and a table below lists every zone of the building with its people (↗ marks a visitor; hover a name for the first and last time seen). **Live view** returns to the current picture. Clicking another building while a window is set reloads it for that building.
+
+* **Meaning of "was in a zone".** After an event at (building, zone) a person stays there until their next event, and at the latest until the end of that day (nobody stays on campus overnight). A zone's people for a window are everyone with such a stay overlapping it. The logic is a pure function, `dsts/presence.py::presence_in_window`, used by both back ends.
+* **Endpoint.** `GET /lane-d/api/zone-presence?building=&start=&end=&purpose=` (real server) and `GET /api/zone-presence?...&role=` (standalone). Default window: the whole latest day.
+* **Who may see names.** The *counts* per zone are aggregates and go to every signed-in role, like the heat map. The *names* are decided occupant by occupant by the persona policy: only people the caller may see at L3+ are listed; the rest are counted as "not named for this role". In practice: an Officer (Dean) sees only himself on a general lookup, and names local occupants (and visitors in the building) for a `security_investigation` / `audit` purpose; he sees counts but no foreign names for other buildings (his own occupants who are visiting there are named, as the policy allows); a Teacher sees counts only; a Student sees only themselves. A non-Dean asking for an investigation purpose gets 403. The request is written to the audit log.
+* **Files.** `dsts/presence.py` (new), `dsts/api/lane_d.py` (endpoint), `dsts/api/standalone.py` (demo endpoint), `static_lane_d/{index.html,app.js}` (controls, `applyWindow`, `windowDetail`, `renderZoneTable`). Tests: `tests/api/test_zone_presence.py` (6 unit tests of the stay logic), `tests/api/test_zone_presence_integrated.py` (5, real run and RBAC), one in `tests/standalone/test_standalone_api.py`.
+* **Console UI.** Not changed: the filter is in the Lane D dashboard only.
+
 ---
 
 ## 4. Changes to the zip's page (`static_lane_d/`)
@@ -193,7 +203,7 @@ Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Build
 
 ## 7. Verification
 
-* **Tests:** the full suite now has 379 tests, all passing (it was 334 before this integration). 45 new: 5 (the zip's own, unchanged) + 4 (offline server) + 18 (dashboard on the real data and RBAC) + 17 (adapter helpers) + 1 (Layer-2 audit regression).
+* **Tests:** the full suite now has 391 tests, all passing (it was 334 before this integration). 45 new: 5 (the zip's own, unchanged) + 4 (offline server) + 18 (dashboard on the real data and RBAC) + 17 (adapter helpers) + 1 (Layer-2 audit regression).
 * **Browser, standalone (`:8001`):** the page renders 4 buildings; the B1 → B5 demo adds 7 events, the KPIs, feed and campus update.
 * **Browser, integrated (`/lane-d/`):** 10 buildings, 500 occupants, 90 zones, a live feed disclosed at L2 (sector names, hour-rounded times), no console errors. Queries run through the real RBAC, for example (run seed 42):
   * Officer, Q6 on the demo target → *"At building_5 / Common Amenities Wing at 16:00:00 (confidence High)"*, `RULE_A_LOCAL_OCCUPANT_ROUTINE`, L2.
@@ -220,6 +230,6 @@ Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Build
 
 ## 9. File inventory (this integration)
 
-Created: `dsts/api/lane_d.py`, `dsts/api/standalone.py`, `dsts/api/static_lane_d/{index.html,app.js,style.css}`, `dsts/contracts.py`, `dsts/testing.py`, `dsts/events/{__init__,mobility}.py`, `dsts/orchestration/{__init__,building,campus}.py`, `dsts/security/{__init__,access,transport}.py`, `config/campus.yaml`, `scripts/terminal_walk.py`, `scripts/run_demo.sh`, `tests/standalone/{test_lane_d,test_standalone_api}.py`, `tests/api/{test_lane_d_integrated,test_lane_d_unit}.py`, `INTEGRATION.md`.
+Created: `dsts/presence.py`, `dsts/api/lane_d.py`, `dsts/api/standalone.py`, `dsts/api/static_lane_d/{index.html,app.js,style.css}`, `dsts/contracts.py`, `dsts/testing.py`, `dsts/events/{__init__,mobility}.py`, `dsts/orchestration/{__init__,building,campus}.py`, `dsts/security/{__init__,access,transport}.py`, `config/campus.yaml`, `scripts/terminal_walk.py`, `scripts/run_demo.sh`, `tests/standalone/{test_lane_d,test_standalone_api}.py`, `tests/api/{test_lane_d_integrated,test_lane_d_unit}.py`, `INTEGRATION.md`.
 
 Modified: `dsts/api/server.py` (console route + `/console`, `DSTS_DEFAULT_UI`, mounts the adapter, audits Layer 2), `access_control/authorize.py` (`audit_policy_decision`), `pipeline/query.py` (audits Layer 2 in the CLI), `manage.py` (`serve --ui`, `standalone`, `walk`), `tests/conftest.py` (the new run-dependent module), `tests/access_control/test_access_hardening.py` (audit test), `.claude/launch.json` (standalone preview), `README.md`.
