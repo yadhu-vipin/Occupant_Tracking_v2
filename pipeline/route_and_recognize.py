@@ -19,6 +19,13 @@ local rejection, routes to a shortlist of candidate buildings
 ``query_node.py`` (own-gallery -> pool -> route -> handoff -> aggregate ->
 abstain, all in one cascade) is superseded by this phase split and dropped.
 
+Visitor database (``buildinglib/visitor_pool.py``): before routing, a locally rejected capture is matched against the
+building's own visitor cache -- visitors seen earlier the same simulated day plus the permanent pool -- and a hit
+is confirmed without contacting any other building (``routing_source`` "day_cache" / "permanent_pool"). Every
+confirmed visit also runs the visit lifecycle here, in event order: arrival at ``zT`` mints the visit pointer and
+counts an entry (a visitor whose earlier entries already crossed the promotion threshold gets his embeddings stored
+permanently), a second ``zT`` event is his departure and closes the pointer, and a new day closes whatever is left.
+
 NEW -- pointer MINT hook: at the exact point a Phase-3 candidate's reply is
 confirmed (mirroring the old ``if reply.matched: verified = record; break``),
 if the event was observed at the transition zone (``zT``), mint a visit
@@ -48,13 +55,16 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.paths import run_paths  # noqa: E402
+from shared.experiment_config import load_experiment_config  # noqa: E402
 from buildinglib._vendored.lsh import encode_with_margins, preprocess          # noqa: E402
 from buildinglib.artifact import load_building                                  # noqa: E402
 from buildinglib.node import BuildingNode, load_routing_contract                # noqa: E402
 from buildinglib.route import route                                              # noqa: E402
 from buildinglib.split import (default_emb_path, default_meta_path,             # noqa: E402
                                list_buildings, normalise_occupant_ids)
+from buildinglib.visitor_pool import VisitorDB                                   # noqa: E402
 from nodelib.deploy import PointerStore                                          # noqa: E402
+from shared.timeutil import day_of                                               # noqa: E402
 from pipeline.recognize import LocalRecognizer, confirm_at_candidate            # noqa: E402
 from recognition.contract import load_local_recognition_contract                # noqa: E402
 from recognition.io import stream_recognition_results                            # noqa: E402
@@ -103,7 +113,7 @@ class RetrievalRuntime:
     via ``pipeline.recognize.confirm_at_candidate``.
     """
 
-    def __init__(self, embeddings, meta, artifact_dir, nodes_dir=None, secure=True):
+    def __init__(self, embeddings, meta, artifact_dir, nodes_dir=None, secure=True, promotion_rules=None):
         # secure=True: every candidate check is a sealed round trip (see
         # secure_transfer/payload.py) and fails closed. False keeps the bare in-process call.
         self.secure = secure
@@ -118,6 +128,13 @@ class RetrievalRuntime:
                       for building in self.buildings}
         self.nodes_dir = Path(nodes_dir) if nodes_dir else None
         self._pointer_stores: dict[str, PointerStore] = {}
+        rules = tuple(promotion_rules) if promotion_rules is not None else load_experiment_config().visitor_pool.promote_when
+        self.visitor_dbs: dict[str, VisitorDB] = {}
+        for building in self.buildings:
+            folder = self.nodes_dir / building if self.nodes_dir else None
+            db = VisitorDB(building, folder / "state" if folder else None, folder / "embeddings" if folder else None, rules)
+            db.reset()                                   # a fresh run starts with an empty visitor history
+            self.visitor_dbs[building] = db
 
     def _pointer_store(self, building_id):
         if self.nodes_dir is None:
@@ -129,6 +146,58 @@ class RetrievalRuntime:
     def close(self):
         for store in self._pointer_stores.values():
             store.close()
+        for db in getattr(self, "visitor_dbs", {}).values():
+            db.close()
+
+    # ---- visit lifecycle -------------------------------------------------
+    def _close_pointer(self, home, occupant_id, exit_time):
+        store = self._pointer_store(home)
+        if store is not None:
+            store.clear(occupant_id, exit_time)
+
+    def advance_clock(self, timestamp):
+        """Call for every event (accepted or not). A new simulated day wipes every building's day cache and closes
+        the visit pointers of visitors whose departure was never observed."""
+        for db in getattr(self, "visitor_dbs", {}).values():
+            for left in db.roll_day(day_of(timestamp)):
+                self._close_pointer(left.home_building, left.occupant_id, left.last_seen)
+
+    def _track_visit(self, event, current, home, occupant_id, refs):
+        """Presence, pointer and entry bookkeeping for one confirmed visitor event (zT toggles arrival/departure)."""
+        db = getattr(self, "visitor_dbs", {}).get(current)
+        ts, zone = event["timestamp"], event["current_zone"]
+        if db is None:                                   # no visitor database attached: original pointer-only behaviour
+            if zone == TRANSITION_ZONE:
+                store = self._pointer_store(home)
+                if store is not None:
+                    already_open = store.lookup_open(occupant_id)
+                    if already_open is None or already_open["current_building"] != current:
+                        store.mint(occupant_id, current, ts)
+            return
+        present = db.is_present(occupant_id)
+        if refs is not None:
+            db.cache_refs(occupant_id, home, refs)
+        if zone != TRANSITION_ZONE:
+            if present:
+                db.seen(occupant_id, ts, zone)
+            else:
+                db.arrive(occupant_id, home, ts, zone)   # first seen away from the gateway: present, but no entry counted
+            return
+        if present:                                      # second zT event of the visit: he is leaving
+            db.seen(occupant_id, ts, zone)
+            db.depart(occupant_id)
+            self._close_pointer(home, occupant_id, ts)
+            return
+        store = self._pointer_store(home)                # arrival
+        if store is not None:
+            store.mint(occupant_id, current, ts)
+        rule = db.crossed_rule(occupant_id, ts)          # entries BEFORE this one already crossed the threshold?
+        db.record_entry(occupant_id, home, ts)
+        db.arrive(occupant_id, home, ts, zone)
+        if rule is not None and not db.is_permanent(occupant_id):
+            full = refs if refs is not None else db.cached_refs(occupant_id)
+            if full is not None:
+                db.promote(occupant_id, home, full, ts, rule)
 
     def _ask_candidate(self, query, current, candidate):
         if not getattr(self, "secure", False):
@@ -155,11 +224,19 @@ class RetrievalRuntime:
             raise AssertionError("current building must be excluded from routing")
         query = preprocess(self.embeddings[int(event["embedding_row"]):int(event["embedding_row"]) + 1],
                            self.contract.mean_face)[0]
-        codes, margins = encode_with_margins(query[None], self.contract.hyperplanes, self.contract.params.k)
-        shortlist, scores = route(codes[0], margins[0], self.filters, candidates,
-                                  self.contract.space, self.contract.n_probes,
-                                  self.contract.shortlist_k)
-        replies, verified = [], None
+        self.advance_clock(event["timestamp"])
+        replies, verified, verified_refs, routing_source = [], None, None, "routed"
+        db = getattr(self, "visitor_dbs", {}).get(current)
+        hit = db.match(query, self.contract.accept_angle_deg, self.contract.min_votes) if db is not None else None
+        if hit is not None:                              # a visitor this building already knows: no routing at all
+            shortlist, scores, routing_source = [], {}, hit.source
+            verified = {"building": hit.home_building, "matched": True, "occupant_id": hit.occupant_id,
+                        "votes": hit.votes, "candidate_distances": hit.distances}
+        else:
+            codes, margins = encode_with_margins(query[None], self.contract.hyperplanes, self.contract.params.k)
+            shortlist, scores = route(codes[0], margins[0], self.filters, candidates,
+                                      self.contract.space, self.contract.n_probes,
+                                      self.contract.shortlist_k)
         for candidate in shortlist:
             reply = self._ask_candidate(query, current, candidate)
             if reply is None:           # secure exchange failed closed: this candidate says nothing
@@ -170,30 +247,11 @@ class RetrievalRuntime:
             replies.append(record)
             if reply.matched:
                 verified = record
+                verified_refs = getattr(reply, "refs", None)
                 break
 
-        # NEW -- pointer MINT hook: gated on the observation being at the
-        # transition zone, mirroring the zT-entry/exit anchoring used
-        # elsewhere. Idempotent (INSERT OR REPLACE on visit_id), so this is
-        # cheap even if called again on a later event of the same visit --
-        # the gate just avoids the wasted I/O.
-        if verified and event["current_zone"] == TRANSITION_ZONE:
-            store = self._pointer_store(verified["building"])
-            if store is not None:
-                # True idempotency: a visit's zone graph naturally produces
-                # more than one zT-confirmed event before Phase 4 ever closes
-                # it (arrival at the destination, then departure from it are
-                # BOTH observed at zT) -- Phase 3 has no "already admitted
-                # this visit" bookkeeping the way Phase 4's present-visitor
-                # pool does. Without this check, each such event would mint
-                # a genuinely new visit_id (its own entry_time), leaving
-                # multiple simultaneous OPEN pointers for one visit. Only
-                # mint fresh when there is no already-OPEN pointer at this
-                # same current_building -- re-arriving at a DIFFERENT
-                # building while still open is still a fresh mint there.
-                already_open = store.lookup_open(verified["occupant_id"])
-                if already_open is None or already_open["current_building"] != current:
-                    store.mint(verified["occupant_id"], current, event["timestamp"])
+        if verified:
+            self._track_visit(event, current, verified["building"], verified["occupant_id"], verified_refs)
 
         return {
             "event_id": event["event_id"], "timestamp": event["timestamp"],
@@ -214,6 +272,7 @@ class RetrievalRuntime:
             # identity (None when unresolved). Not a probability -- see
             # dsts/state/probability.py and pipeline/phase4_state.py.
             "verification_distance_evidence": verified["candidate_distances"] if verified else None,
+            "routing_source": routing_source,
         }
 
 
@@ -223,10 +282,13 @@ def run_phase3(events, local_results, runtime):
     if len(local_by_id) != len(local_results):
         raise ValueError("recognition results have duplicate event IDs")
     attempts = []
+    advance = getattr(runtime, "advance_clock", None)
     for event in events:
         result = local_by_id.get(event["event_id"])
         if result is None:
             raise ValueError(f"missing local result for {event['event_id']}")
+        if advance is not None:
+            advance(event["timestamp"])
         if not result["accepted"]:
             attempts.append(runtime.retrieve(event, result))
     return attempts

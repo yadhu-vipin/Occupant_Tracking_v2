@@ -71,7 +71,12 @@ VISITOR_BUCKETS = (
     "RANKING_FAILURE_WRONG_IDENTITY",
     "VERIFICATION_FAILURE_AT_TRUTH",
     "PURE_ROUTING_MISS_WRONG_IDENTITY",
+    # served from the building's own visitor database (day cache / permanent pool), no routing at all
+    "CORRECT_VIA_VISITOR_DB",
+    "WRONG_IDENTITY_VIA_VISITOR_DB",
 )
+CACHE_SOURCES = ("day_cache", "permanent_pool")
+CORRECT_BUCKETS = ("CORRECT", "CORRECT_VIA_VISITOR_DB")
 
 
 # --------------------------------------------------------------------------
@@ -86,6 +91,10 @@ def categorize_visitor_event(attempt, truth):
     home, occupant = truth["home_building"], truth["occupant_id"]
     shortlist = attempt["shortlist"]
     candidates_queried = attempt["candidates_queried"]
+
+    if attempt.get("routing_source") in CACHE_SOURCES:
+        right = (attempt["verified_building"] == home and attempt["verified_occupant_id"] == occupant)
+        return ("CORRECT_VIA_VISITOR_DB" if right else "WRONG_IDENTITY_VIA_VISITOR_DB"), None, right
 
     in_shortlist = home in shortlist
     home_rank = shortlist.index(home) + 1 if in_shortlist else None
@@ -152,6 +161,7 @@ def build_event_rows(ground_truth, recognition_by_id, retrieval_by_id):
             row["home_building_rank"] = home_rank
             row["candidates_queried"] = attempt["candidates_queried"]
             row["reached"] = reached
+            row["routing_source"] = attempt.get("routing_source", "routed")
         rows.append(row)
     return rows
 
@@ -221,12 +231,15 @@ def pointer_precision(nodes_dir, ground_truth):
 def summarize(rows, pointer_report):
     visitor_rows = [r for r in rows if r["event_type"] == "visitor"]
     local_rows = [r for r in rows if r["event_type"] == "local"]
-    routed_visitor_rows = [r for r in visitor_rows if r["outcome"] != "LOCAL_FALSE_ACCEPT_OF_VISITOR"]
+    attempted_rows = [r for r in visitor_rows if r["outcome"] != "LOCAL_FALSE_ACCEPT_OF_VISITOR"]
+    cache_rows = [r for r in attempted_rows if r.get("routing_source") in CACHE_SOURCES]
+    routed_visitor_rows = [r for r in attempted_rows if r.get("routing_source") not in CACHE_SOURCES]
 
     def count(rows_, outcome):
         return sum(r["outcome"] == outcome for r in rows_)
 
-    correct_total = count(local_rows, "CORRECT_LOCAL") + count(visitor_rows, "CORRECT")
+    correct_visitor = sum(count(visitor_rows, bucket) for bucket in CORRECT_BUCKETS)
+    correct_total = count(local_rows, "CORRECT_LOCAL") + correct_visitor
     reached_count = sum(1 for r in routed_visitor_rows if r.get("reached"))
     candidates_queried = [r["candidates_queried"] for r in routed_visitor_rows]
 
@@ -238,10 +251,16 @@ def summarize(rows, pointer_report):
         "local_false_accepts_of_visitors": count(visitor_rows, "LOCAL_FALSE_ACCEPT_OF_VISITOR"),
         "accuracy": correct_total / len(rows) if rows else 0.0,
         "local_accuracy": count(local_rows, "CORRECT_LOCAL") / len(local_rows) if local_rows else 0.0,
-        "visitor_accuracy": count(visitor_rows, "CORRECT") / len(visitor_rows) if visitor_rows else 0.0,
+        "visitor_accuracy": correct_visitor / len(visitor_rows) if visitor_rows else 0.0,
+        "visitor_events_served_from_visitor_db": len(cache_rows),
+        "visitor_db_hits_by_source": {src: sum(r.get("routing_source") == src for r in cache_rows) for src in CACHE_SOURCES},
         "routing_recall": reached_count / len(routed_visitor_rows) if routed_visitor_rows else 0.0,
         "communication_cost_mean_candidates_queried": (
             sum(candidates_queried) / len(candidates_queried) if candidates_queried else 0.0
+        ),
+        "communication_cost_per_visitor_event_incl_db_hits": (
+            sum(candidates_queried) / (len(candidates_queried) + len(cache_rows))
+            if candidates_queried or cache_rows else 0.0
         ),
         "visitor_bucket_counts": {bucket: count(visitor_rows, bucket) for bucket in VISITOR_BUCKETS},
         "pointer_precision": pointer_report,

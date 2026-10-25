@@ -340,13 +340,3 @@ def test_visitor_pool_hit_refreshes_last_seen():
     assert v.last_seen > before
 
 
-def test_phase4_present_visitor_expires_after_ttl(tmp_path):
-    refs = np.ones((20, 4), dtype=np.float32)
-    ctx = SimpleNamespace(present_visitors={
-        "old": {"home_building": "building_2", "refs": refs, "last_seen": 8 * 3600},
-        "fresh": {"home_building": "building_2", "refs": np.ones((20, 4)), "last_seen": 11 * 3600},
-        "legacy": {"home_building": "building_2", "refs": None},       # no last_seen: never expired
-    })
-    phase4_state._expire_present_visitors(ctx, 13 * 3600, tmp_path, "13:00:00")
-    assert set(ctx.present_visitors) == {"fresh", "legacy"}
-    assert not refs.any()

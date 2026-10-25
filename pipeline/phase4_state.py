@@ -15,11 +15,9 @@ identity decision (who is accepted locally, who is confirmed remotely) is
 never changed by this module -- it only decides how to turn that decision
 into a probability distribution and what to persist.
 
-Also owns the visit-pointer CLEAR hook (test_5): the existing zT-departure
-eviction below (``del context.present_visitors[occupant_id]``) additionally
-closes that occupant's open pointer in their HOME building's own
-``state/pointers.db`` -- see ``nodelib.deploy.PointerStore`` and the MINT
-hook in ``pipeline/route_and_recognize.py``.
+Visit pointers (mint on arrival, clear on departure, close at the end of the day) are owned by Phase 3
+(``pipeline/route_and_recognize.py``), which runs the same visit lifecycle in event order; this phase only keeps
+the *probabilities*.
 
 Two candidate-set regimes, depending on identity source:
 
@@ -32,7 +30,8 @@ Two candidate-set regimes, depending on identity source:
 - **Confirmed visitor events** (``retrieval_attempt["verification_result"] ==
   "CONFIRMED"``): this is where a *building* can have more than one
   concurrently present visitor, so this module tracks, per building, which
-  occupants are already present there (``BuildingContext.present_visitors``):
+  occupants are already present there (``BuildingContext.visitors``, a
+  :class:`buildinglib.visitor_pool.VisitorDB`):
 
     - **First sighting at this building** ("new visitor"): ``D`` is the full
       home-building gallery evidence Phase 3 already computed and exposed as
@@ -50,7 +49,13 @@ Two candidate-set regimes, depending on identity source:
       that an ambiguous capture at a building should be judged against who
       might plausibly already be there, not an unrelated home gallery.
       Presence lasts until that occupant's own event lands at zone ``zT``
-      (transition/gateway), which is treated as their departure.
+      (transition/gateway), which is treated as their departure. A visitor whose
+      last known zone is ``zT`` (just arrived, not yet seen inside) is *in
+      transit*: from the next state on he is left out of both the evidence set
+      ``D`` and the persisted rows until he is seen outside ``zT`` again. His
+      20 reference embeddings stay cached for the whole simulated day (also
+      after he leaves); a new day resets every building's BSTS table and
+      presence, because nobody stays on campus overnight.
 
 Either way, no Bloom/routing score, vote count, or ground truth ever feeds
 Definition 3.3 -- only biometric distance (angle) evidence.
@@ -81,12 +86,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.paths import run_paths  # noqa: E402
-from shared.timeutil import to_seconds  # noqa: E402
+from shared.timeutil import day_of  # noqa: E402
 from buildinglib._vendored.lsh import preprocess
 from buildinglib.node import load_routing_contract
 from buildinglib.refs import reference_tensor
 from buildinglib.split import default_emb_path, default_meta_path, normalise_occupant_ids
 from buildinglib.verify import vote_evidence
+from buildinglib.visitor_pool import VisitorDB
 from dsts.state.bsts import StateTable
 from dsts.state.probability import occupant_probabilities
 from dsts.state.store import FakeOccupantRegistry
@@ -97,10 +103,6 @@ log = logging.getLogger(__name__)
 
 EVENT_FIELDS = {"event_id", "timestamp", "current_building", "current_zone", "embedding_row"}
 TRANSITION_ZONE = "zT"
-# A present visitor not seen for this long (event-clock seconds) is presumed to have
-# left without a zT event; their borrowed reference vectors are dropped and their
-# open visit pointer is closed. Mirrors buildinglib.node.VisitorPool's TTL.
-PRESENT_VISITOR_TTL_SECONDS = 4 * 3600
 
 
 class BuildingContext:
@@ -120,9 +122,9 @@ class BuildingContext:
         self.building_id = building_id
         self.bsts = StateTable(list(ZONES))
         self.store = SplitSqliteStore(Path(nodes_dir) / building_id / "state", registry)
-        # {occupant_id: {"home_building": str, "refs": (R, dim) ndarray}} for
-        # every visitor currently considered present at this building.
-        self.present_visitors: dict[str, dict] = {}
+        # Presence + the day cache of the reference vectors borrowed for every visitor of the day. Entries and the
+        # permanent pool are Phase 3's business (they are on disk); this phase only needs the in-memory part.
+        self.visitors = VisitorDB(building_id)
         # Tuning only -- no schema/behaviour change. Each identified event
         # issues one write_state() per zone (9 rows) per persisted occupant;
         # at SQLite's default durability this is dominated by an fsync per
@@ -134,8 +136,21 @@ class BuildingContext:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
 
+    @property
+    def present_visitors(self):
+        return self.visitors.presence
+
+    def advance_day(self, day):
+        """A new simulated day: nobody is inside any more, so the zone beliefs start over and the day cache is wiped."""
+        if day is None or day == self.visitors.day:
+            return
+        if self.visitors.day is not None:
+            self.bsts = StateTable(list(ZONES))
+        self.visitors.roll_day(day)
+
     def close(self):
         self.store.close()
+        self.visitors.close()
 
 
 class CorpusContext:
@@ -189,28 +204,15 @@ def _confirmed_visitor(retrieval_attempt):
     return retrieval_attempt["verified_occupant_id"], retrieval_attempt["verified_building"], distances
 
 
-def _hms_to_seconds(value):
-    """Seconds since midnight. Events carry only a time of day, so expiry assumes events are processed in time
-    order within one day (the generated event days are 08:00-17:00)."""
-    h, m, sec = (int(x) for x in str(value).split(":"))
-    return h * 3600 + m * 60 + sec
-
-
-def _expire_present_visitors(context, now_s, nodes_dir, timestamp):
-    """Evict visitors unseen for ``PRESENT_VISITOR_TTL_SECONDS``: wipe their borrowed refs and close their pointer."""
-    for occupant_id, entry in list(context.present_visitors.items()):
-        last_seen = entry.get("last_seen")
-        if last_seen is None or now_s - last_seen <= PRESENT_VISITOR_TTL_SECONDS:
-            continue
-        refs = entry.get("refs")
-        if isinstance(refs, np.ndarray) and refs.flags.writeable and refs.base is None:
-            refs[...] = 0                      # only wipe arrays this pool owns outright
-        del context.present_visitors[occupant_id]
-        try:
-            with PointerStore(Path(nodes_dir) / entry["home_building"] / "state") as pointers:
-                pointers.clear(occupant_id, exit_time=timestamp)
-        except (OSError, sqlite3.Error) as exc:     # no nodes dir / unreadable store: expiry still stands
-            log.warning("could not close pointer of expired visitor %s: %s", occupant_id, exc)
+def _day_refs(visitors, corpus, occupant_id):
+    """The visitor's reference vectors from today's cache, borrowed from the corpus (his home gallery) on a miss."""
+    refs = visitors.cached_refs(occupant_id)
+    if refs is None:
+        home = visitors.home_of(occupant_id)
+        refs = corpus.occupant_refs(home, occupant_id)
+        visitors.cache_refs(occupant_id, home, refs)
+        refs = visitors.cached_refs(occupant_id)
+    return refs
 
 
 def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_dir, corpus=None):
@@ -253,35 +255,37 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         if current_building not in contexts:
             contexts[current_building] = BuildingContext(current_building, nodes_dir)
         context = contexts[current_building]
-        now_s = to_seconds(event["timestamp"])
-        _expire_present_visitors(context, now_s, nodes_dir, event["timestamp"])
+        timestamp, zone = event["timestamp"], event["current_zone"]
+        for other in contexts.values():
+            other.advance_day(day_of(timestamp))
+        visitors = context.visitors
 
         if local is not None:
             distances = local[1]
             result = occupant_probabilities(distances)
             to_persist = {occupant_id: result.probabilities[occupant_id]}
             row["presence_mode"] = "local"
-        elif occupant_id in context.present_visitors:
+        elif visitors.is_present(occupant_id):
             if corpus is None:
                 raise RuntimeError("present-visitor re-matching requires a CorpusContext")
             query = corpus.preprocess_query(event)
-            present_ids = list(context.present_visitors)
-            candidate_refs = np.stack([context.present_visitors[o]["refs"] for o in present_ids])
+            # everybody inside who is not waiting in the transition zone, plus the person this event is about
+            present_ids = visitors.active_candidates(subject=occupant_id)
+            candidate_refs = np.stack([_day_refs(visitors, corpus, o) for o in present_ids])
             angles, _votes = vote_evidence(candidate_refs, query, corpus.contract.accept_angle_deg)
             distances = {o: float(angles[i].min()) for i, o in enumerate(present_ids)}
             result = occupant_probabilities(distances)
-            to_persist = result.probabilities  # every present visitor is updated
+            to_persist = result.probabilities  # every active present visitor is updated
             row["presence_mode"] = "present_visitor_pool"
-            context.present_visitors[occupant_id]["last_seen"] = now_s
         else:
             distances = home_gallery_distances
             result = occupant_probabilities(distances)
             to_persist = {occupant_id: result.probabilities[occupant_id]}
             row["presence_mode"] = "new_visitor_home_gallery"
             if corpus is not None:
-                # private copy: the pool owns (and on expiry wipes) what it borrowed
-                refs = np.array(corpus.occupant_refs(home_building, occupant_id), copy=True)
-                context.present_visitors[occupant_id] = {"home_building": home_building, "refs": refs, "last_seen": now_s}
+                if visitors.cached_refs(occupant_id) is None:   # first time today: borrow his references once
+                    visitors.cache_refs(occupant_id, home_building, corpus.occupant_refs(home_building, occupant_id))
+                visitors.arrive(occupant_id, home_building, timestamp, zone)
 
         row["distance_scores"] = distances
         row["sigma"] = result.sigma
@@ -296,21 +300,15 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         return row
 
     try:
-        context.bsts.apply(event["timestamp"], event["current_zone"], to_persist, context.store)
+        context.bsts.apply(timestamp, zone, to_persist, context.store)
         row["bsts_state_after_update"] = context.bsts.get_state(occupant_id)
-        # A visitor's own event at the transition zone is treated as their
-        # departure -- the NEXT time they are seen (anywhere), it is a fresh
-        # "new visitor" home-gallery lookup, not a present-pool re-match.
-        if row["presence_mode"] == "present_visitor_pool" and event["current_zone"] == TRANSITION_ZONE:
-            home_building = context.present_visitors[occupant_id]["home_building"]
-            del context.present_visitors[occupant_id]
-            # NEW -- pointer CLEAR hook: the same zT-departure event that
-            # evicts this visitor from the present-visitor pool also closes
-            # their open visit pointer, anchored in the HOME building's own
-            # pointer store (mirrors the MINT hook in
-            # pipeline/route_and_recognize.py, anchored on zT-entry).
-            with PointerStore(Path(nodes_dir) / home_building / "state") as pointers:
-                pointers.clear(occupant_id, exit_time=event["timestamp"])
+        if row["presence_mode"] == "present_visitor_pool":
+            visitors.seen(occupant_id, timestamp, zone)
+            # A visitor's own event at the transition zone is his departure: his presence ends (the day cache stays,
+            # so coming back later today needs no new request to his home building). Closing his visit pointer is
+            # Phase 3's job.
+            if zone == TRANSITION_ZONE:
+                visitors.depart(occupant_id)
     except Exception as exc:  # persistence/BSTS-layer failure -- keep the run going
         row["status"] = "PERSISTENCE_ERROR"
         row["error"] = str(exc)

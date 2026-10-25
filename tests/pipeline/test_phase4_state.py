@@ -217,7 +217,7 @@ def test_first_sighting_uses_home_gallery_and_admits_to_present_pool(tmp_path):
 
         context = contexts["building_1"]
         assert "0000009" in context.present_visitors
-        assert context.present_visitors["0000009"]["home_building"] == "building_2"
+        assert context.present_visitors["0000009"].home_building == "building_2"
     finally:
         close_all(contexts)
 
@@ -232,16 +232,11 @@ def test_reappearance_redistributes_over_present_pool_and_persists_everyone(tmp_
         process_event(visitor_event("E1", "zT", embedding_row=0), rejected_recognition(),
                      confirmed_retrieval(occupant="0000009", home="building_2", others=()),
                      contexts, tmp_path, corpus)
-        process_event(visitor_event("E2", "zT", embedding_row=2), rejected_recognition(),
+        process_event(visitor_event("E2", "z1", embedding_row=2), rejected_recognition(),
                      confirmed_retrieval(occupant="0000020", home="building_3", others=()),
                      contexts, tmp_path, corpus)
         context = contexts["building_1"]
         assert set(context.present_visitors) == {"0000009", "0000020"}
-
-        # Simulate the pointer that Phase 3's MINT hook would already have
-        # opened for 0000009 at their zT-entry into building_1.
-        with PointerStore(tmp_path / "building_2" / "state") as pointers:
-            pointers.mint("0000009", "building_1", "08:00:00")
 
         # 0000009 is seen again -- Phase 3 still says so (unchanged), but since
         # they are already present, D must be built from the actual capture
@@ -261,14 +256,6 @@ def test_reappearance_redistributes_over_present_pool_and_persists_everyone(tmp_
         # bystander in the pool and is unaffected by someone else's departure.
         assert "0000009" not in context.present_visitors
         assert "0000020" in context.present_visitors
-
-        # NEW (test_5): departure via zT also closes 0000009's visit pointer
-        # in their HOME building's (building_2) own pointers.db.
-        with PointerStore(tmp_path / "building_2" / "state") as pointers:
-            history = pointers.lookup_history("0000009")
-            assert history and history[-1]["status"] == "CLOSED"
-            assert history[-1]["exit_time"] == "08:10:00"
-            assert pointers.lookup_open("0000009") is None
 
         # Every present visitor was actually persisted for this event's timestamp,
         # not just the Phase-3-confirmed occupant.
@@ -290,7 +277,7 @@ def test_present_visitor_pool_requires_a_corpus(tmp_path):
     contexts = {}
     try:
         context = pipeline.BuildingContext("building_1", tmp_path)
-        context.present_visitors["0000009"] = {"home_building": "building_2", "refs": None}
+        context.visitors.arrive("0000009", "building_2", "08:00:00", "z1")
         contexts["building_1"] = context
 
         row = process_event(visitor_event("E1", "z1"), rejected_recognition(),
@@ -298,5 +285,75 @@ def test_present_visitor_pool_requires_a_corpus(tmp_path):
                             contexts, tmp_path, corpus=None)
         assert row["status"] == "PROBABILITY_ERROR"
         assert "CorpusContext" in row["error"]
+    finally:
+        close_all(contexts)
+
+
+def test_visitor_waiting_in_the_transition_zone_is_left_out_of_later_updates(tmp_path):
+    make_building(tmp_path, "building_1", ["0000001"])
+    corpus = make_corpus()
+    contexts = {}
+    try:
+        # 0000009 arrives at zT (updated once, by his own event) ...
+        first = process_event(visitor_event("E1", "zT", embedding_row=0, timestamp="08:00:00"), rejected_recognition(),
+                              confirmed_retrieval(occupant="0000009", home="building_2", others=()),
+                              contexts, tmp_path, corpus)
+        assert first["presence_mode"] == "new_visitor_home_gallery"
+        process_event(visitor_event("E2", "z1", embedding_row=2, timestamp="08:05:00"), rejected_recognition(),
+                      confirmed_retrieval(occupant="0000020", home="building_3", others=()),
+                      contexts, tmp_path, corpus)
+        # ... another visitor's next event: the one still in zT takes no part in it.
+        row = process_event(visitor_event("E3", "z1", embedding_row=2, timestamp="08:10:00"), rejected_recognition(),
+                            confirmed_retrieval(occupant="0000020", home="building_3", others=()),
+                            contexts, tmp_path, corpus)
+        assert row["presence_mode"] == "present_visitor_pool"
+        assert set(row["distance_scores"]) == {"0000020"}
+        conn = sqlite3.connect(tmp_path / "building_1" / "state" / "visitor.db")
+        rows = conn.execute("SELECT COUNT(*) FROM visitor_state WHERE occupant = ? AND time = ?",
+                            ("0000009", "08:10:00")).fetchone()[0]
+        assert rows == 0
+        # he steps inside (z3): from his own event on he is part of the updates again.
+        inside = process_event(visitor_event("E4", "z3", embedding_row=4, timestamp="08:15:00"), rejected_recognition(),
+                               confirmed_retrieval(occupant="0000009", home="building_2", others=()),
+                               contexts, tmp_path, corpus)
+        assert set(inside["distance_scores"]) == {"0000009", "0000020"}
+        after = process_event(visitor_event("E5", "z1", embedding_row=2, timestamp="08:20:00"), rejected_recognition(),
+                              confirmed_retrieval(occupant="0000020", home="building_3", others=()),
+                              contexts, tmp_path, corpus)
+        assert set(after["distance_scores"]) == {"0000009", "0000020"}
+        conn.close()
+    finally:
+        close_all(contexts)
+
+
+def test_day_cache_outlives_the_visit_and_a_new_day_wipes_it(tmp_path):
+    make_building(tmp_path, "building_1", ["0000001"])
+    corpus = make_corpus()
+    contexts = {}
+    try:
+        day1 = "2026-01-05 "
+        process_event(visitor_event("E1", "zT", embedding_row=0, timestamp=day1 + "08:00:00"), rejected_recognition(),
+                      confirmed_retrieval(occupant="0000009", home="building_2", others=()), contexts, tmp_path, corpus)
+        visitors = contexts["building_1"].visitors
+        cached = visitors.cached_refs("0000009")
+        assert cached is not None and cached.shape == (2, 2)
+        process_event(visitor_event("E2", "z3", embedding_row=4, timestamp=day1 + "09:00:00"), rejected_recognition(),
+                      confirmed_retrieval(occupant="0000009", home="building_2", others=()), contexts, tmp_path, corpus)
+        process_event(visitor_event("E3", "zT", embedding_row=4, timestamp=day1 + "10:00:00"), rejected_recognition(),
+                      confirmed_retrieval(occupant="0000009", home="building_2", others=()), contexts, tmp_path, corpus)
+        assert not visitors.is_present("0000009")                       # he left through zT ...
+        assert visitors.cached_refs("0000009") is not None               # ... but his 20 references stay for the day
+        # back the same day: no new borrowing needed
+        again = process_event(visitor_event("E4", "zT", embedding_row=4, timestamp=day1 + "13:00:00"),
+                              rejected_recognition(),
+                              confirmed_retrieval(occupant="0000009", home="building_2", others=()),
+                              contexts, tmp_path, corpus)
+        assert again["presence_mode"] == "new_visitor_home_gallery" and visitors.is_present("0000009")
+        # the next morning everything is gone
+        process_event(visitor_event("E5", "z1", embedding_row=2, timestamp="2026-01-06 08:00:00"),
+                      rejected_recognition(),
+                      confirmed_retrieval(occupant="0000020", home="building_3", others=()), contexts, tmp_path, corpus)
+        assert visitors.cached_refs("0000009") is None and not visitors.is_present("0000009")
+        assert np.all(cached == 0)                                        # the borrowed array was zeroed
     finally:
         close_all(contexts)
