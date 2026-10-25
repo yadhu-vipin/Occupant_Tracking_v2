@@ -227,7 +227,7 @@ class BuildingNode:
         """Lazy-loaded zero-trust security handler bound to this building node."""
         if not hasattr(self, '_security_handler') or self._security_handler is None:
             try:
-                from nodelib.security_handler import SecureBuildingNodeHandler
+                from secure_transfer.handler import SecureBuildingNodeHandler
                 self._security_handler = SecureBuildingNodeHandler()
                 self._security_handler.register_node(self.building_id)
             except Exception:

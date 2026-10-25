@@ -43,7 +43,7 @@ from buildinglib.params import ContractMismatch, check_vendored, load_params   #
 from buildinglib.refs import reference_tensor                                   # noqa: E402
 from buildinglib.split import (default_emb_path, default_meta_path,            # noqa: E402
                                list_buildings, split_building)
-from dsts.legacy_state.store import FakeOccupantRegistry                       # noqa: E402
+from dsts.state.store import FakeOccupantRegistry                       # noqa: E402
 from nodelib.deploy import DeployedBuilding, PointerStore, SplitSqliteStore, write_node_config  # noqa: E402
 
 DEFAULT_EMB = default_emb_path()

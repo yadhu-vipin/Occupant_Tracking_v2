@@ -15,7 +15,7 @@ python -m pip install -r requirements.txt
 python manage.py test        # whole test suite (234 tests, a few seconds)
 python manage.py pipeline    # roles -> enroll -> events -> Phase 2 -> 3 -> 4  (seed 42)
 python manage.py states      # per-state TP/FP/TN/FN against ground truth, averaged over all states
-python manage.py demo        # RBAC + queries, end to end (run_project.py)
+python manage.py demo        # RBAC + queries, end to end (scripts/demo.py)
 python manage.py serve       # API + dashboard on http://127.0.0.1:8000
 python manage.py query --caller <id> --target <id> --query Q6
 bash paper/reproduce.sh      # rebuild every number in the paper
@@ -66,11 +66,11 @@ What is real and what is simulated: embeddings come from a stored corpus, not a 
 
 ```
 manage.py                 one entry point: test | pipeline | demo | serve | query
-run_project.py            full operational run + multi-run reliability check (--repeat N)
-build_campus_roles.py     assigns Dean/Teacher/Student roles to the 500 occupants (seed 42)
-merge_check.py            checks that a set of Bloom artifacts shares one contract
-verify_building.py        verifies (and optionally re-derives) one artifact
-compare_topologies.py     2 / 5 / 10-building comparison;  build_variant_meta.py writes its meta.csv variants
+scripts/demo.py            full operational run + multi-run reliability check (--repeat N)
+population/roles.py     assigns Dean/Teacher/Student roles to the 500 occupants (seed 42)
+tools/merge_check.py            checks that a set of Bloom artifacts shares one contract
+tools/verify_building.py        verifies (and optionally re-derives) one artifact
+tools/compare_topologies.py     2 / 5 / 10-building comparison;  tools/build_variant_meta.py writes its meta.csv variants
 requirements.txt, pytest.ini, .gitignore
 
 shared/                   federation contract: params.json, mean_face.npy, routing_params.json
@@ -83,7 +83,7 @@ pipeline/                 the stages (section 4)
 events/                   event generator + validator (library)
 recognition/              result schema + mask handling
 retrieval/ centralized/   Phase 3 output folder; centralized global-search benchmark
-dsts/legacy_state/        zones, BSTS, Definition 3.3 probability, SQLite stores
+dsts/state/        zones, BSTS, Definition 3.3 probability, SQLite stores
 dsts/api/                 FastAPI server, metrics, static dashboard (index.html, app.js, style.css)
 nodelib/                  per-building deployment (deploy.py, PointerStore), security_handler.py, transfer_codec.py
 security/                 crypto, CA/mTLS (transport.py), replay guard, sealed payloads (payload.py),
@@ -94,7 +94,7 @@ tests/                    pytest suite
 out/                      published Bloom filters (.npz + manifest)         [generated]
 nodes/                    per-building folders: embeddings, filters, 3 SQLite DBs   [generated]
 variants/rbac10/          role registry                                      [generated, git-ignored]
-reports/                  execution summary written by run_project.py
+reports/                  execution summary written by scripts/demo.py
 ```
 
 `nodes/building_N/` holds `building.json`, `config.json` (same bytes in all 10), `mean_face.npy`, `embeddings/` (raw rows, cached `refs.npy` of shape 50×20×512, ids), `filters/` (the other nine Bloom filters) and `state/{registered,visitor,pointers}.db`.
@@ -120,14 +120,14 @@ evaluate_pipeline ──► evaluate_pipeline/output/end_to_end_{results,summary
 Run order (`python manage.py pipeline` does all of it):
 
 ```bash
-python build_campus_roles.py
+python -m population.roles
 python pipeline/enroll_and_broadcast.py --all
 python pipeline/generate_events.py --seed 42
 python pipeline/route_and_recognize.py --phase 2
 python pipeline/route_and_recognize.py --phase 3
 python pipeline/phase4_state.py
-python pipeline/evaluate_pipeline.py        # optional: scores everything against ground truth
-python pipeline/evaluate_states.py          # optional: state-by-state TP/FP/TN/FN (below)
+python evaluation/evaluate_events.py        # optional: scores everything against ground truth
+python evaluation/evaluate_states.py          # optional: state-by-state TP/FP/TN/FN (below)
 ```
 
 **Phase 1, events and states (one timeline).** `events/generator.py` simulates every occupant moving on the zone graph and writes three views of that one simulation:
@@ -143,14 +143,14 @@ Model: every occupant has 20 movements (the corpus has 20 test photos each), 8,0
 
 **Phase 4, state.** See section 6.
 
-**Reference result** (seed 42, 10 × 50, default `spread` schedule, `python manage.py pipeline` then `python pipeline/evaluate_pipeline.py`): 2,000 visitor events, 1,936 routed after the local check, of which 1,791 are identified correctly (92.5%), 63 wrongly and 82 not recovered; routing recall (right building in the shortlist) 94.5%; 1.47 candidate buildings queried per rejection; overall event accuracy 94.3% (local 95.5%, visitor 89.6%); visit-pointer precision 83.5%. On the original `burst` stream the same measure was 1,778 of 1,935 (91.89%); the numbers differ because the two schedules draw different event streams (other test photos, destinations and event order) from the same seed; the recognition and routing rules are identical. A full pipeline run takes about a minute.
+**Reference result** (seed 42, 10 × 50, default `spread` schedule, `python manage.py pipeline` then `python evaluation/evaluate_events.py`): 2,000 visitor events, 1,936 routed after the local check, of which 1,791 are identified correctly (92.5%), 63 wrongly and 82 not recovered; routing recall (right building in the shortlist) 94.5%; 1.47 candidate buildings queried per rejection; overall event accuracy 94.3% (local 95.5%, visitor 89.6%); visit-pointer precision 83.5%. On the original `burst` stream the same measure was 1,778 of 1,935 (91.89%); the numbers differ because the two schedules draw different event streams (other test photos, destinations and event order) from the same seed; the recognition and routing rules are identical. A full pipeline run takes about a minute.
 
-**State-by-state evaluation** (`pipeline/evaluate_states.py`, `python manage.py states`). State s_k is the campus after event k, for k = 0 … n (10,000 states).
+**State-by-state evaluation** (`evaluation/evaluate_states.py`, `python manage.py states`). State s_k is the campus after event k, for k = 0 … n (10,000 states).
 - *Ground truth of s_k:* `events/output/state_truth.json`, the generator's own state sequence (section above). Occupants not yet on campus are not in the state.
 - *System s_k:* for every occupant identified so far, the building of their latest identified event and the most probable zone of their BSTS belief (`dsts/output/phase4_results.json`).
 - *Counts per state*, over (occupant, location) pairs with one location per occupant: **TP** predicted at L and truly at L; **FP** predicted at L but truly elsewhere (including people the system places before they have truly arrived); **FN** truly at L but not predicted there (predicted elsewhere, or not identified yet); **TN** all other pairs (A × L − TP − FP − FN). Precision, recall, F1 and accuracy are computed in every state and then averaged over all states.
 - Reported at three levels: `location` (building + zone, 90 labels), `building` (10) and `zone` (9). Output: `evaluate_pipeline/output/state_metrics.json` (averages) and `state_metrics.csv` (one row per state and level).
-- `python pipeline/evaluate_states.py --dump-state 3000` prints who truly is in each zone at s_3000 and who the system puts there, with the missed (FN) and wrong (FP) occupants.
+- `python evaluation/evaluate_states.py --dump-state 3000` prints who truly is in each zone at s_3000 and who the system puts there, with the missed (FN) and wrong (FP) occupants.
 - Seed 42, `spread` schedule, averaged over all states. Building + zone: precision 0.94, recall 0.94, F1 0.94 (mean TP 447, FP 29, FN 29). Building only: precision 0.98, recall 0.98. Zone only: 0.95 / 0.95. Accuracy is about 0.999 but is dominated by TN, so read precision, recall and F1.
 - Limit: only the identified occupant's belief is read per event; other present visitors that Phase 4 also updates in the database are not read.
 
@@ -176,7 +176,7 @@ Model: every occupant has 20 movements (the corpus has 20 test photos each), 8,0
 
 ## 6. State, zones and visit pointers
 
-**Zones.** Each building is one flat floor: `z1` Entrance, `z2` Mail room, `z3` Office, `z4` Lounge, `z5` Conference, `z6` Classroom, `z7` Cafeteria (only via exit), `z8` Exit, plus `zT`, the transition zone to the outdoors. Movement between buildings must leave and enter through `zT`. Adjacency lives in `dsts/legacy_state/zones.py`.
+**Zones.** Each building is one flat floor: `z1` Entrance, `z2` Mail room, `z3` Office, `z4` Lounge, `z5` Conference, `z6` Classroom, `z7` Cafeteria (only via exit), `z8` Exit, plus `zT`, the transition zone to the outdoors. Movement between buildings must leave and enter through `zT`. Adjacency lives in `dsts/state/zones.py`.
 
 **Definition 3.3.** For one event with candidate distances D: σ = population std of D, and p_i = exp(−d_i² / 2σ²) / Σ exp(−d_l² / 2σ²). If all distances are equal, σ = 0 and the result is uniform over the ties. The Bloom score never enters this.
 
@@ -192,18 +192,18 @@ Model: every occupant has 20 movements (the corpus has 20 test photos each), 8,0
 
 ## 7. Security
 
-The security layer is in `security/` and `nodelib/security_handler.py`. It protects the two things that actually cross a building boundary — the captured embedding and the matched person's reference vectors — and the access paths to tracking data.
+The security layer is in `security/` and `secure_transfer/handler.py`. It protects the two things that actually cross a building boundary — the captured embedding and the matched person's reference vectors — and the access paths to tracking data.
 
 | Mechanism | What it does | Where |
 |---|---|---|
-| Sealed payloads | Per message: ephemeral X25519 → HKDF-SHA256 → AES-128-GCM with the whole header as associated data; Ed25519 signature over header, nonce and ciphertext; `in_reply_to` binds each reply to its request | `security/payload.py` |
-| Fail closed | Any failed step (certificate, signature, replay, decrypt, binding) → no reply, nothing admitted | `nodelib/security_handler.py` |
-| Certificates | Campus CA issues node certificates; expiry, revocation, subject and pinning are checked; an mTLS session is required per building pair | `security/transport.py` |
-| Replay guard | 300 s window plus unique nonces, run **after** signature verification so the timestamp is authenticated | `security/replay_guard.py` |
-| Compact framing | Binary arrays (no JSON/base64 inside the ciphertext), base64 envelope fields. Request 3.2 KB, reply 56 KB (about 1.35× raw, was 2.7×). Decoding is strict (type, rank, size, exact length, magic, no trailing bytes) | `nodelib/transfer_codec.py` |
+| Sealed payloads | Per message: ephemeral X25519 → HKDF-SHA256 → AES-128-GCM with the whole header as associated data; Ed25519 signature over header, nonce and ciphertext; `in_reply_to` binds each reply to its request | `secure_transfer/payload.py` |
+| Fail closed | Any failed step (certificate, signature, replay, decrypt, binding) → no reply, nothing admitted | `secure_transfer/handler.py` |
+| Certificates | Campus CA issues node certificates; expiry, revocation, subject and pinning are checked; an mTLS session is required per building pair | `secure_transfer/transport.py` |
+| Replay guard | 300 s window plus unique nonces, run **after** signature verification so the timestamp is authenticated | `secure_transfer/replay_guard.py` |
+| Compact framing | Binary arrays (no JSON/base64 inside the ciphertext), base64 envelope fields. Request 3.2 KB, reply 56 KB (about 1.35× raw, was 2.7×). Decoding is strict (type, rank, size, exact length, magic, no trailing bytes) | `secure_transfer/codec.py` |
 | Visitor pool hygiene | Private copy, 4 h TTL, zeroed on eviction/replacement | `buildinglib/node.py` |
-| Signed tokens | HMAC-SHA256, 1 h expiry, mintable only by the server; raw occupant IDs are not tokens | `security/tokens.py` |
-| Audit log | Every authorization decision is recorded; bounded deque | `security/authorize.py` |
+| Signed tokens | HMAC-SHA256, 1 h expiry, mintable only by the server; raw occupant IDs are not tokens | `access_control/tokens.py` |
+| Audit log | Every authorization decision is recorded; bounded deque | `access_control/authorize.py` |
 | Metrics | `/metrics` needs `DSTS_METRICS_TOKEN` or a loopback client | `server.py` |
 
 Secure mode is the default in both `nodelib.deploy.identify` and `RetrievalRuntime`. On the real data it gives the same confirmations as plain mode (checked on a 40-event sample), roughly 4× slower on that sample.
@@ -212,12 +212,12 @@ Secure mode is the default in both `nodelib.deploy.identify` and `RetrievalRunti
 
 ## 8. Access control (RBAC)
 
-**Roles.** 500 occupants = 10 Deans + 100 Teachers + 390 Students (1 Dean, 10 Teachers, 39 Students per building; each teacher has a roster of about 4 students). Assignment is deterministic (seed 42, `build_campus_roles.py`) and saved to `variants/rbac10/`.
+**Roles.** 500 occupants = 10 Deans + 100 Teachers + 390 Students (1 Dean, 10 Teachers, 39 Students per building; each teacher has a roster of about 4 students). Assignment is deterministic (seed 42, `population/roles.py`) and saved to `variants/rbac10/`.
 
 **Two layers, both before execution:**
 
-1. **Layer 1 — infrastructure** (`security/authorize.py`): principals are `ADMIN`, `BUILDING_NODE`, `QUERY_CLIENT`. Decides whether a principal may perform an action on a resource and records the decision.
-2. **Layer 2 — campus persona policy** (`security/campus_policy.py`): building-scoped hierarchy **Dean (A) > Teacher (B) > Student (C)**. A requester's authority is bounded by their own home building. A *visitor* of building b is someone whose current building is b and whose registered building is not b.
+1. **Layer 1 — infrastructure** (`access_control/authorize.py`): principals are `ADMIN`, `BUILDING_NODE`, `QUERY_CLIENT`. Decides whether a principal may perform an action on a resource and records the decision.
+2. **Layer 2 — campus persona policy** (`access_control/campus_policy.py`): building-scoped hierarchy **Dean (A) > Teacher (B) > Student (C)**. A requester's authority is bounded by their own home building. A *visitor* of building b is someone whose current building is b and whose registered building is not b.
 
 **Disclosure levels** (minimum necessary disclosure):
 
@@ -330,13 +330,13 @@ Global registries are cleared by some test modules, so fixtures re-register them
 |---|---|
 | Everything works | `python manage.py test` |
 | Whole system end to end | `python manage.py pipeline`, then `python manage.py demo` |
-| Same result every run | `python run_project.py --repeat 5` |
-| Enrollment and the published artifact | `python pipeline/enroll_and_broadcast.py --building-id building_3`, `python verify_building.py out/building_3.npz`, `python merge_check.py out/` |
-| Routing and accuracy | `python pipeline/route_and_recognize.py --phase 3`, then `python pipeline/evaluate_pipeline.py` |
+| Same result every run | `python scripts/demo.py --repeat 5` |
+| Enrollment and the published artifact | `python pipeline/enroll_and_broadcast.py --building-id building_3`, `python tools/verify_building.py out/building_3.npz`, `python tools/merge_check.py out/` |
+| Routing and accuracy | `python pipeline/route_and_recognize.py --phase 3`, then `python evaluation/evaluate_events.py` |
 | Centralised vs decentralised | `python -m centralized.evaluate` |
-| Topology comparison | `python build_variant_meta.py && python compare_topologies.py` |
+| Topology comparison | `python tools/build_variant_meta.py && python tools/compare_topologies.py` |
 | Databases filled | after `phase4_state.py`: count rows in `nodes/*/state/*.db` (SQLite) |
-| State-by-state TP/FP/TN/FN | `python manage.py states`; one state: `python pipeline/evaluate_states.py --dump-state 3000` |
+| State-by-state TP/FP/TN/FN | `python manage.py states`; one state: `python evaluation/evaluate_states.py --dump-state 3000` |
 | A query with its policy decision | `python manage.py query --caller <id> --target <id> --query Q6 --explain` |
 | RBAC in the browser | `DSTS_DEMO_MODE=1 python manage.py serve`, switch persona, open Query and Security tabs |
 | Sealed transfer | `python -m pytest -q tests/test_secure_transfer.py -v` |

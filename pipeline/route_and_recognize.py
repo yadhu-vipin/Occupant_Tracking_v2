@@ -76,12 +76,12 @@ def print_phase2_report(results):
     accepted = sum(item["accepted"] for item in results)
     print(f"\nSUMMARY\ntotal events: {len(results)}\naccepted locally: {accepted}\n"
           f"rejected locally (routed to Phase 3): {len(results) - accepted}")
-    print("\nRun pipeline/evaluate_pipeline.py after Phase 4 for ground-truth accuracy.")
+    print("\nRun evaluation/evaluate_events.py after Phase 4 for ground-truth accuracy.")
 
 
 def run_phase2(args):
     """Own-gallery pass over every event. Ground truth is intentionally not
-    supplied to recognize_locally() -- see ``pipeline/evaluate_pipeline.py``
+    supplied to recognize_locally() -- see ``evaluation/evaluate_events.py``
     for the one unified end-to-end evaluator that compares against it.
     """
     events = json.loads(args.events.read_text(encoding="utf-8"))
@@ -104,7 +104,7 @@ class RetrievalRuntime:
 
     def __init__(self, embeddings, meta, artifact_dir, nodes_dir=None, secure=True):
         # secure=True: every candidate check is a sealed round trip (see
-        # security/payload.py) and fails closed. False keeps the bare in-process call.
+        # secure_transfer/payload.py) and fails closed. False keeps the bare in-process call.
         self.secure = secure
         self.secure_failures: list = []     # (current, candidate, reason) for every failed sealed exchange
         self.embeddings = embeddings
@@ -211,7 +211,7 @@ class RetrievalRuntime:
             # Definition 3.3 evidence: {occupant_id: min reference angle deg}
             # for every occupant of the building that actually confirmed the
             # identity (None when unresolved). Not a probability -- see
-            # dsts/legacy_state/probability.py and pipeline/phase4_state.py.
+            # dsts/state/probability.py and pipeline/phase4_state.py.
             "verification_distance_evidence": verified["candidate_distances"] if verified else None,
         }
 

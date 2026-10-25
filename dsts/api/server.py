@@ -4,8 +4,8 @@ dsts/api/server.py — Production DSTS Wiring, Query Interface & Dashboard Serve
 FastAPI application for DSTS Command Center, integrating:
   1. Real QueryEngine supporting Q1..Q13 and TRACK
   2. Two-Layer Zero-Trust Access Control:
-     - Layer 1: Infrastructure RBAC (security/authorize.py)
-     - Layer 2: Building-Scoped Hierarchical Persona ReBAC (A > B > C) (security/campus_policy.py)
+     - Layer 1: Infrastructure RBAC (access_control/authorize.py)
+     - Layer 2: Building-Scoped Hierarchical Persona ReBAC (A > B > C) (access_control/campus_policy.py)
   3. Token-based Authentication & Principle of Least Privilege (S1, S2)
   4. Real Occupancy & Heatmap derived from the 10-building deployment state
   5. Real Zero-Trust Security Audit Logging & Replay Rejection
@@ -45,7 +45,7 @@ from prometheus_client import (
 import yaml
 
 from dsts.api import metrics as m
-from dsts.legacy_state.zones import ZONES, zone_label, zone_sector
+from dsts.state.zones import ZONES, zone_label, zone_sector
 from pipeline.query import (
     IdentifiedEvent,
     build_engine,
@@ -60,8 +60,8 @@ from pipeline.query import (
     TRAJECTORY_QUERIES,
 )
 from pipeline.query_cache import QueryCache
-from security.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
-from security.campus_policy import (
+from access_control.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
+from access_control.campus_policy import (
     evaluate_campus_query_policy,
     DisclosureLevel,
     QueryPurpose,
@@ -70,7 +70,7 @@ from security.campus_policy import (
     get_occupant_building,
     clear_campus_registry,
 )
-from security.authorize import (
+from access_control.authorize import (
     authorize_with_reason,
     get_audit_log,
     clear_audit_log,
@@ -179,7 +179,7 @@ def _strip_bearer(raw_token: Optional[str]) -> Optional[str]:
 def resolve_token_principal(raw_token: Optional[str]) -> Optional[str]:
     """Return the occupant ID a signed, unexpired token was issued to (None otherwise).
 
-    Only tokens minted by this server (security.tokens.issue_token) verify. An occupant
+    Only tokens minted by this server (access_control.tokens.issue_token) verify. An occupant
     ID, a guessable string or a client-built value is never a valid credential.
     """
     principal = verify_token(_strip_bearer(raw_token))

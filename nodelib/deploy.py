@@ -44,12 +44,12 @@ from buildinglib.node import (BuildingNode as RoutingNode, Identification, Routi
 from buildinglib.params import ContractMismatch, Params, compute_params_hash, sha256_file  # noqa: E402
 from buildinglib.route import route                   # noqa: E402
 from buildinglib.verify import vote                    # noqa: E402
-from dsts.legacy_state.bsts import StateTable                # noqa: E402
-from dsts.legacy_state.store import FakeOccupantRegistry, StateRow  # noqa: E402
+from dsts.state.bsts import StateTable                # noqa: E402
+from dsts.state.store import FakeOccupantRegistry, StateRow  # noqa: E402
 from pipeline.recognize import confirm_at_candidate    # noqa: E402
-from dsts.legacy_state.zones import ZONES                    # noqa: E402
+from dsts.state.zones import ZONES                    # noqa: E402
 
-SCHEMA_SQL = _BUILDINGS / "dsts" / "legacy_state" / "schema.sql"
+SCHEMA_SQL = _BUILDINGS / "dsts" / "state" / "schema.sql"
 _FILE_FOR_TABLE = {"registered_state": "registered.db", "visitor_state": "visitor.db"}
 
 
@@ -144,7 +144,7 @@ def load_node_contract(folder):
 
 def _table_ddl():
     """``{table_name: "CREATE TABLE IF NOT EXISTS ..."}`` parsed from the one
-    ``dsts/legacy_state/schema.sql`` -- so the DDL has a single source of truth.
+    ``dsts/state/schema.sql`` -- so the DDL has a single source of truth.
     """
     text = SCHEMA_SQL.read_text(encoding="utf-8")
     ddl = {}
@@ -156,10 +156,10 @@ def _table_ddl():
 
 
 class SplitSqliteStore:
-    """Duck-types ``dsts.legacy_state.store.StateStore``, backed by two SQLite files
+    """Duck-types ``dsts.state.store.StateStore``, backed by two SQLite files
     instead of one -- ``registered.db`` holds ``registered_state``,
     ``visitor.db`` holds ``visitor_state``. Routed the same way
-    ``dsts.legacy_state.store.SqliteStore`` routes: by ``registry.is_registered()``.
+    ``dsts.state.store.SqliteStore`` routes: by ``registry.is_registered()``.
     """
 
     def __init__(self, state_dir, registry):
@@ -221,7 +221,7 @@ class SplitSqliteStore:
 
 def _pointers_ddl():
     """Parse ``CREATE TABLE visitor_pointers`` and its index straight out of
-    the one ``dsts/legacy_state/schema.sql`` -- same single-source-of-truth
+    the one ``dsts/state/schema.sql`` -- same single-source-of-truth
     idiom as :func:`_table_ddl`, just not restricted to ``CREATE TABLE``.
     """
     text = SCHEMA_SQL.read_text(encoding="utf-8")

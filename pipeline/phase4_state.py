@@ -3,14 +3,14 @@
     event
       -> existing recognition/retrieval result   (identity + candidate set)
       -> biometric distance evidence               (per-candidate min angle)
-      -> dsts.legacy_state.probability.occupant_probabilities()   (Definition 3.3)
-      -> dsts.legacy_state.bsts.StateTable.apply()
+      -> dsts.state.probability.occupant_probabilities()   (Definition 3.3)
+      -> dsts.state.bsts.StateTable.apply()
       -> nodes/<current_building>/state/{registered,visitor}.db
 
 This module only ever reads observable events plus the existing Phase 2/3
 outputs (``recognition_results.json``, ``retrieval_attempts.json``). It never
 reads ``ground_truth.json`` -- ground truth is a Phase 4 *evaluation* concern
-(see ``pipeline/evaluate_pipeline.py``), not a prediction input. Phase 3's own
+(see ``evaluation/evaluate_events.py``), not a prediction input. Phase 3's own
 identity decision (who is accepted locally, who is confirmed remotely) is
 never changed by this module -- it only decides how to turn that decision
 into a probability distribution and what to persist.
@@ -85,10 +85,10 @@ from buildinglib.node import load_routing_contract
 from buildinglib.refs import reference_tensor
 from buildinglib.split import default_emb_path, default_meta_path, normalise_occupant_ids
 from buildinglib.verify import vote_evidence
-from dsts.legacy_state.bsts import StateTable
-from dsts.legacy_state.probability import occupant_probabilities
-from dsts.legacy_state.store import FakeOccupantRegistry
-from dsts.legacy_state.zones import ZONES
+from dsts.state.bsts import StateTable
+from dsts.state.probability import occupant_probabilities
+from dsts.state.store import FakeOccupantRegistry
+from dsts.state.zones import ZONES
 from nodelib.deploy import PointerStore, SplitSqliteStore
 
 log = logging.getLogger(__name__)

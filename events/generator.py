@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from buildinglib.split import default_emb_path, default_meta_path, list_buildings, normalise_occupant_ids
-from dsts.legacy_state.zones import ZONE_ADJACENCY
+from dsts.state.zones import ZONE_ADJACENCY
 from .ground_truth import make_ground_truth, make_state_transition
 from .models import Event, OccupantState
 

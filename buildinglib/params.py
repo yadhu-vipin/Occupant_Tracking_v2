@@ -17,7 +17,7 @@ a real match still always hits).
 
 Any difference and the codes silently stop matching -- nothing crashes, routing
 just quietly stops working. So the four are hashed into one ``params_hash`` that
-travels inside every artifact, and ``merge_check.py`` refuses a set of filters
+travels inside every artifact, and ``tools/merge_check.py`` refuses a set of filters
 whose hashes disagree.
 
 ``shared/params.json`` declares the contract; ``shared/mean_face.npy`` is the

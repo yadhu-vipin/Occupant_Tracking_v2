@@ -18,8 +18,8 @@ Merges what used to be two files:
   - ``query_engine.py``'s ``QueryEngine`` (Q1/Q2/Q3/Q5/Q6/execute_query),
     built over ``dsts/output/phase4_results.json`` + ``nodes/<building>/
     building.json``
-  - ``query_campus_real.py``'s two-layer RBAC wiring (``security.authorize``
-    + ``security.campus_policy``) plus the ``--caller --target --building
+  - ``query_campus_real.py``'s two-layer RBAC wiring (``access_control.authorize``
+    + ``access_control.campus_policy``) plus the ``--caller --target --building
     --query`` CLI and TRACK
 
 ``query_campus_real.py`` was pure wrapping with no independent
@@ -27,8 +27,8 @@ responsibility beyond RBAC + CLI, so this is a clean fold; it (and
 ``query_engine.py``) are dropped as standalone files.
 
 Security: every query is gated through the zero-trust RBAC chokepoint in
-``security/authorize.py`` (Layer 1: is this a registered query client at
-all?) and, for per-occupant queries, ``security/campus_policy.py`` (Layer 2:
+``access_control/authorize.py`` (Layer 1: is this a registered query client at
+all?) and, for per-occupant queries, ``access_control/campus_policy.py`` (Layer 2:
 persona ReBAC -- what may this caller see about this target?). Both layers
 stay exactly where they were: the pointer optimization below is a
 data-source choice behind the SAME authorization check, never a new
@@ -67,13 +67,13 @@ ROOT_DIR = HERE.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from dsts.legacy_state.zones import ZONES, zone_label, zone_sector          # noqa: E402
+from dsts.state.zones import ZONES, zone_label, zone_sector          # noqa: E402
 from nodelib.deploy import PointerStore                                      # noqa: E402
-from security.authorize import (                                            # noqa: E402
+from access_control.authorize import (                                            # noqa: E402
     Role, authorize, clear_audit_log, clear_registry, get_audit_log,
     register_node, set_enforce_policy,
 )
-from security.campus_policy import (                                        # noqa: E402
+from access_control.campus_policy import (                                        # noqa: E402
     DisclosureLevel, PolicyDecision, QueryContext, QueryPurpose,
     check_office_presence, clear_campus_registry, evaluate_campus_query_policy,
     get_occupant_role, register_class_roster, register_occupant_building, register_occupant_role,
@@ -214,7 +214,7 @@ class QueryEngine:
 
     Every call is gated by RBAC: ``principal`` must hold (or be granted, via
     ``register_node``) a role permitted to ``QUERY`` -- see
-    ``security/authorize.py``. With ``enforce_rbac=True`` (the default) an
+    ``access_control/authorize.py``. With ``enforce_rbac=True`` (the default) an
     unregistered or under-privileged principal raises ``PermissionError``
     instead of silently returning data.
 
@@ -796,16 +796,16 @@ def load_real_registry() -> tuple[dict[str, str], dict[str, list[str]]]:
     rosters_file = ROLES_DIR / "class_rosters.json"
     if not roles_file.exists() or not rosters_file.exists():
         try:
-            from build_campus_roles import main as build_roles_main
+            from population.roles import main as build_roles_main
             build_roles_main()
         except Exception:
             raise FileNotFoundError(
-                f"Missing {roles_file} or {rosters_file}. Run: python build_campus_roles.py"
+                f"Missing {roles_file} or {rosters_file}. Run: python -m population.roles"
             )
     roles = json.loads(roles_file.read_text(encoding="utf-8"))
     rosters = json.loads(rosters_file.read_text(encoding="utf-8"))
     if not roles:
-        raise SystemExit("no roles found -- run: python build_campus_roles.py first")
+        raise SystemExit("no roles found -- run: python -m population.roles first")
     return roles, rosters
 
 

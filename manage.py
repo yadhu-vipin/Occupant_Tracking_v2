@@ -3,7 +3,7 @@
     python manage.py test                 run the whole test suite
     python manage.py pipeline             enroll -> events -> Phase 2 -> Phase 3 -> Phase 4 (seed 42)
     python manage.py states               per-state TP/FP/TN/FN vs ground truth, averaged over all states
-    python manage.py demo                 run_project.py demo (RBAC + queries end to end)
+    python manage.py demo                 scripts/demo.py demo (RBAC + queries end to end)
     python manage.py serve                start the API/dashboard on http://127.0.0.1:8000
     python manage.py query ARGS...        pipeline/query.py (e.g. --caller X --target Y --query Q6)
 
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent
 PY = sys.executable
 
 PIPELINE = [
-    ["build_campus_roles.py"],
+    ["-m", "population.roles"],
     ["pipeline/enroll_and_broadcast.py", "--all", "--force"],
     ["pipeline/generate_events.py", "--seed", "42"],
     ["pipeline/route_and_recognize.py", "--phase", "2"],
@@ -41,9 +41,9 @@ def main(argv):
         for step in PIPELINE:
             run(*step)
     elif task == "states":
-        run("pipeline/evaluate_states.py", *rest)
+        run("evaluation/evaluate_states.py", *rest)
     elif task == "demo":
-        run("run_project.py", *rest)
+        run("scripts/demo.py", *rest)
     elif task == "serve":
         run("-m", "uvicorn", "dsts.api.server:app", "--host", "127.0.0.1", "--port", "8000", *rest)
     elif task == "query":
