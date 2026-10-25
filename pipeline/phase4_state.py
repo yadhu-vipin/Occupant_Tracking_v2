@@ -233,6 +233,7 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         "identity_source": None, "presence_mode": None, "identified_occupant_id": None,
         "verified_building": None, "distance_scores": None, "sigma": None,
         "occupant_probabilities": None, "bsts_state_after_update": None,
+        "state_updates": None,
         "status": "NO_IDENTITY", "error": None,
     }
 
@@ -302,6 +303,9 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
     try:
         context.bsts.apply(timestamp, zone, to_persist, context.store)
         row["bsts_state_after_update"] = context.bsts.get_state(occupant_id)
+        # Everyone whose row this event updated, with the zone the system now considers most probable.
+        row["state_updates"] = {o: max(belief, key=belief.get)
+                                for o in to_persist if (belief := context.bsts.get_state(o))}
         if row["presence_mode"] == "present_visitor_pool":
             visitors.seen(occupant_id, timestamp, zone)
             # A visitor's own event at the transition zone is his departure: his presence ends (the day cache stays,

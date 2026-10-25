@@ -63,6 +63,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.paths import run_paths  # noqa: E402
+from evaluation.confusion import one_vs_rest  # noqa: E402
 
 VISITOR_BUCKETS = (
     "CORRECT",
@@ -129,6 +130,29 @@ def categorize_local_event(recognition_result, truth):
     return "INCORRECT_LOCAL"
 
 
+def predicted_occupant(recognition_result, attempt):
+    """Who the system says produced this event: the local match, else the building-confirmed visitor, else nobody."""
+    if recognition_result is not None and recognition_result.get("accepted"):
+        return recognition_result.get("predicted_occupant_id")
+    if attempt is not None and attempt.get("verification_result") == "CONFIRMED":
+        return attempt.get("verified_occupant_id")
+    return None
+
+
+def event_confusion(rows):
+    """One-vs-rest TP / FP / FN / TN over occupant identities (see ``evaluation/confusion.py``), for all events and
+    split into local and visitor events. An abstention is a FN only; a wrong identity is a FP and a FN."""
+    labels = len({r["occupant_id"] for r in rows})
+
+    def pairs(subset):
+        return [(r["occupant_id"], r.get("predicted_occupant_id")) for r in subset]
+
+    return {"n_labels": labels,
+            "all": one_vs_rest(pairs(rows), labels),
+            "local": one_vs_rest(pairs([r for r in rows if r["event_type"] == "local"]), labels),
+            "visitor": one_vs_rest(pairs([r for r in rows if r["event_type"] == "visitor"]), labels)}
+
+
 def build_event_rows(ground_truth, recognition_by_id, retrieval_by_id):
     rows = []
     for truth in ground_truth:
@@ -140,6 +164,7 @@ def build_event_rows(ground_truth, recognition_by_id, retrieval_by_id):
             "occupant_id": truth["occupant_id"], "home_building": truth["home_building"],
             "current_building": truth["current_building"], "current_zone": truth["current_zone"],
             "event_type": "visitor" if visitor else "local",
+            "predicted_occupant_id": predicted_occupant(recognition_result, retrieval_by_id.get(event_id)),
         }
         if not visitor:
             row["outcome"] = categorize_local_event(recognition_result, truth)
@@ -264,6 +289,7 @@ def summarize(rows, pointer_report):
         ),
         "visitor_bucket_counts": {bucket: count(visitor_rows, bucket) for bucket in VISITOR_BUCKETS},
         "pointer_precision": pointer_report,
+        "event_confusion": event_confusion(rows),
     }
 
 
@@ -324,6 +350,8 @@ def run_evaluation(
         json.dumps(rows, indent=2) + "\n", encoding="utf-8")
     (out_dir / "end_to_end_summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    (out_dir / "event_metrics.json").write_text(
+        json.dumps(summary["event_confusion"], indent=2) + "\n", encoding="utf-8")
 
     return summary
 

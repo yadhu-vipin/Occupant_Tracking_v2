@@ -56,3 +56,28 @@ def test_state_carries_forward_and_means_are_averaged():
     assert series["location"][1]["fn"] == 1                      # B missed
     assert summary["location"]["mean_recall"] == (1.0 + 0.5) / 2
     assert "b2" in dump_state(truth, rows, 1)
+
+
+def test_a_new_day_starts_empty_on_both_sides():
+    truth = [{**gt(1, "A", "b1", "z1"), "timestamp": "2026-01-05 08:00:01"},
+             {**gt(2, "B", "b2", "z2"), "timestamp": "2026-01-06 08:00:02"}]
+    rows = [row(1, "A", "b1", "z1"), row(2, "B", "b2", "z2")]
+    _, series = run(truth, rows)
+    last = series["location"][1]
+    assert last["active"] == 1 and (last["tp"], last["fp"], last["fn"]) == (1, 0, 0)   # A left overnight, no ghost
+
+
+def test_visitors_updated_by_other_peoples_events_are_scored():
+    truth = [{**gt(1, "V", "b1", "z1"), "home_building": "b2"},
+             {**gt(2, "A", "b1", "z2"), "home_building": "b1"}]
+    first = row(1, "V", "b1", "z1")
+    second = row(2, "A", "b1", "z2")
+    second["state_updates"] = {"A": "z2", "V": "z1"}          # event 2 also refreshed visitor V
+    _, series = run(truth, [first, second])
+    s = series["location"][1]
+    assert (s["tp"], s["fp"], s["fn"]) == (2, 0, 0)
+    assert s["visitors"] == 1 and s["visitor_recall"] == 1.0
+    stale = row(2, "A", "b1", "z2")
+    stale["state_updates"] = {"A": "z2", "V": "z2"}           # system now thinks V moved to z2: a FP and a FN
+    _, series = run(truth, [first, stale])
+    assert series["location"][1]["visitor_recall"] == 0.0 and series["location"][1]["fp"] == 1

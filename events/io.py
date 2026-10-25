@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from .ground_truth import build_state_ground_truth
+
 
 def save_events(events, ground_truth, output_dir, states=None):
     output = Path(output_dir)
@@ -14,6 +16,8 @@ def save_events(events, ground_truth, output_dir, states=None):
     )
     if states is not None:
         (output / "state_truth.json").write_text(json.dumps(states, indent=1) + "\n", encoding="utf-8")
+        (output / "state_ground_truth.json").write_text(
+            json.dumps(build_state_ground_truth(states), separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def load_events(events_path, ground_truth_path):
