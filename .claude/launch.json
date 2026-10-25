@@ -7,6 +7,12 @@
       "runtimeArgs": ["-m", "uvicorn", "dsts.api.server:app", "--host", "127.0.0.1", "--port", "8000"],
       "port": 8000,
       "env": { "DSTS_DEMO_MODE": "1" }
+    },
+    {
+      "name": "dsts-standalone",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "dsts.api.standalone:app", "--host", "127.0.0.1", "--port", "8001"],
+      "port": 8001
     }
   ]
 }

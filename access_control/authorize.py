@@ -344,6 +344,23 @@ def authorize_decision(
 
 
 
+def audit_policy_decision(principal: Optional[str], target: str, permitted: bool, policy_rule: str = "",
+                          level: str = "", reason: str = "") -> None:
+    """Record a Layer-2 (persona policy) decision next to the Layer-1 ones, so the audit trail shows both layers.
+
+    ``authorize_decision(..., check_target_policy=False)`` judges Layer 1 only; whoever then evaluates Layer 2 with the
+    real context calls this with the outcome."""
+    target_type, target_id = parse_target_resource(target)
+    _audit_log.append({
+        "timestamp": time.time(), "building": "", "principal": principal, "verb": "QUERY", "target": target,
+        "target_type": target_type, "target_id": target_id,
+        "decision": "PERMIT" if permitted else "DENY",
+        "reason": "" if permitted else f"{CODE_TARGET_POLICY}: {policy_rule} {reason}".strip(),
+        "layer": LAYER_POLICY, "code": "" if permitted else CODE_TARGET_POLICY,
+        "policy_rule": policy_rule, "level": level,
+    })
+
+
 def get_audit_log():
     """Return the accumulated audit log entries."""
     return list(_audit_log)

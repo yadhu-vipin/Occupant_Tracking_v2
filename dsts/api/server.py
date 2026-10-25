@@ -35,7 +35,7 @@ from fastapi import (
     Depends,
     status,
 )
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import RedirectResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from prometheus_client import (
@@ -78,7 +78,7 @@ from access_control.campus_policy import (
     clear_campus_registry,
 )
 from access_control.authorize import (
-    authorize_decision, authorize_with_reason,
+    audit_policy_decision, authorize_decision, authorize_with_reason,
     get_audit_log,
     clear_audit_log,
     clear_registry,
@@ -375,12 +375,25 @@ def _compute_real_occupancy_locked(engine: QueryEngine) -> tuple[Dict[str, List[
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-@app.get("/", include_in_schema=False)
-def index() -> FileResponse:
+def _console_page() -> FileResponse:
     index_file = STATIC_DIR / "index.html"
     if not index_file.exists():
         raise HTTPException(status_code=500, detail="Dashboard index.html is missing.")
     return FileResponse(str(index_file))
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    """The Command Center console. ``DSTS_DEFAULT_UI=lane_d`` makes the Lane D dashboard (/lane-d/) the front page."""
+    if os.environ.get("DSTS_DEFAULT_UI", "").strip().lower() in ("lane_d", "lane-d"):
+        return RedirectResponse("/lane-d/")
+    return _console_page()
+
+
+@app.get("/console", include_in_schema=False)
+def console() -> FileResponse:
+    """The console, always (even when the front page is switched to Lane D)."""
+    return _console_page()
 
 
 # Brute-force protection for the credential login: per (client, occupant) and, more loosely, per occupant overall.
@@ -1033,6 +1046,8 @@ def execute_query_endpoint(
     decision = evaluate_campus_query_policy(
         caller_id, target_id, context=ctx, purpose=ctx.purpose, target_current_building=target_curr_b,
     )
+    audit_policy_decision(caller_id, f"occupant:{target_id}", decision.permitted and decision.level > DisclosureLevel.L0_NONE,
+                          decision.policy_rule, decision.level.name, decision.reason)
     if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
         out = _denied_response(q_type, template_fmt, caller_meta, decision.policy_rule, decision.reason, target_meta)
         out["decision"] = decision.to_dict()
@@ -1166,6 +1181,11 @@ async def ws_live(websocket: WebSocket, ticket: Optional[str] = Query(None)) -> 
         reader.cancel()
         _connections.discard(websocket)
         _subscribers.pop(websocket, None)
+
+
+# The Lane D dashboard (dsts_final.zip) on the real data: /lane-d/ and /lane-d/api/* -- see dsts/api/lane_d.py.
+from dsts.api import lane_d as _lane_d  # noqa: E402
+_lane_d.mount(app)
 
 
 def main():

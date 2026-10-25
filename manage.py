@@ -6,7 +6,11 @@
     python manage.py pipeline [--seed N]        the same, for one seed (default seed from config/experiment.yaml)
     python manage.py states [--seed N]          per-state TP/TN/FP/FN vs ground truth
     python manage.py demo [--seed N]            RBAC + queries end to end
-    python manage.py serve [--seed N]           start the API/dashboard on http://127.0.0.1:8000
+    python manage.py serve [--seed N] [--ui lane_d]
+                                                start the real system on http://127.0.0.1:8000: the console at /, the
+                                                Lane D dashboard at /lane-d/ (--ui lane_d makes it the front page)
+    python manage.py standalone                 the Lane D dashboard on its offline, fake-backed demo server (:8001)
+    python manage.py walk                       scripted B1 -> B5 walk in the terminal (offline, needs no corpus)
     python manage.py query [--seed N] ARGS...   pipeline/query.py (e.g. --caller X --target Y --query Q6)
 
 Every seed owns one folder, ``runs/seed_XX/`` (see shared/paths.py); scripts find it through
@@ -102,7 +106,13 @@ def main(argv):
     elif task == "demo":
         run("scripts/demo.py", *rest, seed=seed)
     elif task == "serve":
-        run("-m", "uvicorn", "dsts.api.server:app", "--host", "127.0.0.1", "--port", "8000", *rest, seed=seed)
+        ui = pop_option(rest, "--ui", "")
+        run("-m", "uvicorn", "dsts.api.server:app", "--host", "127.0.0.1", "--port", "8000", *rest, seed=seed,
+            env={"DSTS_DEFAULT_UI": ui} if ui else None)
+    elif task == "standalone":
+        run("-m", "uvicorn", "dsts.api.standalone:app", "--host", "127.0.0.1", "--port", "8001", *rest)
+    elif task == "walk":
+        run("-m", "scripts.terminal_walk", *rest)
     elif task == "query":
         run("pipeline/query.py", *rest, seed=seed)
     else:

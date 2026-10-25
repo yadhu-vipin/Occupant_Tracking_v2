@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DSTS — Lane D Occupant Tracking</title>
+<!-- __MODE__ / __STATIC__ are filled in by the server: "integrated" (real data, login, /lane-d) or "standalone" (offline demo) -->
+<meta name="dsts-mode" content="__MODE__"><link rel="stylesheet" href="__STATIC__/style.css?v=3"></head>
+<body><div class="app">
+<aside class="side">
+ <div class="brand"><div class="logo">◈</div><div><b>DSTS</b><small>Lane D</small></div></div>
+ <nav id="nav">
+  <button class="nav active" data-view="overview"><i>▦</i>Overview</button>
+  <button class="nav" data-view="occupancy"><i>◉</i>Occupancy</button>
+  <button class="nav" data-view="zones"><i>▣</i>Building &amp; Zones</button>
+  <button class="nav" data-view="query"><i>⌕</i>Research Queries</button>
+  <button class="nav" data-view="security"><i>⛨</i>Security</button>
+  <button class="nav" data-view="metrics"><i>◔</i>Metrics</button>
+  <div class="sec">SYSTEM</div>
+  <button class="nav" data-view="generator"><i>✦</i>Event Generator</button>
+  <button class="nav" id="btn-walk"><i>⇄</i>B1 → B5 Demo</button>
+  <button class="nav" data-view="settings"><i>⚙</i>Settings</button>
+ </nav>
+ <div class="user"><div class="avatar">AA</div><div><b>Ajith Ashok</b><small>Lane D Team</small></div></div>
+</aside>
+<main>
+<header class="top">
+ <div><h1>DSTS — Lane D Occupant Tracking</h1><p>Building-level coordination · Zone-level occupancy · Temporal queries</p></div>
+ <div class="top-r"><span class="pill online"><span class="dot" id="live-dot"></span>System Online</span><div class="clock"><span id="clk-d"></span><b id="clk-t"></b></div></div>
+</header>
+
+<section id="v-overview" class="view active">
+ <div class="kpis" id="kpis"></div>
+ <div class="grid2"><div class="card"><div class="ch"><h3>Campus Overview</h3><span class="muted" id="campus-sub"></span></div><div id="campus"></div></div>
+ <div class="card"><div class="ch"><h3>Live Activity</h3><span class="pill live">● Live</span></div><div id="activity" class="activity"></div><a class="link" data-go="occupancy">View all events →</a></div></div>
+</section>
+
+<section id="v-occupancy" class="view"><div class="card"><div class="ch"><div><h3>Current occupancy records</h3><p class="muted">Latest tracked state by occupant and zone.</p></div><span id="occupancy-count" class="pill">0 records</span></div>
+<div class="table-wrap"><table><thead><tr><th>Building</th><th>Zone</th><th>Occupant</th><th>Confidence</th><th>Last observed</th></tr></thead><tbody id="occupancy-body"></tbody></table></div></div></section>
+
+<section id="v-zones" class="view">
+ <div class="ch pad"><div><h2>Building &amp; Zone Map</h2><p class="muted">Every configured zone is shown for every building with real-time occupancy.</p></div><label class="field">Building<select id="heatmap-building"></select></label></div>
+ <div class="bcards" id="bcards"></div>
+ <div class="grid2 z"><div class="card"><div class="ch"><h3 id="zmap-title">Zones</h3></div><div class="stage"><div class="plane" id="plane"></div></div>
+  <div class="legend"><span>Low</span><i></i><span>High</span></div></div>
+ <div class="card" id="zone-detail"></div></div>
+</section>
+
+<section id="v-query" class="view"><div class="card"><div class="ch"><div><h3>Research-paper query templates</h3><p class="muted">Choose one of the 13 query types, enter its parameters, and execute it against available tracking records.</p></div></div>
+<div class="query-toolbar"><label class="field grow">Query template<select id="query-kind"></select></label>
+<label class="field">Role<select id="q-role"><option value="officer">Officer</option><option value="analyst">Analyst</option><option value="self">Self</option></select></label>
+<label class="field" id="purpose-field">Purpose<select id="q-purpose"><option value="general_lookup">General lookup</option><option value="security_investigation">Security investigation</option><option value="audit">Audit</option></select></label>
+<button id="btn-voice" class="ghost">🎙 Voice query</button><label class="check"><input type="checkbox" id="q-speak"> Speak result</label></div>
+<div id="query-description" class="qdesc"></div><div id="query-fields" class="query-fields"></div>
+<div class="row"><button id="btn-query">Run query</button><button id="btn-clear-query" class="ghost">Clear</button></div>
+<p class="small muted" id="q-as" aria-live="polite"></p><p class="small muted" id="voice-status" aria-live="polite"></p><p class="small muted" id="query-note" aria-live="polite"></p>
+<div id="query-answer" class="qans"></div>
+<div class="table-wrap"><table><thead><tr><th>Building</th><th>Zone</th><th>Occupant</th><th>Confidence</th><th>Timestamp / details</th></tr></thead><tbody id="query-body"></tbody></table></div></div></section>
+
+<section id="v-security" class="view">
+ <div class="ch pad"><div><h2>Security &amp; Access Control</h2><p class="muted">Manage access, monitor authentication and view security status.</p></div></div>
+ <div class="secbar"><div class="shield">⛨</div><div class="sb-t"><b>System Secure</b><span id="sec-sub">Role-based access, signed transport and replay protection are active</span></div><div class="kpis four" id="sec-kpis"></div></div>
+ <div class="card"><div class="subtabs" id="subtabs"><button class="active" data-st="logs">Access Logs</button><button data-st="roles">Roles</button><button data-st="policies">Policies</button><button data-st="certs">Certificates</button></div>
+ <div class="table-wrap" id="sec-body"></div></div>
+</section>
+
+<section id="v-metrics" class="view"><div class="card"><h3>Prometheus &amp; Grafana</h3><p class="muted">Live counters are exposed at <code>/metrics</code>. Open Grafana at <a href="http://localhost:3000" target="_blank" rel="noopener">localhost:3000</a>.</p><div class="row"><a class="btn" href="/metrics" target="_blank" rel="noopener">Open raw metrics →</a></div></div></section>
+
+<section id="v-generator" class="view"><div class="card"><h3>Event Generator</h3><p class="muted">Generate simulated mobility events for every building.</p>
+<div class="row"><label class="field">Events <input id="sim-count" type="number" value="20" min="1" max="200"></label><label class="field">Seed <input id="sim-seed" type="number" value="42"></label></div>
+<div class="row"><button id="btn-simulate">Generate Events</button><button id="btn-reset" class="ghost">Reset</button></div></div></section>
+
+<section id="v-settings" class="view"><div class="card"><h3>Recognition threshold</h3><input id="theta" type="range" min="0" max="100" value="40"><div class="muted" id="theta-value">0.40</div>
+<h3 class="mt">About this lane</h3><p class="muted">Lane D connects recognition, cross-building routing, state retrieval, role-aware access and monitoring. Occupancy and query answers are based on the demo data available to this running instance.</p></div></section>
+</main></div><script src="__STATIC__/app.js?v=3"></script></body></html>

@@ -17,7 +17,11 @@ python manage.py run --seeds 0-4            # N-seed experiment: a different pop
 python manage.py pipeline --days 1          # one seed (default 42), original single-day event stream
 python manage.py states --seed 42           # per-state TP/TN/FP/FN against ground truth
 python manage.py demo                       # RBAC + queries, end to end (scripts/demo.py)
-python manage.py serve                      # API + dashboard on http://127.0.0.1:8000
+python manage.py serve                      # real system: console at http://127.0.0.1:8000/, Lane D dashboard at /lane-d/
+python manage.py serve --ui lane_d          # same, with the Lane D dashboard as the front page
+python manage.py standalone                 # the Lane D dashboard on its offline, fake-backed demo server (:8001)
+python manage.py walk                       # scripted B1 -> B5 walk in the terminal (offline, needs no corpus)
+bash scripts/run_demo.sh                    # walk, then the real system if a run exists, else the standalone demo
 python manage.py query --caller <id> --target <id> --query Q6
 python tools/rbac_matrix.py                 # what every persona gets for every query type (checks RBAC end to end)
 bash paper/reproduce.sh                     # rebuild every number in the paper
@@ -89,12 +93,15 @@ evaluation/               evaluate_events (event TP/TN/FP/FN, buckets), evaluate
                           confusion.py (shared maths), stats.py, summarize_runs.py (mean ± 95% CI over seeds)
 centralized/              centralised global-search benchmark
 dsts/state/               zones, BSTS, Definition 3.3 probability, SQLite stores
-dsts/api/                 FastAPI server, metrics, static dashboard
+dsts/api/                 server.py (the real FastAPI server) + static/ (the console); lane_d.py + static_lane_d/ (the Lane D
+                          dashboard on the real data, at /lane-d/); standalone.py (the same dashboard on fakes); metrics.py
+dsts/contracts.py, testing.py, events/mobility.py, orchestration/, security/
+                          the Lane D hand-over's standalone demo layer (fakes, in-process campus, HMAC transport) -- see INTEGRATION.md
 nodelib/                  per-building deployment (deploy.py: DeployedBuilding, PointerStore)
 access_control/           Layer-1 RBAC (authorize.py), Layer-2 persona policy (campus_policy.py), tokens.py,
                           scope.py, credentials.py, rate_limit.py, tickets.py, personas.py
 secure_transfer/          crypto, CA/mTLS (transport.py), replay guard, sealed payloads (payload.py), handler.py, codec.py
-scripts/demo.py           full operational run + reliability check
+scripts/demo.py           full operational run + reliability check;  terminal_walk.py, run_demo.sh: the offline scripted walk
 tools/                    merge_check, verify_building, compare_topologies, build_variant_meta, rbac_matrix
 monitoring/               Prometheus + Grafana (docker-compose, optional)
 paper/                    paper sources, experiment code, stored results, reproduce.sh (section 11)
@@ -310,6 +317,8 @@ Start it: `DSTS_DEMO_MODE=1 python manage.py serve [--seed N]`, then open http:/
 
 **How it works.** `dsts/api/server.py` (FastAPI) serves the static dashboard (`static/index.html`, `app.js`, `style.css`) and a JSON API. At boot the page asks `POST /api/auth/login` for tokens for the three personas — a Dean, a Teacher and a Student of one building, plus a rostered student and a student of another building for the quick-pick chips, all picked from the run's roles. With demo mode off the page shows the server's 403 message. Every request sends the active persona's bearer token; on a 401 the page re-signs in. The persona switcher swaps tokens and refetches everything. The live WebSocket asks `/api/ws-ticket` for a single-use ticket and connects to `/ws/live?ticket=`.
 
+**Two front ends, one server.** The console above is `/`. The Lane D dashboard from the team hand-over (`dsts_final.zip`) is served at `/lane-d/` by the same process: same page as its original, but every call goes through `dsts/api/lane_d.py` to the real data and the real RBAC (its Officer / Analyst / Self roles act as the demo Dean / Teacher / Student). `DSTS_DEFAULT_UI=lane_d` (or `serve --ui lane_d`) makes it the front page; `/console` is always the console. `python manage.py standalone` runs the same page on the hand-over's fake-backed server with no corpus and no login. Details and the file-by-file mapping: [INTEGRATION.md](INTEGRATION.md).
+
 **Tabs:** Dashboard (campus totals, per-building counts, live feed), Occupancy (who is where, disclosed per role), Heatmap (zone density), Query (pick Q-type, caller, target, time; shows the answer, the policy decision and redactions), Security (audit log of decisions for this persona), Metrics (Prometheus/Grafana embed).
 
 **Endpoints:**
@@ -371,7 +380,8 @@ paper/reproduce.sh          runs all of the above in order
 | `tests/pipeline` | Phase 2/3/4, the visitor DB (transit rule, day cache, entry windows, promotion on the next entry, permanent hits), pointer lifecycle |
 | `tests/queries` | the query engine, multi-day time normalisation |
 | `tests/access_control` | every policy cell, structured Layer-1 decisions, building scope, login lockout, credentials, tickets, API-level RBAC attacks |
-| `tests/api` | the API server end to end, the query cache |
+| `tests/api` | the API server end to end, the query cache; the Lane D dashboard on the real server (`test_lane_d_integrated.py`: every endpoint, per-role disclosure, queries through RBAC) and its pure helpers |
+| `tests/standalone` | the hand-over's own tests (scripted walk, transport, role policy, heat map) and the offline demo server |
 | `tests/secure_transfer` | sealed payloads (tampering of every header field, replay, wrong sender/recipient, revoked cert, fail closed, codec strictness), certified key-agreement keys |
 | `tests/test_timeutil.py`, `dsts/tests`, `centralized/tests` | libraries |
 
@@ -430,6 +440,7 @@ for f in sorted(Path('runs/seed_42/nodes').iterdir()):
 - *Time.* Multi-day events use dated timestamps (`shared/timeutil.py`); single-day output is byte-identical to before.
 - *Visitor DB.* One database per building replaces the 4 h TTL pool: presence with the `zT` in-transit rule, a day-long cache, entry history and a permanent pool for frequent visitors. Phase 3 owns the visit lifecycle (pointer mint/clear, entries, promotion) because it must run in event order and the identity of an arrival is decided there.
 - *Ground truth and metrics.* Per-state truth with local/visitor status; one confusion helper for events and states; state metrics reset daily and score every visitor Phase 4 updated.
+- *Lane D hand-over.* The dashboard and demo layer from `dsts_final.zip` were added without touching the console: the dashboard runs on the real data through an adapter (`dsts/api/lane_d.py`), the original fake-backed server is kept as `dsts/api/standalone.py`. See [INTEGRATION.md](INTEGRATION.md).
 - *Hardening.* Structured Layer-1 decisions (no reason-string parsing), one building-scope rule for API and CLI, one L2 time-rounding rule, the dead and contradictory disclosure matrices removed (the code is the single source of truth, pinned by a test per cell), per-occupant login credentials with lockout, single-use WebSocket tickets, and CA certificates that bind and sign the X25519 key-agreement key.
 
 ---
@@ -452,5 +463,7 @@ for f in sorted(Path('runs/seed_42/nodes').iterdir()):
 - `is_office_hours` comes from the query timestamp (history is replayed), not the wall clock.
 - Token secret (when random), caches, the lockout counters and the simulated event list are per process.
 - In demo mode any dashboard viewer can act as any of the three personas, by design.
+
+- The standalone demo (`dsts/orchestration`, `dsts/security/transport.py`, `dsts/testing.py`) runs on fakes with an HMAC in-process transport; it demonstrates behaviour, not security, and is separate from `access_control/` and `secure_transfer/`.
 
 **Git hygiene.** Source, tests, contracts and small config are tracked. Generated outputs (`runs/`, corpus, per-node embeddings) are git-ignored and regenerable (`python manage.py run --seeds N`).

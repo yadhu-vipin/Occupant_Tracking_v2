@@ -72,7 +72,7 @@ from shared.timeutil import approx_time, day_of, quantize, with_date  # noqa: E4
 from dsts.state.zones import ZONES, zone_label, zone_sector          # noqa: E402
 from nodelib.deploy import PointerStore                                      # noqa: E402
 from access_control.authorize import (                                            # noqa: E402
-    Role, authorize, authorize_decision, clear_audit_log, clear_registry, get_audit_log,
+    Role, audit_policy_decision, authorize, authorize_decision, clear_audit_log, clear_registry, get_audit_log,
     register_node, set_enforce_policy,
 )
 from access_control.scope import building_scope_denial                            # noqa: E402
@@ -973,6 +973,8 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         purpose=context.purpose,
         target_current_building=target_current_b,
     )
+    audit_policy_decision(caller_id, target_resource, decision.permitted and decision.level > DisclosureLevel.L0_NONE,
+                          decision.policy_rule, decision.level.name, decision.reason)
     print(f"  Layer 2 (persona ReBAC): {'PERMIT' if decision.permitted else 'DENY'}  level={decision.level.name}")
     print(f"  Policy Rule:    {decision.policy_rule or 'N/A'}")
     print(f"  Reason:         {decision.reason}")

@@ -143,3 +143,15 @@ def test_ticket_is_single_use_and_expires():
     assert store.redeem(t2) is None                           # expired
     assert store.redeem("made-up") is None and store.redeem(None) is None
     assert store.issue("S1") != store.issue("S1")
+
+
+# ---------------------------------------------------------------- Layer 2 stays in the audit trail
+def test_layer2_decisions_are_audited_next_to_layer1(campus):
+    az.authorize_decision("S1", "QUERY", "occupant:S1b", check_target_policy=False)         # Layer 1: no objection
+    az.audit_policy_decision("S1", "occupant:S1b", False, "RULE_C_PEER_STALKING_DENIED", "L0_NONE", "anti-stalking")
+    az.audit_policy_decision("D1", "occupant:S1", True, "RULE_A_LOCAL_OCCUPANT_ROUTINE", "L2_CURRENT_ZONE")
+    entries = [e for e in az.get_audit_log() if "decision" in e]
+    assert [(e["layer"], e["decision"]) for e in entries[-3:]] == [("", "PERMIT"), ("L2_POLICY", "DENY"), ("L2_POLICY", "PERMIT")]
+    denied = entries[-2]
+    assert denied["code"] == az.CODE_TARGET_POLICY and "RULE_C_PEER_STALKING_DENIED" in denied["reason"]
+    assert denied["target_id"] == "S1b"
