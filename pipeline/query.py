@@ -68,6 +68,9 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from dsts.legacy_state.zones import ZONES, zone_label, zone_sector          # noqa: E402
+from pipeline.explain import (                                               # noqa: E402
+    QUERY_CLASS, EvidenceItem, Explanation, flag_counts, uncertainty_flags,
+)
 from nodelib.deploy import PointerStore                                      # noqa: E402
 from security.authorize import (                                            # noqa: E402
     Role, authorize, clear_audit_log, clear_registry, get_audit_log,
@@ -203,9 +206,32 @@ class QueryResult:
     answer: Any
     evidence: list[str] = field(default_factory=list)
     success: bool = True
+    # Why the answer came out this way, built from the same events (pipeline/explain.py).
+    # Unredacted: pass it through explain.redact() before showing it to anyone.
+    explanation: Explanation | None = None
 
     def __repr__(self) -> str:
         return f"QueryResult({self.query_id}: answer={self.answer}, success={self.success})"
+
+
+def _sorted_by_time(events) -> list[IdentifiedEvent]:
+    return sorted(events, key=lambda e: e.timestamp)
+
+
+def _first_per_occupant(events) -> dict[str, IdentifiedEvent]:
+    first: dict[str, IdentifiedEvent] = {}
+    for e in events:
+        if e.occupant_id not in first or e.timestamp < first[e.occupant_id].timestamp:
+            first[e.occupant_id] = e
+    return first
+
+
+def _match_mode_counts(events) -> dict[str, int]:
+    """How many of these identifications were routed vs matched in the local gallery."""
+    local = sum(1 for e in events
+                if (e.provenance or {}).get("mode", "local" if e.source == "local_registered_gallery" else "routed")
+                == "local")
+    return {"locally_matched": local, "routed": len(events) - local}
 
 
 # --------------------------------------------------------------------------
@@ -226,15 +252,21 @@ class QueryEngine:
     ``None`` so unit tests that construct a ``QueryEngine`` directly from an
     in-memory event log (no ``nodes/`` folder at all) keep working exactly
     as before -- Q6 simply falls straight through to the full-log scan.
+
+    ``explain`` (default True) makes every query also build an
+    ``Explanation`` (``QueryResult.explanation``) from the same events it
+    answered from; False skips that work (used to measure its overhead).
     """
 
     def __init__(self, events: list[IdentifiedEvent], registered_occupants: dict[str, set[str]],
-                 *, principal: str = "console", enforce_rbac: bool = True, nodes_dir: Path | None = None):
+                 *, principal: str = "console", enforce_rbac: bool = True, nodes_dir: Path | None = None,
+                 explain: bool = True):
         self.events = events
         self.registered = registered_occupants
         self.principal = principal
         self.enforce_rbac = enforce_rbac
         self.nodes_dir = Path(nodes_dir) if nodes_dir else None
+        self.explain = explain
         if enforce_rbac:
             set_enforce_policy(True)
             register_node(principal, Role.QUERY_CLIENT)
@@ -250,10 +282,23 @@ class QueryEngine:
         if self.enforce_rbac and not authorize(self.principal, "QUERY", target):
             raise PermissionError(f"{self.principal!r} is not authorized to run {query_id} on {target!r}")
 
+    def _explanation(self, query_id: str, rule: str, evidence: list[EvidenceItem] | None = None, *,
+                     absence: str | None = None, at_time: str | None = None, pointer_used: dict | None = None,
+                     details: dict | None = None) -> Explanation | None:
+        if not self.explain:
+            return None
+        evidence = evidence or []
+        return Explanation(query_id=query_id, query_class=QUERY_CLASS[query_id], rule=rule, evidence=evidence,
+                           absence=absence, uncertainty=uncertainty_flags(evidence, at_time=at_time,
+                                                                          pointer_used=pointer_used),
+                           pointer_used=pointer_used, details=details or {})
+
     def _unknown_building(self, query_id: str, query_text: str, parameters: dict, building_id: str) -> QueryResult:
         return QueryResult(query_id=query_id, query_text=query_text, parameters=parameters,
                            answer=False, evidence=[f"  Building {building_id} not found in the pipeline output"],
-                           success=False)
+                           success=False,
+                           explanation=self._explanation(query_id, "the building must exist in the pipeline output",
+                                                         absence=f"building {building_id} is not in the pipeline output"))
 
     def _home_building(self, occupant_id: str) -> str | None:
         """Which building's own roster this occupant belongs to, if any."""
@@ -274,14 +319,28 @@ class QueryEngine:
         occupants_present = {e.occupant_id for e in events_after}
         answer = bool(occupants_present)
 
+        last_after: dict[str, IdentifiedEvent] = {}
+        for e in events_after:
+            if e.occupant_id not in last_after or e.timestamp > last_after[e.occupant_id].timestamp:
+                last_after[e.occupant_id] = e
         evidence = []
         for occupant_id in sorted(occupants_present):
-            relevant = [e for e in events_after if e.occupant_id == occupant_id]
-            last = max(relevant, key=lambda e: e.timestamp)
+            last = last_after[occupant_id]
             prob = f"{last.identity_probability:.3f}" if last.identity_probability is not None else "n/a"
             evidence.append(f"  {occupant_id} detected at {last.zone} (t={last.timestamp}, p={prob}, via {last.source})")
 
-        return QueryResult(query_id="Q1", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+        explanation = None
+        if self.explain:
+            first_after = _first_per_occupant(events_after)
+            decisive = [EvidenceItem.from_event(first_after[o], "decisive") for o in sorted(first_after)]
+            explanation = self._explanation(
+                "Q1", f"yes if anyone has an identified sighting in {building_id} after {after_time}; "
+                      "each person's first such sighting is decisive", decisive,
+                absence=None if answer else f"no identified sighting in {building_id} after {after_time}",
+                details={"people_seen_after_t": len(decisive), **_match_mode_counts(list(first_after.values())),
+                         "flag_counts": flag_counts(decisive)})
+        return QueryResult(query_id="Q1", query_text=query_text, parameters=parameters, answer=answer,
+                           evidence=evidence, explanation=explanation)
 
     def _present_at(self, building_id: str, at_time: str) -> dict[str, IdentifiedEvent]:
         """{occupant_id: last event} for everyone present in ``building_id`` at ``at_time``.
@@ -331,9 +390,22 @@ class QueryEngine:
             f"  Visitors present at t={at_time}: {n_visitors}",
             f"  Visitor IDs: {visitors_present if visitors_present else 'none'}",
         ]
+        explanation = None
+        if self.explain:
+            items = [EvidenceItem.from_event(present[o], "last_before_t", note="visitor") for o in visitors_present]
+            items += [EvidenceItem.from_event(present[o], "last_before_t", note="registered")
+                      for o in registered_present]
+            explanation = self._explanation(
+                "Q2", f"a person counts as present in {building_id} at {at_time} if their last identified sighting "
+                      "at or before then is in the building and is not a zT departure; yes if more visitors "
+                      "than registered occupants are present", items, at_time=at_time,
+                absence=None if present else f"nobody is present in {building_id} at {at_time}",
+                details={"visitors_present": n_visitors, "registered_present": n_registered,
+                         "roster_size": len(roster), **_match_mode_counts(list(present.values())),
+                         "flag_counts": flag_counts(items, at_time=at_time)})
         return QueryResult(query_id="Q2",
                            query_text=f"Was #visitors ({n_visitors}) > #registered ({n_registered}) in {building_id} at t={at_time}?",
-                           parameters=parameters, answer=answer, evidence=evidence)
+                           parameters=parameters, answer=answer, evidence=evidence, explanation=explanation)
 
     # ─── Q3: Did occupant o leave building b before time t? ───────────────
     def Q3(self, occupant_id: str, building_id: str, before_time: str) -> QueryResult:
@@ -346,13 +418,18 @@ class QueryEngine:
         left = False
         leave_evidence: list[str] = []
         was_in_building = False
+        leave_event: IdentifiedEvent | None = None
+        last_inside: IdentifiedEvent | None = None
         for e in self.events:
             if e.timestamp >= before_time or e.occupant_id != occupant_id:
                 continue
             if e.building == building_id and e.zone != "zT":
                 was_in_building = True
+                if not left:
+                    last_inside = e
             elif was_in_building and not left and (e.zone == "zT" or e.building != building_id):
                 left = True
+                leave_event = e
                 leave_evidence.append(f"  Left via {e.zone} at t={e.timestamp} (building={e.building})")
 
         evidence = []
@@ -364,7 +441,23 @@ class QueryEngine:
         else:
             evidence.append(f"  NO — occupant {occupant_id} was never detected in {building_id} before t={before_time}")
 
-        return QueryResult(query_id="Q3", query_text=query_text, parameters=parameters, answer=left, evidence=evidence)
+        explanation = None
+        if self.explain:
+            items = []
+            if last_inside is not None:
+                items.append(EvidenceItem.from_event(last_inside, "supporting", note="last sighting inside the building"))
+            if leave_event is not None:
+                items.append(EvidenceItem.from_event(leave_event, "decisive"))
+            absence = None
+            if not left:
+                absence = (f"no exit event found before {before_time}, so still inside {building_id}" if was_in_building
+                           else f"never seen inside {building_id} before {before_time}")
+            explanation = self._explanation(
+                "Q3", f"yes if, after a sighting inside {building_id} before {before_time}, a later sighting before "
+                      "then is at zT or in another building; the first such sighting is decisive",
+                items, absence=absence)
+        return QueryResult(query_id="Q3", query_text=query_text, parameters=parameters, answer=left,
+                           evidence=evidence, explanation=explanation)
 
     # ─── Q4: Did occupant o enter building b between t1 and t2? ───────────
     def Q4(self, occupant_id: str, building_id: str, t1: str, t2: str) -> QueryResult:
@@ -379,9 +472,9 @@ class QueryEngine:
         # by events/generator.py (a building transfer always arrives via zT)
         # and consulted by phase4_state.py/PointerStore. Reusing it here means
         # Q4 needs no new zone logic, just a filter over the same event log.
-        entries = [e for e in self.events
-                  if e.occupant_id == occupant_id and e.building == building_id
-                  and e.zone == TRANSITION_ZONE and t1 <= e.timestamp <= t2]
+        gateway = [e for e in self.events
+                   if e.occupant_id == occupant_id and e.building == building_id and e.zone == TRANSITION_ZONE]
+        entries = [e for e in gateway if t1 <= e.timestamp <= t2]
         answer = bool(entries)
 
         evidence = []
@@ -392,7 +485,25 @@ class QueryEngine:
         else:
             evidence.append(f"  NO — no entry into {building_id} by {occupant_id} detected in [{t1}, {t2}]")
 
-        return QueryResult(query_id="Q4", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+        explanation = None
+        if self.explain:
+            items = [EvidenceItem.from_event(e, "decisive") for e in entries]
+            absence = None
+            if not entries:
+                absence = f"no zT entry into {building_id} in [{t1}, {t2}]"
+                before = [e for e in gateway if e.timestamp < t1]
+                after = [e for e in gateway if e.timestamp > t2]
+                if before:
+                    items.append(EvidenceItem.from_event(max(before, key=lambda e: e.timestamp),
+                                                         "nearest_outside_window", note="before t1"))
+                if after:
+                    items.append(EvidenceItem.from_event(min(after, key=lambda e: e.timestamp),
+                                                         "nearest_outside_window", note="after t2"))
+            explanation = self._explanation(
+                "Q4", f"yes if there is an identified zT (entry) sighting in {building_id} with {t1} <= time <= {t2}",
+                items, absence=absence)
+        return QueryResult(query_id="Q4", query_text=query_text, parameters=parameters, answer=answer,
+                           evidence=evidence, explanation=explanation)
 
     # ─── Q5: Did occupant o visit all zones in building b? ────────────────
     def Q5(self, occupant_id: str, building_id: str) -> QueryResult:
@@ -402,15 +513,30 @@ class QueryEngine:
         if building_id not in self.registered:
             return self._unknown_building("Q5", query_text, parameters, building_id)
 
-        visited = {e.zone for e in self.events
-                  if e.occupant_id == occupant_id and e.building == building_id and e.zone in INTERNAL_ZONES}
+        inside = [e for e in self.events
+                  if e.occupant_id == occupant_id and e.building == building_id and e.zone in INTERNAL_ZONES]
+        visited = {e.zone for e in inside}
         missing = INTERNAL_ZONES - visited
         answer = not missing
 
         evidence = [f"  Internal zones: {sorted(INTERNAL_ZONES)}", f"  Visited zones:  {sorted(visited)}"]
         evidence.append(f"  Missing zones:  {sorted(missing)}" if missing else f"  ALL {len(INTERNAL_ZONES)} internal zones visited")
 
-        return QueryResult(query_id="Q5", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+        explanation = None
+        if self.explain:
+            first_in_zone: dict[str, IdentifiedEvent] = {}
+            for e in inside:
+                if e.zone not in first_in_zone or e.timestamp < first_in_zone[e.zone].timestamp:
+                    first_in_zone[e.zone] = e
+            items = [EvidenceItem.from_event(first_in_zone[z], "zone_visit") for z in sorted(first_in_zone)]
+            explanation = self._explanation(
+                "Q5", f"yes if every internal zone (z1-z8) of {building_id} has at least one identified sighting; "
+                      "each zone's first sighting proves the visit", items,
+                absence=f"{len(missing)} internal zone(s) of {building_id} have no sighting" if missing else None,
+                details={"checklist": {z: (first_in_zone[z].event_id if z in first_in_zone else "missing")
+                                       for z in sorted(INTERNAL_ZONES)}})
+        return QueryResult(query_id="Q5", query_text=query_text, parameters=parameters, answer=answer,
+                           evidence=evidence, explanation=explanation)
 
     # ─── Q7: How many zones did occupant o visit during [t1, t2]? ─────────
     def Q7(self, occupant_id: str, t1: str, t2: str) -> QueryResult:
@@ -432,7 +558,28 @@ class QueryEngine:
         else:
             evidence.append(f"  No detections of {occupant_id} in that window")
 
-        return QueryResult(query_id="Q7", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+        explanation = None
+        if self.explain:
+            ordered = _sorted_by_time(window)
+            prior = [e for e in self.events if e.occupant_id == occupant_id and e.timestamp < t1]
+            carry = max(prior, key=lambda e: e.timestamp) if prior else None
+            items = ([EvidenceItem.from_event(carry, "carry_in_state")] if carry else [])
+            items += [EvidenceItem.from_event(e, "supporting") for e in ordered]
+            # Dwell per zone inside the window: each sighting lasts until the next one (or t2).
+            dwell: dict[str, int] = {}
+            for i, e in enumerate(ordered):
+                end = ordered[i + 1].timestamp if i + 1 < len(ordered) else t2
+                dwell[e.zone] = dwell.get(e.zone, 0) + max(0, _parse_time_seconds(end) - _parse_time_seconds(e.timestamp))
+            carry_seconds = None
+            if carry is not None:
+                carry_seconds = _parse_time_seconds(ordered[0].timestamp if ordered else t2) - _parse_time_seconds(t1)
+            explanation = self._explanation(
+                "Q7", f"count the distinct zones among identified sightings with {t1} <= time <= {t2}; the carry-in "
+                      "state shows where the occupant already was when the window opened and is not counted",
+                items, absence=None if window else f"no identified sighting in [{t1}, {t2}]",
+                details={"dwell_seconds": dwell, "carry_in_seconds": carry_seconds})
+        return QueryResult(query_id="Q7", query_text=query_text, parameters=parameters, answer=answer,
+                           evidence=evidence, explanation=explanation)
 
     # ─── Q6: Where was occupant o at time t? ──────────────────────────────
     def _q6_from_pointer(self, occupant_id: str, at_time: str) -> QueryResult | None:
@@ -461,12 +608,20 @@ class QueryEngine:
             f"since t={pointer['entry_time']} (home={home}, visit_id={pointer['visit_id']})",
             "  Answered from the visit-pointer index -- no full event-log scan needed.",
         ]
-        return QueryResult(query_id="Q6", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+        explanation = self._explanation(
+            "Q6", "location at t is the building of the open visit pointer minted at or before t "
+                  "(answered without scanning the event log; pointers are about 83% precise)",
+            at_time=at_time,
+            pointer_used={"visit_id": pointer["visit_id"], "current_building": pointer["current_building"],
+                          "entry_time": pointer["entry_time"], "status": pointer["status"]})
+        return QueryResult(query_id="Q6", query_text=query_text, parameters=parameters, answer=answer,
+                           evidence=evidence, explanation=explanation)
 
     def Q6(self, occupant_id: str, at_time: str) -> QueryResult:
         query_text = f"Where was {occupant_id} at t={at_time}?"
         parameters = {"occupant_id": occupant_id, "at_time": at_time}
         self._authorize("Q6", f"occupant:{occupant_id}")
+        rule = "location at t is the last identified sighting at or before t"
 
         pointer_result = self._q6_from_pointer(occupant_id, at_time)
         if pointer_result is not None:
@@ -475,7 +630,9 @@ class QueryEngine:
         candidates = [e for e in self.events if e.occupant_id == occupant_id and e.timestamp <= at_time]
         if not candidates:
             return QueryResult(query_id="Q6", query_text=query_text, parameters=parameters, answer=None,
-                               evidence=[f"  No detection of {occupant_id} at or before t={at_time}"], success=False)
+                               evidence=[f"  No detection of {occupant_id} at or before t={at_time}"], success=False,
+                               explanation=self._explanation(
+                                   "Q6", rule, absence=f"no identified sighting at or before {at_time}"))
 
         last = max(candidates, key=lambda e: e.timestamp)
         prob = f"{last.identity_probability:.3f}" if last.identity_probability is not None else "n/a"
@@ -492,7 +649,9 @@ class QueryEngine:
                                      "distribution": last.zone_distribution}
             evidence.append(f"  BSTS belief:    {best_zone} (p={last.zone_distribution[best_zone]:.3f})")
 
-        return QueryResult(query_id="Q6", query_text=query_text, parameters=parameters, answer=answer, evidence=evidence)
+        explanation = self._explanation("Q6", rule, [EvidenceItem.from_event(last, "last_before_t")], at_time=at_time)
+        return QueryResult(query_id="Q6", query_text=query_text, parameters=parameters, answer=answer,
+                           evidence=evidence, explanation=explanation)
 
     # ─── TRACK: full historical trajectory ─────────────────────────────────
     def track(self, occupant_id: str) -> dict:
@@ -503,9 +662,16 @@ class QueryEngine:
         recorded), additive to the existing full-log scan below, not a
         replacement of it.
         """
+        return self.track_explained(occupant_id)[0]
+
+    def track_explained(self, occupant_id: str) -> tuple[dict, Explanation | None]:
+        """``track()`` plus its explanation, built from the same history."""
+        rule = ("the trajectory is every identified sighting in time order, plus the visit-pointer "
+                "history recorded at the occupant's home building")
         history = sorted((e for e in self.events if e.occupant_id == occupant_id), key=lambda e: e.timestamp)
         if not history:
-            return {"error": f"no real detections of {occupant_id} at all"}
+            return ({"error": f"no real detections of {occupant_id} at all"},
+                    self._explanation("TRACK", rule, absence="no identified sighting at all"))
         zone_counts: dict[str, int] = {}
         for e in history:
             zone_counts[e.zone] = zone_counts.get(e.zone, 0) + 1
@@ -524,13 +690,33 @@ class QueryEngine:
             if home is not None and (self.nodes_dir / home).exists():
                 with PointerStore(self.nodes_dir / home / "state") as store:
                     result["pointer_history"] = store.lookup_history(occupant_id)
-        return result
+        if not self.explain:
+            return result, None
+
+        pointers = result.get("pointer_history") or []
+        closed = [p for p in pointers if p["status"] == "CLOSED"]
+
+        def in_closed_visit(e: IdentifiedEvent) -> bool:
+            return any(p["current_building"] == e.building and p["entry_time"] <= e.timestamp
+                       <= (p["exit_time"] or DEFAULT_AT_TIME) for p in closed)
+
+        items = [EvidenceItem.from_event(e, "supporting", note="closed pointer segment" if in_closed_visit(e) else None)
+                 for e in history]
+        pointer_used = None
+        if pointers:
+            pointer_used = {"visits": len(pointers), "closed": len(closed), "open": len(pointers) - len(closed),
+                            "segments": [{"visit_id": p["visit_id"], "current_building": p["current_building"],
+                                          "entry_time": p["entry_time"], "exit_time": p["exit_time"],
+                                          "status": p["status"]} for p in pointers]}
+        return result, self._explanation("TRACK", rule, items, pointer_used=pointer_used)
 
     # ─── Q8: At what time did occupant o visit zone z for the first time? ─
     def Q8(self, occupant_id: str, zone: str, building_id: str | None = None) -> QueryResult:
         query_text = f"At what time did {occupant_id} visit zone {zone} for the first time?"
         parameters = {"occupant_id": occupant_id, "zone": zone, "building_id": building_id}
         self._authorize("Q8", f"occupant:{occupant_id}")
+        where = f"zone {zone}" + (f" of {building_id}" if building_id else "")
+        rule = f"the answer is the earliest identified sighting in {where}"
 
         matches = [e for e in self.events if e.occupant_id == occupant_id and e.zone == zone]
         if building_id:
@@ -541,7 +727,8 @@ class QueryEngine:
                 query_id="Q8", query_text=query_text, parameters=parameters,
                 answer=None,
                 evidence=[f"  Occupant {occupant_id} has never visited zone {zone} ({zone_label(zone)})"],
-                success=True
+                success=True,
+                explanation=self._explanation("Q8", rule, absence=f"no identified sighting in {where}"),
             )
 
         first_event = min(matches, key=lambda e: e.timestamp)
@@ -551,14 +738,20 @@ class QueryEngine:
             f"  Confidence: p={prob} (via {first_event.source})",
             f"  Total detections in this zone: {len(matches)}",
         ]
+        explanation = self._explanation("Q8", rule, [EvidenceItem.from_event(first_event, "decisive")],
+                                        details={"detections_in_zone": len(matches)})
         return QueryResult(query_id="Q8", query_text=query_text, parameters=parameters,
-                           answer=first_event.timestamp, evidence=evidence, success=True)
+                           answer=first_event.timestamp, evidence=evidence, success=True, explanation=explanation)
 
     # ─── Q9: How long did occupant o spend at zone z during his first visit?
     def Q9(self, occupant_id: str, zone: str, building_id: str | None = None) -> QueryResult:
         query_text = f"How long did {occupant_id} spend at zone {zone} during his first visit?"
         parameters = {"occupant_id": occupant_id, "zone": zone, "building_id": building_id}
         self._authorize("Q9", f"occupant:{occupant_id}")
+        where = f"zone {zone}" + (f" of {building_id}" if building_id else "")
+        rule = (f"the first visit starts at the earliest identified sighting in {where} and ends at the next "
+                "sighting in another zone or building, or at the last sighting if there is none; the duration "
+                "is at least 1 s (30 s when no later sighting ends the stay)")
 
         history = sorted((e for e in self.events if e.occupant_id == occupant_id), key=lambda e: e.timestamp)
         first_idx = None
@@ -572,7 +765,8 @@ class QueryEngine:
                 query_id="Q9", query_text=query_text, parameters=parameters,
                 answer=None,
                 evidence=[f"  Occupant {occupant_id} has never visited zone {zone} ({zone_label(zone)})"],
-                success=True
+                success=True,
+                explanation=self._explanation("Q9", rule, absence=f"no identified sighting in {where}"),
             )
 
         start_event = history[first_idx]
@@ -609,8 +803,14 @@ class QueryEngine:
             f"  {status_desc}",
             f"  Total time spent: {duration_fmt} ({sec} seconds)",
         ]
+        explanation = None
+        if self.explain:
+            end_item = (EvidenceItem.from_event(next_event, "supporting", note="ended the stay") if next_event
+                        else EvidenceItem.from_event(history[-1], "supporting",
+                                                     note="last sighting; nothing later ended the stay"))
+            explanation = self._explanation("Q9", rule, [EvidenceItem.from_event(start_event, "decisive"), end_item])
         return QueryResult(query_id="Q9", query_text=query_text, parameters=parameters,
-                           answer=answer, evidence=evidence, success=True)
+                           answer=answer, evidence=evidence, success=True, explanation=explanation)
 
     # ─── Q10: Who was there in zone z at time t? ──────────────────────────
     def Q10(self, zone: str, at_time: str, building_id: str | None = None) -> QueryResult:
@@ -625,10 +825,12 @@ class QueryEngine:
                 occupants_events.setdefault(e.occupant_id, []).append(e)
 
         present: list[dict[str, Any]] = []
+        last_events: dict[str, IdentifiedEvent] = {}
         for occ_id, evs in occupants_events.items():
             last_ev = max(evs, key=lambda x: x.timestamp)
             if last_ev.zone == zone:
                 if building_id is None or last_ev.building == building_id:
+                    last_events[occ_id] = last_ev
                     present.append({
                         "occupant_id": occ_id,
                         "building": last_ev.building,
@@ -649,29 +851,46 @@ class QueryEngine:
         if len(present) > 15:
             evidence.append(f"    ... and {len(present) - 15} more")
 
+        explanation = None
+        if self.explain:
+            where = f"zone {zone}" + (f" of {building_id}" if building_id else "")
+            items = [EvidenceItem.from_event(last_events[o], "last_before_t") for o in occupant_ids]
+            explanation = self._explanation(
+                "Q10", f"a person is listed if their last identified sighting at or before {at_time} is in {where}",
+                items, at_time=at_time,
+                absence=None if items else f"nobody's last identified sighting at or before {at_time} is in {where}",
+                details={"people_listed": len(items), **_match_mode_counts(list(last_events.values())),
+                         "flag_counts": flag_counts(items, at_time=at_time)})
         return QueryResult(query_id="Q10", query_text=query_text, parameters=parameters,
-                           answer=occupant_ids, evidence=evidence, success=True)
+                           answer=occupant_ids, evidence=evidence, success=True, explanation=explanation)
 
     # ─── Q11: Where was the occupant o during [t1, t2]? ───────────────────
     def Q11(self, occupant_id: str, t1: str, t2: str) -> QueryResult:
         query_text = f"Where was {occupant_id} during [{t1}, {t2}]?"
         parameters = {"occupant_id": occupant_id, "t1": t1, "t2": t2}
         self._authorize("Q11", f"occupant:{occupant_id}")
+        rule = (f"the trajectory is every identified sighting with {t1} <= time <= {t2}, in time order; the "
+                "carry-in state is where the occupant already was when the window opened")
 
         window = sorted([e for e in self.events if e.occupant_id == occupant_id and t1 <= e.timestamp <= t2],
                         key=lambda e: e.timestamp)
+        last_prior = None
+        if self.explain or not window:
+            prior = [e for e in self.events if e.occupant_id == occupant_id and e.timestamp < t1]
+            last_prior = max(prior, key=lambda e: e.timestamp) if prior else None
+        carry = [EvidenceItem.from_event(last_prior, "carry_in_state")] if (last_prior and self.explain) else []
 
         if not window:
-            prior = [e for e in self.events if e.occupant_id == occupant_id and e.timestamp < t1]
-            if prior:
-                last_prior = max(prior, key=lambda e: e.timestamp)
+            if last_prior:
                 msg = f"No transitions in [{t1}, {t2}]; last observed at {last_prior.building}:{last_prior.zone} ({zone_label(last_prior.zone)}) at t={last_prior.timestamp}"
             else:
                 msg = f"No observations of occupant {occupant_id} prior to or during [{t1}, {t2}]"
             return QueryResult(
                 query_id="Q11", query_text=query_text, parameters=parameters,
                 answer={"total_observations": 0, "status": msg, "trajectory": []},
-                evidence=[f"  {msg}"], success=True
+                evidence=[f"  {msg}"], success=True,
+                explanation=self._explanation("Q11", rule, carry,
+                                              absence=f"no identified sighting in [{t1}, {t2}]"),
             )
 
         trajectory = [
@@ -703,8 +922,12 @@ class QueryEngine:
         if len(trajectory) > 10:
             evidence.append(f"    ... and {len(trajectory) - 10} more detections")
 
+        explanation = None
+        if self.explain:
+            explanation = self._explanation("Q11", rule, carry + [EvidenceItem.from_event(e, "supporting")
+                                                                  for e in window])
         return QueryResult(query_id="Q11", query_text=query_text, parameters=parameters,
-                           answer=answer, evidence=evidence, success=True)
+                           answer=answer, evidence=evidence, success=True, explanation=explanation)
 
     # ─── Q12: Who was there in zone z from t1 to t2? ──────────────────────
     def Q12(self, zone: str, t1: str, t2: str, building_id: str | None = None) -> QueryResult:
@@ -724,14 +947,15 @@ class QueryEngine:
             if e.timestamp < t1:
                 all_prior.setdefault(e.occupant_id, []).append(e)
 
+        # Carry-in: someone whose last sighting before t1 was in z was already there when the window opened.
+        carried_in: dict[str, IdentifiedEvent] = {}
         for occ_id, p_events in all_prior.items():
             if occ_id in detected_occupants:
                 continue
             last_p = max(p_events, key=lambda x: x.timestamp)
             if last_p.zone == zone and (building_id is None or last_p.building == building_id):
-                future = [e for e in self.events if e.occupant_id == occ_id and e.timestamp > t1]
-                if not future or future[0].timestamp > t1:
-                    detected_occupants.add(occ_id)
+                carried_in[occ_id] = last_p
+        detected_occupants |= set(carried_in)
 
         occupant_ids = sorted(detected_occupants)
         evidence = [
@@ -741,8 +965,20 @@ class QueryEngine:
         if len(occupant_ids) > 20:
             evidence.append(f"  ... and {len(occupant_ids) - 20} more occupants")
 
+        explanation = None
+        if self.explain:
+            where = f"zone {zone}" + (f" of {building_id}" if building_id else "")
+            first_in = _first_per_occupant(window_events)
+            items = [EvidenceItem.from_event(first_in[o], "supporting") if o in first_in
+                     else EvidenceItem.from_event(carried_in[o], "carry_in_state") for o in occupant_ids]
+            explanation = self._explanation(
+                "Q12", f"a person is listed if they have an identified sighting in {where} with {t1} <= time <= {t2}, "
+                       f"or their last sighting before {t1} was in {where} (already there when the window opened)",
+                items, absence=None if items else f"nobody was in {where} during [{t1}, {t2}]",
+                details={"people_listed": len(items), "seen_in_window": len(first_in),
+                         "carried_in": len(items) - len(first_in), "flag_counts": flag_counts(items)})
         return QueryResult(query_id="Q12", query_text=query_text, parameters=parameters,
-                           answer=occupant_ids, evidence=evidence, success=True)
+                           answer=occupant_ids, evidence=evidence, success=True, explanation=explanation)
 
     # ─── Q13: Who all visited zone z? ─────────────────────────────────────
     def Q13(self, zone: str, building_id: str | None = None) -> QueryResult:
@@ -773,8 +1009,19 @@ class QueryEngine:
         for occ, cnt in occ_counts.most_common(5):
             evidence.append(f"    - {occ}: {cnt} visit detections")
 
+        explanation = None
+        if self.explain:
+            where = f"zone {zone}" + (f" of {building_id}" if building_id else "")
+            first_in = _first_per_occupant(matching)
+            items = [EvidenceItem.from_event(first_in[o], "zone_visit", note=f"{occ_counts[o]} detection(s)")
+                     for o in sorted_occupants]
+            explanation = self._explanation(
+                "Q13", f"a person is listed if they have at least one identified sighting in {where}; "
+                       "each person's first sighting is shown with their detection count",
+                items, absence=None if items else f"nobody was ever identified in {where}",
+                details={"people_listed": len(items), "detections": len(matching), "flag_counts": flag_counts(items)})
         return QueryResult(query_id="Q13", query_text=query_text, parameters=parameters,
-                           answer=answer, evidence=evidence, success=True)
+                           answer=answer, evidence=evidence, success=True, explanation=explanation)
 
     # ─── generic dispatcher ────────────────────────────────────────────────
     def execute_query(self, query_type: QueryType | str, **kwargs) -> QueryResult:
