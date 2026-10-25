@@ -68,17 +68,18 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from shared.paths import run_paths  # noqa: E402
-from shared.timeutil import day_of, quantize, with_date  # noqa: E402
+from shared.timeutil import approx_time, day_of, quantize, with_date  # noqa: E402
 from dsts.state.zones import ZONES, zone_label, zone_sector          # noqa: E402
 from nodelib.deploy import PointerStore                                      # noqa: E402
 from access_control.authorize import (                                            # noqa: E402
-    Role, authorize, clear_audit_log, clear_registry, get_audit_log,
+    Role, authorize, authorize_decision, clear_audit_log, clear_registry, get_audit_log,
     register_node, set_enforce_policy,
 )
+from access_control.scope import building_scope_denial                            # noqa: E402
 from access_control.campus_policy import (                                        # noqa: E402
     DisclosureLevel, PolicyDecision, QueryContext, QueryPurpose,
     check_office_presence, clear_campus_registry, evaluate_campus_query_policy,
-    get_occupant_role, register_class_roster, register_occupant_building, register_occupant_role,
+    get_occupant_building, get_occupant_role, register_class_roster, register_occupant_building, register_occupant_role,
     register_occupant_current_building,
 )
 
@@ -872,7 +873,7 @@ def q6_answer_for_disclosure(engine: QueryEngine, target_id: str, level: Disclos
             "home_building": current.answer.get("home_building"),
             "current_building": building,
             "status": f"In {building}",
-            "approx_time": quantize(ts, 60),
+            "approx_time": approx_time(ts),
         }
     if decision and decision.policy_rule in ("RULE_A_VISITOR_IN_OWN_BUILDING", "RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION"):
         return {
@@ -903,8 +904,12 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
     'building', not 'occupant'."""
     target_resource = f"building:{building_id}"
     print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {building_id}  params={params}")
-    permitted = authorize(caller_id, "QUERY", target_resource)
-    reason = get_audit_log()[-1]["reason"]
+    denial = building_scope_denial(get_real_role(caller_id), get_occupant_building(caller_id), building_id)
+    if denial:
+        print(f"  DENIED (building scope): {denial[0]} -- {denial[1]}")
+        return
+    decision = authorize_decision(caller_id, "QUERY", target_resource)
+    permitted, reason = decision.permitted, decision.reason
     print(f"  Layer 1 (infra RBAC): {'PERMIT' if permitted else 'DENY'}  (reason={reason or 'registered QUERY_CLIENT'})")
     print("  Layer 2 (persona ReBAC): N/A -- building-wide query, no target occupant")
     if not permitted:
@@ -922,6 +927,7 @@ def run_building_query(engine: QueryEngine, caller_id: str, q_type: str, buildin
 def resolve_target_current_building(engine: QueryEngine, target_id: str, at_time: str) -> Optional[str]:
     """Determine the target occupant's current building location at or before at_time."""
     home = engine._home_building(target_id)
+    at_time = engine._t(at_time)
     if engine.nodes_dir and home and (engine.nodes_dir / home).exists():
         with PointerStore(engine.nodes_dir / home / "state") as store:
             pointer = store.lookup_open(target_id)
@@ -949,15 +955,12 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
         register_occupant_current_building(target_id, target_current_b)
 
     target_resource = f"occupant:{target_id}"
-    permitted =  authorize(caller_id, "QUERY", target_resource)
-    last_reason = get_audit_log()[-1]["reason"]
-    if not permitted:
-        print(f"  Layer 1 (infra RBAC) DENIED: {last_reason}")
-        if last_reason.startswith("target_occupant_denied_by_policy"):
-            print("  (^ a Layer-2 persona-policy denial surfacing through the Layer-1 check --"
-                 " see the module docstring)")
+    # Layer 1 only: Layer 2 runs below with the target's real current building and the query context.
+    layer1 = authorize_decision(caller_id, "QUERY", target_resource, check_target_policy=False)
+    if not layer1.permitted:
+        print(f"  Layer 1 (infra RBAC) DENIED: {layer1.reason}")
         return
-    print(f"  Layer 1 (infra RBAC):  PERMIT  (reason={last_reason or 'registered QUERY_CLIENT'})")
+    print(f"  Layer 1 (infra RBAC):  PERMIT  (reason={layer1.reason or 'registered QUERY_CLIENT'})")
 
     caller_role, target_role = get_real_role(caller_id), get_real_role(target_id)
     print(f"  Real roles/buildings:  caller={caller_role}  target={target_role}")
@@ -1032,22 +1035,25 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
                    building_id: str | None = None, at_time: str = DEFAULT_AT_TIME,
                    t1: str = "08:00:00", t2: str = "18:00:00", explain: bool = False) -> None:
     """Q10/Q12/Q13 -- zone queries. Gated on building/zone infra RBAC + anti-stalking policy."""
+    caller_role = get_real_role(caller_id)
+    building_id = building_id or get_occupant_building(caller_id)      # a zone query is always scoped to one building
     target_resource = f"building:{building_id}" if building_id else f"zone:{zone}"
     print(f"\n{'=' * 78}\n{caller_id} -> {q_type} on {zone} (building={building_id})")
-
-    caller_role = get_real_role(caller_id)
+    denial = building_scope_denial(caller_role, get_occupant_building(caller_id), building_id)
+    if denial:
+        print(f"  DENIED (building scope): {denial[0]} -- {denial[1]}")
+        return
     if caller_role == "student":
         print(f"  Layer 1 (infra RBAC): PERMIT (registered QUERY_CLIENT)")
         print(f"  Layer 2 (persona ReBAC): DENY (RULE_C_PEER_ZONE_SURVEILLANCE_DENIED)")
         print(f"  Reason: Students are prohibited from performing zone-level occupant surveillance (anti-stalking isolation)")
         return
 
-    permitted = authorize(caller_id, "QUERY", target_resource)
-    last_reason = get_audit_log()[-1]["reason"] if get_audit_log() else ""
-    if not permitted:
-        print(f"  Layer 1 (infra RBAC) DENIED: {last_reason}")
+    layer1 = authorize_decision(caller_id, "QUERY", target_resource)
+    if not layer1.permitted:
+        print(f"  Layer 1 (infra RBAC) DENIED: {layer1.reason}")
         return
-    print(f"  Layer 1 (infra RBAC): PERMIT (reason={last_reason or 'registered QUERY_CLIENT'})")
+    print(f"  Layer 1 (infra RBAC): PERMIT (reason={layer1.reason or 'registered QUERY_CLIENT'})")
     print(f"  Layer 2 (persona ReBAC): PERMIT (role={caller_role} in building={building_id or 'all'})")
 
     if q_type == "Q10":

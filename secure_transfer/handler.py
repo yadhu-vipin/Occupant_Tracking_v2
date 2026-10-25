@@ -26,7 +26,7 @@ from secure_transfer.metadata import (
 )
 from secure_transfer.replay_guard import ReplayGuard
 from access_control.authorize import register_node as authorize_register_node, authorize, get_role, Role, set_enforce_policy
-from secure_transfer.crypto import load_ed25519_public
+from secure_transfer.crypto import load_ed25519_public, load_x25519_public
 from secure_transfer.payload import (
     KIND_CAPTURE_REQUEST, KIND_MATCH_REPLY, PayloadError, open_payload, seal_payload,
 )
@@ -71,7 +71,8 @@ class SecureBuildingNodeHandler:
             identity = NodeIdentity.generate(building_id)
             self.identities[building_id] = identity
             pub_hex = identity.ed25519_public_bytes().hex()
-            self.transport_manager.provision_node(building_id, pub_hex)
+            self.transport_manager.provision_node(building_id, pub_hex,
+                                                  x25519_public_hex=identity.x25519_public_bytes().hex())
 
         # (Re-)register in RBAC whenever the principal registry no longer knows this node
         # (e.g. it was cleared elsewhere); identities/certificates are kept.
@@ -94,7 +95,7 @@ class SecureBuildingNodeHandler:
         if not authorize(source_building, "HANDOFF", "transition_metadata"):
             raise PermissionError(f"Node {source_building} unauthorized to initiate handoff")
 
-        channel = SecureChannel(sender_id, receiver_id.x25519_public)
+        channel = SecureChannel(sender_id, self._encryption_key(dest_building))
         metadata = create_handoff_metadata(
             visitor_id=visitor_id,
             source_building=source_building,
@@ -131,7 +132,7 @@ class SecureBuildingNodeHandler:
         sender_id = self.register_node(source_building)
 
         try:
-            channel = SecureChannel(receiver_id, sender_id.x25519_public)
+            channel = SecureChannel(receiver_id, self._encryption_key(source_building))
             metadata = open_metadata(envelope, channel, sender_id.ed25519_public)
             return True, metadata, "Success"
         except Exception as exc:
@@ -167,6 +168,14 @@ class SecureBuildingNodeHandler:
         """Ed25519 verification key taken from the building's CA-issued certificate."""
         return load_ed25519_public(bytes.fromhex(self.transport_manager.get_certificate(building_id).public_key_hex))
 
+    def _encryption_key(self, building_id: str):
+        """X25519 key-agreement key taken from the building's CA-certified certificate -- never from an
+        uncertified identity object -- so a payload can only be sealed to the key the CA vouched for."""
+        cert = self.transport_manager.get_certificate(building_id)
+        if cert is None or not cert.x25519_public_hex:
+            raise PayloadError(f"certificate for {building_id} carries no key-agreement key")
+        return load_x25519_public(bytes.fromhex(cert.x25519_public_hex))
+
     def seal_capture_request(self, source_building: str, dest_building: str, capture_q) -> Dict[str, Any]:
         """Encrypt + sign the captured embedding for ``dest_building``. Raises PermissionError / PayloadError."""
         sender = self.register_node(source_building)
@@ -177,7 +186,7 @@ class SecureBuildingNodeHandler:
         if failure:
             raise PayloadError(failure)
         return seal_payload(encode_capture(capture_q), kind=KIND_CAPTURE_REQUEST, sender=sender,
-                            receiver_building=dest_building, receiver_x25519_public=receiver.x25519_public)
+                            receiver_building=dest_building, receiver_x25519_public=self._encryption_key(dest_building))
 
     def open_capture_request(self, dest_building: str, envelope: Dict[str, Any]):
         """Receiver side. Returns ``(ok, capture_q, request_id, source_building, reason)``."""
@@ -210,7 +219,8 @@ class SecureBuildingNodeHandler:
         if failure:
             raise PayloadError(failure)
         return seal_payload(encode_reply(reply), kind=KIND_MATCH_REPLY, sender=sender,
-                            receiver_building=requester_building, receiver_x25519_public=receiver.x25519_public,
+                            receiver_building=requester_building,
+                            receiver_x25519_public=self._encryption_key(requester_building),
                             in_reply_to=request_id)
 
     def open_match_reply(self, requester_building: str, expected_responder: str, envelope: Dict[str, Any],

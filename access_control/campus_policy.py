@@ -18,12 +18,17 @@ policy for campus location queries, separating what information is exposed from 
      L4 — Historical Track: Full historical trajectory / movement across zones over time.
                             ("Student's zone-by-zone movements over the last 2 hours")
 
-2. Maximum Disclosure Matrix (Requester -> Target ceiling):
-     Requester ↓ / Target →  Dean  Teacher  Student  Visitor
-     Dean                     L2      L4       L4       L2
-     Teacher                  L2      L2       L0       L0
-     Student                  L1      L1       L0       L0
-     Visitor                  L2      L2       L0       L0
+2. The rules (building-scoped; the code in ``evaluate_campus_query_policy`` is the single source of truth, and
+   ``tests/access_control/test_policy_matrix.py`` pins every role x relationship cell):
+     Dean    -> local Teacher/Student : L2 routine, L4 on an authorised investigation / audit
+     Dean    -> visitor in own building: L2 (L4 investigation), history outside the building redacted
+     Dean    -> peer Dean (other bldg) : L2 coarse status;  -> anyone else outside the building: L0
+     Teacher -> student on the roster  : L2 in office hours;  -> other local student: L2 supervision (L0 if the
+                purpose is the academic roster);  -> Dean / peer Teacher in the building: L2;  elsewhere: L0
+     Student -> Teacher / Dean in the building: L1 availability in office hours;  -> peer Student: L0 (anti-stalking)
+                -> anyone in another building: L0
+     Anyone  -> self                   : L4 (self-query exemption)
+     Unresolved role / building        : L0 (fail closed)
 
 3. Purpose & Context Policy Layer (ABAC):
      Requester + Target + Purpose + Context -> Permitted Disclosure Level
@@ -149,46 +154,6 @@ LEVEL_TO_SCOPE_GRANULARITY: Dict[DisclosureLevel, Tuple[AccessScope, LocationGra
     DisclosureLevel.L2_CURRENT_ZONE:     (AccessScope.CURRENT, LocationGranularity.ZONE),
     DisclosureLevel.L3_PRECISE_CURRENT:  (AccessScope.CURRENT, LocationGranularity.PRECISE),
     DisclosureLevel.L4_HISTORICAL_TRACK: (AccessScope.FULL_TRACK, LocationGranularity.PRECISE),
-}
-
-
-# ─── Maximum Disclosure Matrix ───────────────────────────────────────────────
-# Requester -> Target ceiling
-
-MAX_DISCLOSURE_MATRIX: Dict[CampusRole, Dict[CampusRole, DisclosureLevel]] = {
-    CampusRole.DEAN: {
-        CampusRole.DEAN:    DisclosureLevel.L2_CURRENT_ZONE,
-        CampusRole.TEACHER: DisclosureLevel.L4_HISTORICAL_TRACK,
-        CampusRole.STUDENT: DisclosureLevel.L4_HISTORICAL_TRACK,
-        CampusRole.VISITOR: DisclosureLevel.L2_CURRENT_ZONE,
-    },
-    CampusRole.TEACHER: {
-        CampusRole.DEAN:    DisclosureLevel.L2_CURRENT_ZONE,
-        CampusRole.TEACHER: DisclosureLevel.L2_CURRENT_ZONE,
-        CampusRole.STUDENT: DisclosureLevel.L2_CURRENT_ZONE,      # Current / Zone (academic supervision)
-        CampusRole.VISITOR: DisclosureLevel.L0_NONE,
-    },
-    CampusRole.STUDENT: {
-        CampusRole.DEAN:    DisclosureLevel.L1_PRESENCE,  # Dean office presence check
-        CampusRole.TEACHER: DisclosureLevel.L1_PRESENCE,  # Teacher cabin presence check
-        CampusRole.STUDENT: DisclosureLevel.L0_NONE,      # Anti-stalking peer isolation
-        CampusRole.VISITOR: DisclosureLevel.L0_NONE,
-    },
-    CampusRole.VISITOR: {
-        CampusRole.DEAN:    DisclosureLevel.L2_CURRENT_ZONE,
-        CampusRole.TEACHER: DisclosureLevel.L2_CURRENT_ZONE,
-        CampusRole.STUDENT: DisclosureLevel.L0_NONE,
-        CampusRole.VISITOR: DisclosureLevel.L0_NONE,
-    },
-}
-
-# Derived legacy matrix: matrix[caller_role][target_role] -> (access, granularity)
-POLICY_MATRIX: Dict[CampusRole, Dict[CampusRole, Tuple[AccessScope, LocationGranularity]]] = {
-    c_role: {
-        t_role: LEVEL_TO_SCOPE_GRANULARITY[lvl]
-        for t_role, lvl in targets.items()
-    }
-    for c_role, targets in MAX_DISCLOSURE_MATRIX.items()
 }
 
 

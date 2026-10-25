@@ -1,11 +1,13 @@
 """
-v6/access_control/authorize.py — Authorization chokepoint (RBAC)
-=================================================================
+access_control/authorize.py — Layer 1: authorization chokepoint (RBAC)
+======================================================================
 A single authorize(principal, verb, target) chokepoint called at
 every data-release point. Supports role-based access control.
 
-This cannot be retrofitted without a protocol break, so the seam
-is built now.
+``authorize_decision`` returns a structured :class:`AuthDecision` (which layer said no, and a machine-readable
+code), so callers never have to parse a reason string. By default a campus occupant querying another occupant is
+also checked against the Layer-2 persona policy (the legacy single-call behaviour); callers that evaluate Layer 2
+themselves, with full context, pass ``check_target_policy=False`` and get a pure Layer-1 verdict.
 
 Roles:
   BUILDING_NODE  — can DETECT, SEEK, RESOLVE, GOSSIP, SYNC
@@ -14,6 +16,7 @@ Roles:
 """
 
 import time
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Dict, Set, Tuple
 
@@ -200,14 +203,37 @@ def parse_target_resource(target: str) -> Tuple[str, str]:
 
 # ─── Authorization ─────────────────────────────────────────────────────────────
 
+LAYER_INFRA = "L1_INFRA"
+LAYER_POLICY = "L2_POLICY"
+
+# Machine-readable denial codes (``AuthDecision.code``).
+CODE_NO_PRINCIPAL = "NO_PRINCIPAL"
+CODE_UNREGISTERED = "UNREGISTERED_PRINCIPAL"
+CODE_VERB_NOT_ALLOWED = "VERB_NOT_ALLOWED"
+CODE_SYSTEM_TARGET = "SYSTEM_TARGET_REQUIRES_ADMIN"
+CODE_TARGET_POLICY = "TARGET_DENIED_BY_POLICY"
+
+
+@dataclass(frozen=True)
+class AuthDecision:
+    """Outcome of one authorization check. ``layer`` is the layer that denied (``""`` when permitted)."""
+    permitted: bool
+    layer: str = ""
+    code: str = ""
+    reason: str = ""
+
+    def __bool__(self) -> bool:
+        return self.permitted
+
+
 def authorize(
     principal: Optional[str],
     verb: str,
     target: str,
     building_id: str = "",
 ) -> bool:
-    """Boolean wrapper around :func:`authorize_with_reason`."""
-    return authorize_with_reason(principal, verb, target, building_id)[0]
+    """Boolean wrapper around :func:`authorize_decision`."""
+    return authorize_decision(principal, verb, target, building_id).permitted
 
 
 def authorize_with_reason(
@@ -216,12 +242,24 @@ def authorize_with_reason(
     target: str,
     building_id: str = "",
 ) -> Tuple[bool, str]:
-    """
-    Same as :func:`authorize` but also returns the denial reason (``""`` on permit).
+    """``(permitted, reason)`` -- the legacy form of :func:`authorize_decision` (reason is ``""`` on permit)."""
+    d = authorize_decision(principal, verb, target, building_id)
+    return d.permitted, d.reason
 
-    Callers must use this instead of reading ``get_audit_log()[-1]`` after a call to
-    ``authorize``: under concurrent requests the last audit entry can belong to a
-    different request.
+
+def authorize_decision(
+    principal: Optional[str],
+    verb: str,
+    target: str,
+    building_id: str = "",
+    *,
+    check_target_policy: bool = True,
+) -> AuthDecision:
+    """
+    Authorization verdict with the layer and code that denied it.
+
+    Callers must use this (or :func:`authorize_with_reason`) instead of reading ``get_audit_log()[-1]`` after a
+    call to ``authorize``: under concurrent requests the last audit entry can belong to a different request.
 
     Target-aware authorization chokepoint.
 
@@ -249,38 +287,43 @@ def authorize_with_reason(
     """
     decision = "PERMIT"
     reason = ""
+    layer = ""
+    code = ""
     target_type, target_id = parse_target_resource(target)
+
+    def deny(deny_layer: str, deny_code: str, deny_reason: str):
+        return "DENY", deny_layer, deny_code, deny_reason
 
     if _enforce_policy:
         if principal is None:
-            decision = "DENY"
-            reason = "no_principal"
+            decision, layer, code, reason = deny(LAYER_INFRA, CODE_NO_PRINCIPAL, "no_principal")
         elif principal not in _principal_registry:
-            decision = "DENY"
-            reason = "unregistered_principal"
+            decision, layer, code, reason = deny(LAYER_INFRA, CODE_UNREGISTERED, "unregistered_principal")
         else:
             role = _principal_registry[principal]
             allowed_verbs = _ROLE_PERMISSIONS.get(role, set())
             if verb not in allowed_verbs:
-                decision = "DENY"
-                reason = f"role_{role.value}_cannot_{verb}"
+                decision, layer, code, reason = deny(
+                    LAYER_INFRA, CODE_VERB_NOT_ALLOWED, f"role_{role.value}_cannot_{verb}")
             else:
                 # ── Target-Aware Policy Evaluation ──
                 # 1. System target requires Role.ADMIN
                 if target_type == "system" and role != Role.ADMIN:
-                    decision = "DENY"
-                    reason = "system_target_requires_role_admin"
+                    decision, layer, code, reason = deny(
+                        LAYER_INFRA, CODE_SYSTEM_TARGET, "system_target_requires_role_admin")
 
-                # 2. Occupant target evaluated against campus ReBAC policy
-                elif target_type == "occupant" and target_id:
+                # 2. Occupant target evaluated against campus ReBAC policy (skipped when the caller runs Layer 2
+                #    itself with full context -- see ``check_target_policy``)
+                elif check_target_policy and target_type == "occupant" and target_id:
                     caller_has_campus_role = (
                         get_occupant_role is not None and get_occupant_role(principal) is not None
                     )
                     if caller_has_campus_role and evaluate_campus_query_policy is not None:
                         p_decision = evaluate_campus_query_policy(caller_id=principal, target_id=target_id)
                         if not p_decision.permitted or p_decision.access.value == "none":
-                            decision = "DENY"
-                            reason = f"target_occupant_denied_by_policy: {p_decision.reason}"
+                            decision, layer, code, reason = deny(
+                                LAYER_POLICY, CODE_TARGET_POLICY,
+                                f"target_occupant_denied_by_policy: {p_decision.reason}")
 
     entry = {
         "timestamp": time.time(),
@@ -292,10 +335,12 @@ def authorize_with_reason(
         "target_id": target_id,
         "decision": decision,
         "reason": reason,
+        "layer": layer,
+        "code": code,
     }
     _audit_log.append(entry)
 
-    return decision == "PERMIT", reason
+    return AuthDecision(decision == "PERMIT", layer, code, reason)
 
 
 

@@ -405,6 +405,10 @@ def test_query_cache_hit():
 # B3: LIVE WEBSOCKET ENDPOINT (TOKEN AUTH & SNAPSHOT)
 # ================================================================
 
+def _ticket(token):
+    return client.post("/api/ws-ticket", headers=_auth(token)).json()["ticket"]
+
+
 def test_b3_websocket_unauthenticated_rejected():
     """Unauthenticated WebSocket connection is closed/rejected."""
     try:
@@ -417,7 +421,7 @@ def test_b3_websocket_unauthenticated_rejected():
 
 def test_b3_websocket_authenticated_snapshot():
     """Authenticated WebSocket receives initial connection snapshot."""
-    with client.websocket_connect(f"/ws/live?token={DEAN_TOKEN}") as ws:
+    with client.websocket_connect(f"/ws/live?ticket={_ticket(DEAN_TOKEN)}") as ws:
         msg = ws.receive_json()
         assert msg["type"] == "connected"
         assert msg["principal"] == P.dean
@@ -549,8 +553,8 @@ def test_unknown_building_comes_from_deployment_not_hardcoded_list():
 
 
 def test_websocket_broadcast_reaches_every_client():
-    with client.websocket_connect(f"/ws/live?token={DEAN_TOKEN}") as ws1, \
-         client.websocket_connect(f"/ws/live?token={TEACHER_TOKEN}") as ws2:
+    with client.websocket_connect(f"/ws/live?ticket={_ticket(DEAN_TOKEN)}") as ws1, \
+         client.websocket_connect(f"/ws/live?ticket={_ticket(TEACHER_TOKEN)}") as ws2:
         assert ws1.receive_json()["type"] == "connected"
         assert ws2.receive_json()["type"] == "connected"
         client.post("/api/simulate", headers=_auth(DEAN_TOKEN), json={"n_events": 5, "seed": 3})

@@ -19,11 +19,12 @@ Threat model coverage:
   - Certificate spoofing  -> pinning registry cross-validates fingerprints
 """
 
+import hmac
 import os
 import time
 import hashlib
 from typing import Dict, Optional, Tuple, List, Set
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 
 
@@ -39,6 +40,15 @@ class CertificateInfo:
     not_after: float          # Unix timestamp (expiry)
     is_ca: bool = False       # Whether this is a CA certificate
     key_usage: str = "digitalSignature,keyEncipherment"
+    x25519_public_hex: str = ""   # key-agreement key, certified together with the signing key
+    signature: str = ""           # CA MAC over every field above (set by CertificateAuthority.issue_node_certificate)
+
+    def signed_fields(self) -> bytes:
+        """Canonical bytes the CA signature covers: everything that identifies the holder and its keys."""
+        return "|".join(str(x) for x in (
+            self.subject, self.issuer, self.serial_number, self.fingerprint, self.public_key_hex,
+            self.x25519_public_hex, self.not_before, self.not_after, self.is_ca, self.key_usage,
+        )).encode("utf-8")
 
     @property
     def is_expired(self) -> bool:
@@ -78,6 +88,10 @@ class CertificateAuthority:
     ca_cert: CertificateInfo
     _issued_serials: Set[str] = field(default_factory=set)
     _revoked_serials: Set[str] = field(default_factory=set)
+    _mac_key: bytes = field(default_factory=lambda: os.urandom(32), repr=False)   # the CA's signing secret
+
+    def _sign(self, cert: CertificateInfo) -> str:
+        return hmac.new(self._mac_key, cert.signed_fields(), hashlib.sha256).hexdigest()
 
     @classmethod
     def generate(cls, ca_name: str = "DSTS-Campus-CA",
@@ -108,18 +122,23 @@ class CertificateAuthority:
         building_id: str,
         public_key_hex: str,
         validity_days: int = 365,
+        x25519_public_hex: str = "",
     ) -> CertificateInfo:
-        """Issue a certificate for a building node, signed by this CA."""
+        """Issue a certificate for a building node, signed by this CA.
+
+        The certificate binds the node's Ed25519 signing key *and* its X25519 key-agreement key: the fingerprint
+        (what peers pin) covers both, and the CA signature covers every field, so neither key can be swapped
+        without the certificate failing validation."""
         now = time.time()
         serial = hashlib.sha256(
             f"{building_id}:{now}:{os.urandom(8).hex()}".encode()
         ).hexdigest()[:16]
 
         fingerprint = hashlib.sha256(
-            bytes.fromhex(public_key_hex)
+            bytes.fromhex(public_key_hex) + bytes.fromhex(x25519_public_hex)
         ).hexdigest()
 
-        cert = CertificateInfo(
+        unsigned = CertificateInfo(
             subject=building_id,
             issuer=self.ca_name,
             serial_number=serial,
@@ -128,7 +147,9 @@ class CertificateAuthority:
             not_before=now,
             not_after=now + validity_days * 86400,
             is_ca=False,
+            x25519_public_hex=x25519_public_hex,
         )
+        cert = replace(unsigned, signature=self._sign(unsigned))
         self._issued_serials.add(serial)
         return cert
 
@@ -166,6 +187,9 @@ class CertificateAuthority:
 
         if cert.is_expired:
             return False, "expired"
+
+        if not cert.signature or not hmac.compare_digest(cert.signature, self._sign(cert)):
+            return False, "bad_signature"
 
         return True, "valid"
 
@@ -335,10 +359,11 @@ class TransportSecurityManager:
         building_id: str,
         public_key_hex: str,
         validity_days: int = 365,
+        x25519_public_hex: str = "",
     ) -> CertificateInfo:
         """Issue a certificate and set up pinning for a building node."""
         cert = self.ca.issue_node_certificate(
-            building_id, public_key_hex, validity_days
+            building_id, public_key_hex, validity_days, x25519_public_hex
         )
         self._node_certs[building_id] = cert
         self._pin_registries[building_id] = CertificatePinningRegistry(building_id)
@@ -410,14 +435,14 @@ class TransportSecurityManager:
         return results
 
     def rotate_certificate(
-        self, building_id: str, public_key_hex: str
+        self, building_id: str, public_key_hex: str, x25519_public_hex: str = ""
     ) -> CertificateInfo:
         """Rotate a building node's certificate (revoke old, issue new)."""
         old_cert = self._node_certs.get(building_id)
         if old_cert:
             self.ca.revoke(old_cert.serial_number)
 
-        new_cert = self.provision_node(building_id, public_key_hex)
+        new_cert = self.provision_node(building_id, public_key_hex, x25519_public_hex=x25519_public_hex)
 
         # Update pins in all peer registries
         for bid, registry in self._pin_registries.items():

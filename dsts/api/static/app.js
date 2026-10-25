@@ -2196,7 +2196,7 @@ function setConnectionStatus(connected) {
 }
 
 
-function connectLive() {
+async function connectLive() {
 
   const protocol =
     location.protocol === "https:"
@@ -2204,10 +2204,29 @@ function connectLive() {
       : "ws";
 
 
+  // The bearer token never goes into the URL: trade it for a single-use ticket first.
+  let ticket = "";
+
+  try {
+
+    const res = await fetch("/api/ws-ticket", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${state.activeToken || ""}` }
+    });
+
+    if (res.ok) {
+      ticket = (await res.json()).ticket || "";
+    }
+
+  } catch (error) {
+    /* the socket below is refused and the reconnect timer tries again */
+  }
+
+
   const socket =
     new WebSocket(
-      `${protocol}://${location.host}/ws/live?token=` +
-      encodeURIComponent(state.activeToken || "")
+      `${protocol}://${location.host}/ws/live?ticket=` +
+      encodeURIComponent(ticket)
     );
 
 

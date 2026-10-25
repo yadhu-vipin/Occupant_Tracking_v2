@@ -81,5 +81,14 @@ def quantize(ts: str, minutes: int = 15) -> str:
     return make_ts(d, f"{h:02d}:{(mi // minutes) * minutes:02d}:00")
 
 
+# Disclosure level L2 reveals an approximate time only. One rule everywhere (point queries, occupancy lists):
+# the clock is rounded down to the hour; the date, if any, is kept.
+L2_APPROX_MINUTES = 60
+
+
+def approx_time(ts: str) -> str:
+    return quantize(ts, L2_APPROX_MINUTES)
+
+
 def format_clock(when: datetime) -> str:
     return when.strftime("%H:%M:%S")

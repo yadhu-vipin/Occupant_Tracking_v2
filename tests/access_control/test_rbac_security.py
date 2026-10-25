@@ -100,12 +100,31 @@ def test_persona_login_in_demo_mode_issues_working_token(monkeypatch):
 
 
 def test_key_login(monkeypatch):
+    from access_control.credentials import credential_for
     monkeypatch.setenv("DSTS_LOGIN_KEY", "s3cret")
+    srv._login_guard_client.reset(); srv._login_guard_principal.reset()
     assert client.post("/api/auth/login", json={"principal_id": DEAN5, "key": "wrong"}).status_code == 401
     assert client.post("/api/auth/login", json={"principal_id": DEAN5}).status_code == 401
-    assert client.post("/api/auth/login", json={"principal_id": "nobody", "key": "s3cret"}).status_code == 401
-    ok = client.post("/api/auth/login", json={"principal_id": DEAN5, "key": "s3cret"})
+    assert client.post("/api/auth/login", json={"principal_id": "nobody", "key": credential_for("nobody")}).status_code == 401
+    # the master key itself is not a credential, and one occupant's credential does not open another account
+    assert client.post("/api/auth/login", json={"principal_id": DEAN5, "key": "s3cret"}).status_code == 401
+    assert client.post("/api/auth/login", json={"principal_id": DEAN5, "key": credential_for(TEACHER5)}).status_code == 401
+    ok = client.post("/api/auth/login", json={"principal_id": DEAN5, "key": credential_for(DEAN5)})
     assert ok.status_code == 200 and verify_token(ok.json()["token"]) == DEAN5
+    srv._login_guard_client.reset(); srv._login_guard_principal.reset()
+
+
+def test_repeated_bad_logins_lock_the_account_out(monkeypatch):
+    from access_control.credentials import credential_for
+    monkeypatch.setenv("DSTS_LOGIN_KEY", "s3cret")
+    srv._login_guard_client.reset(); srv._login_guard_principal.reset()
+    for _ in range(5):
+        assert client.post("/api/auth/login", json={"principal_id": TEACHER5, "key": "guess"}).status_code == 401
+    locked = client.post("/api/auth/login", json={"principal_id": TEACHER5, "key": credential_for(TEACHER5)})
+    assert locked.status_code == 429 and int(locked.headers["Retry-After"]) > 0      # even the right key is refused
+    other = client.post("/api/auth/login", json={"principal_id": STUDENT5, "key": credential_for(STUDENT5)})
+    assert other.status_code == 200                                                  # another occupant is unaffected
+    srv._login_guard_client.reset(); srv._login_guard_principal.reset()
 
 
 def test_key_login_disabled_when_no_key_configured(monkeypatch):
@@ -276,8 +295,21 @@ def test_reset_keeps_audit_log():
 def test_websocket_rejects_unsigned_tokens():
     for bad in (P.dean, "dsts-dean-token"):
         with pytest.raises(Exception):
-            with client.websocket_connect(f"/ws/live?token={bad}"):
+            with client.websocket_connect(f"/ws/live?ticket={bad}"):
                 pass
+
+
+def test_websocket_ticket_is_single_use_and_the_bearer_token_in_the_url_is_not_accepted():
+    ticket = client.post("/api/ws-ticket", headers=tok(DEAN5)).json()["ticket"]
+    with client.websocket_connect(f"/ws/live?ticket={ticket}") as ws:
+        assert ws.receive_json()["principal"] == DEAN5
+    with pytest.raises(Exception):                                  # redeemed once, gone
+        with client.websocket_connect(f"/ws/live?ticket={ticket}"):
+            pass
+    with pytest.raises(Exception):                                  # a real token in the URL is just an unknown ticket
+        with client.websocket_connect(f"/ws/live?ticket={issue_token(DEAN5)}"):
+            pass
+    assert client.post("/api/ws-ticket").status_code == 401         # tickets need authentication
 
 
 # ───────────────────────── policy engine stays fail-closed ─────────────────────────

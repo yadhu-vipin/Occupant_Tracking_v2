@@ -21,7 +21,7 @@ if str(PROTO_DIR) not in sys.path:
 from access_control.campus_policy import (
     CampusRole, DisclosureLevel, QueryPurpose, QueryContext,
     AccessScope, LocationGranularity, PolicyDecision,
-    MAX_DISCLOSURE_MATRIX, evaluate_campus_query_policy, register_occupant_role,
+    evaluate_campus_query_policy, register_occupant_role,
     register_class_roster, clear_campus_registry,
     register_designated_location, check_office_presence,
     register_occupant_building, register_occupant_current_building, is_visitor,

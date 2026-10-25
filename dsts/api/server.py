@@ -62,7 +62,11 @@ from pipeline.query import (
 )
 from pipeline.query_cache import QueryCache
 from access_control.personas import resolve_personas
-from shared.timeutil import is_office_hours, quantize
+from shared.timeutil import approx_time, is_office_hours
+from access_control.credentials import verify_credential
+from access_control.rate_limit import LoginGuard
+from access_control.scope import building_scope_denial
+from access_control.tickets import TicketStore
 from access_control.tokens import DEFAULT_TTL_SECONDS, issue_token, verify_token
 from access_control.campus_policy import (
     evaluate_campus_query_policy,
@@ -74,7 +78,7 @@ from access_control.campus_policy import (
     clear_campus_registry,
 )
 from access_control.authorize import (
-    authorize_with_reason,
+    authorize_decision, authorize_with_reason,
     get_audit_log,
     clear_audit_log,
     clear_registry,
@@ -379,18 +383,25 @@ def index() -> FileResponse:
     return FileResponse(str(index_file))
 
 
+# Brute-force protection for the credential login: per (client, occupant) and, more loosely, per occupant overall.
+_login_guard_client = LoginGuard(max_failures=5, window_seconds=60, lockout_seconds=300)
+_login_guard_principal = LoginGuard(max_failures=20, window_seconds=300, lockout_seconds=900)
+_ws_tickets = TicketStore(ttl_seconds=30.0)
+
+
 class LoginBody(BaseModel):
     persona: Optional[str] = Field(default=None, description="Demo persona (dean|teacher|student|target); needs DSTS_DEMO_MODE=1")
     principal_id: Optional[str] = Field(default=None, description="Occupant ID to sign in as; needs `key`")
-    key: Optional[str] = Field(default=None, description="Shared login key (DSTS_LOGIN_KEY)")
+    key: Optional[str] = Field(default=None, description="The occupant's own login credential (python -m access_control.credentials <id>)")
 
 
 @app.post("/api/auth/login")
-def login(body: LoginBody) -> dict:
+def login(body: LoginBody, request: Request) -> dict:
     """Issue a signed, expiring bearer token.
 
     Two ways in: (1) demo personas, only when the operator set DSTS_DEMO_MODE=1;
-    (2) an occupant ID plus the operator-provided DSTS_LOGIN_KEY.
+    (2) an occupant ID plus that occupant's own credential, derived from the operator's DSTS_LOGIN_KEY
+    (``python -m access_control.credentials <id>``). Repeated failures lock the client / occupant out (HTTP 429).
     """
     _get_engine()
     if body.persona:
@@ -403,15 +414,28 @@ def login(body: LoginBody) -> dict:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail=f"Unknown persona. Valid: {sorted(personas)}.")
     else:
-        expected = os.environ.get("DSTS_LOGIN_KEY", "")
-        supplied = body.key or ""
-        if not expected or not hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8")) \
-                or not body.principal_id or body.principal_id.strip() not in _roles:
+        pid = (body.principal_id or "").strip()
+        client_key = f"{request.client.host if request.client else '?'}|{pid}"
+        wait = max(_login_guard_client.retry_after(client_key) or 0, _login_guard_principal.retry_after(pid) or 0)
+        if wait:
+            m.auth_failures_total.inc()
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                                detail="Too many failed sign-in attempts. Try again later.",
+                                headers={"Retry-After": str(wait)})
+        if not pid or pid not in _roles or not verify_credential(pid, body.key):
+            _login_guard_client.record_failure(client_key)
+            _login_guard_principal.record_failure(pid or "?")
             m.auth_failures_total.inc()
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
-        pid = body.principal_id.strip()
+        _login_guard_client.record_success(client_key)
     return {"token": issue_token(pid), "principal": pid, "role": get_real_role(pid),
             "building": get_occupant_building(pid), "expires_in": DEFAULT_TTL_SECONDS}
+
+
+@app.post("/api/ws-ticket")
+def ws_ticket(principal: str = Depends(get_current_principal)) -> dict:
+    """A single-use ticket (valid for 30 s) for ``/ws/live?ticket=...``, so the bearer token never travels in a URL."""
+    return {"ticket": _ws_tickets.issue(principal), "expires_in": int(_ws_tickets.ttl)}
 
 
 @app.get("/api/health")
@@ -456,9 +480,9 @@ def get_cache_stats(principal: str = Depends(get_current_principal)) -> dict:
 # RBAC-PROTECTED SYSTEM ENDPOINTS (S3)
 # ================================================================
 
-def _quantize_hms(ts: str, minutes: int = 15) -> str:
-    """Round an HH:MM:SS time down to a ``minutes`` bucket (L2 discloses an approximate time only)."""
-    return quantize(ts, minutes)[:-3]
+def _quantize_hms(ts: str) -> str:
+    """L2 discloses an approximate time only: the clock rounded down to the hour (``HH:00``)."""
+    return approx_time(ts)[:-3]
 
 
 def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
@@ -748,11 +772,6 @@ class QueryRequestBody(BaseModel):
 _BUILDING_QUERIES = ("Q1", "Q2")
 _ZONE_QUERIES = ("Q10", "Q12", "Q13")
 _OCCUPANT_QUERIES = ("Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q11", "TRACK")
-_SCOPE_RULE_BY_ROLE = {
-    "dean": "RULE_A_CROSS_BUILDING_DENIED",
-    "teacher": "RULE_B_CROSS_BUILDING_DENIED",
-    "student": "RULE_C_CROSS_BUILDING_DENIED",
-}
 
 
 def _denied_response(q_type: str, template_fmt: str, caller_meta: dict, rule: str, reason: str,
@@ -798,14 +817,7 @@ def _cached_exec(key: tuple, fn) -> tuple[dict, bool]:
     return value, False
 
 
-def _building_scope_denial(caller_role: str, caller_bld: Optional[str], building_id: str) -> Optional[tuple[str, str]]:
-    """Every role is confined to its own home building for building- and zone-level queries."""
-    if caller_bld is None:
-        return "RULE_CALLER_BUILDING_UNRESOLVED", "Caller's home building is unresolved; building-scoped queries are denied."
-    if caller_bld != building_id:
-        return (_SCOPE_RULE_BY_ROLE.get(caller_role, "RULE_CROSS_BUILDING_DENIED"),
-                f"{caller_role.capitalize()} of {caller_bld} cannot query external building {building_id}.")
-    return None
+_building_scope_denial = building_scope_denial     # one rule for the API and the CLI (access_control/scope.py)
 
 
 def _filter_zone_answer(q_type: str, answer: Any, keep: set) -> Any:
@@ -1009,10 +1021,12 @@ def execute_query_endpoint(
     }
 
     # Layer 1: infrastructure RBAC (always runs, always audited)
-    permitted, last_reason = authorize_with_reason(caller_id, "QUERY", f"occupant:{target_id}")
-    if not permitted and not last_reason.startswith("target_occupant_denied_by_policy"):
+    # Layer 1 is judged on its own (check_target_policy=False): the persona policy below is Layer 2, evaluated with the
+    # target's real current building and the query context, so Layer 1 never has to guess or be told apart by a string.
+    layer1 = authorize_decision(caller_id, "QUERY", f"occupant:{target_id}", check_target_policy=False)
+    if not layer1.permitted:
         return _denied_response(q_type, template_fmt, caller_meta, "RULE_LAYER1_DENIED",
-                                f"Infrastructure RBAC denied: {last_reason}", target_meta, metric_kind="rbac_infra")
+                                f"Infrastructure RBAC denied: {layer1.reason}", target_meta, metric_kind="rbac_infra")
 
     # Layer 2: building-scoped persona ReBAC
     ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours_now, authorized_investigation=auth_inv)
@@ -1100,14 +1114,17 @@ def metrics(request: Request, authorization: Optional[str] = Header(None)) -> Re
 
 
 @app.websocket("/ws/live")
-async def ws_live(websocket: WebSocket, token: Optional[str] = Query(None)) -> None:
-    """Live WebSocket stream with authentication and live broadcast loop (B3, S3)."""
-    # Authenticate WebSocket caller
-    principal = resolve_token_principal(token)
+async def ws_live(websocket: WebSocket, ticket: Optional[str] = Query(None)) -> None:
+    """Live WebSocket stream with authentication and live broadcast loop (B3, S3).
+
+    Authenticates with a single-use ``ticket`` from ``POST /api/ws-ticket`` or, for non-browser clients, an
+    ``Authorization: Bearer`` header on the upgrade request. The bearer token is not accepted in the URL."""
+    principal = _ws_tickets.redeem(ticket)
+    if principal:
+        _get_engine()
+        principal = principal if principal in _roles else None
     if not principal:
-        # Check if auth header is sent on upgrade
-        auth_hdr = websocket.headers.get("authorization")
-        principal = resolve_token_principal(auth_hdr)
+        principal = resolve_token_principal(websocket.headers.get("authorization"))
     if not principal:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized")
         return
