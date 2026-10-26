@@ -451,4 +451,4 @@ for f in sorted(Path('nodes').iterdir()):
 - Token secret (when random), caches and the simulated event list are per process.
 - In demo mode any dashboard viewer can act as any of the three personas, by design.
 
-**Git hygiene.** Source, tests, contracts and small config are tracked. Generated outputs (`*/output/`, corpus, `variants/`, per-node embeddings) are git-ignored and regenerable. Running Phase 4 modifies the tracked empty `nodes/*/state/*.db` files; reset or ignore them as you prefer.
+**Git hygiene.** Source, tests, contracts and small config are tracked. Generated outputs (`*/output/`, corpus, `variants/`, per-node embeddings) are git-ignored and regenerable. A pipeline run (`python manage.py pipeline`) modifies tracked files: `nodes/*/building.json`, `nodes/*/config.json`, `nodes/*/embeddings/occupant_ids.json`, `nodes/*/filters/*.manifest.json`, `nodes/*/state/*.db` and `out/*.manifest.json`. Queries and the test suite can touch `nodes/*/state/*.db` too. Run `git checkout -- nodes out` before committing to discard those changes.
