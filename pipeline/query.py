@@ -49,6 +49,7 @@ Exit codes: 0 answered, 2 missing/bad pipeline output, 3 bad input, 4 unauthoriz
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from collections import Counter
@@ -91,6 +92,7 @@ TRANSITION_ZONE = "zT"
 ROLES_DIR = ROOT_DIR / "variants" / "rbac10"
 DEFAULT_AT_TIME = "23:59:59"   # "as of end of day" -> most recent known detection
 TRAJECTORY_QUERIES = {"Q3", "Q4", "Q5", "Q7", "Q8", "Q9", "Q11", "TRACK"}   # require L4 outright, no partial redaction
+BUILDING_PARAM_QUERIES = {"Q3", "Q4", "Q5", "Q8", "Q9"}   # trajectory queries that take a building_id
 
 
 # --------------------------------------------------------------------------
@@ -268,6 +270,7 @@ class QueryEngine:
         self.enforce_rbac = enforce_rbac
         self.nodes_dir = Path(nodes_dir) if nodes_dir else None
         self.explain = explain
+        self.scope_building: str | None = None    # set by in_building()
         if enforce_rbac:
             set_enforce_policy(True)
             register_node(principal, Role.QUERY_CLIENT)
@@ -278,6 +281,31 @@ class QueryEngine:
         nodes_dir = Path(nodes_dir) if nodes_dir else DEFAULT_NODES_DIR
         return cls(load_event_log(phase4_results), load_registered_occupants(nodes_dir),
                    nodes_dir=nodes_dir, **kwargs)
+
+    def in_building(self, building_id: str) -> "QueryEngine":
+        """This engine over ``building_id``'s sightings and visit pointers only.
+
+        A Dean's view of a visitor (VISITOR_IN_BUILDING) runs on this, so no
+        event, zone or time seen in another building can reach the answer.
+        """
+        scoped = copy.copy(self)
+        scoped.events = [e for e in self.events if e.building == building_id]
+        scoped.scope_building = building_id
+        return scoped
+
+    def pointer_history(self, occupant_id: str) -> list[dict] | None:
+        """Every visit pointer recorded for the occupant at their home building
+        (None without a nodes dir or a known home), within ``scope_building`` if set."""
+        if self.nodes_dir is None:
+            return None
+        home = self._home_building(occupant_id)
+        if home is None or not (self.nodes_dir / home).exists():
+            return None
+        with PointerStore(self.nodes_dir / home / "state") as store:
+            history = store.lookup_history(occupant_id)
+        if self.scope_building is not None:
+            history = [p for p in history if p["current_building"] == self.scope_building]
+        return history
 
     def _authorize(self, query_id: str, target: str) -> None:
         if self.enforce_rbac and not authorize(self.principal, "QUERY", target):
@@ -688,11 +716,9 @@ class QueryEngine:
                           "zone_label": zone_label(e.zone), "probability": e.identity_probability}
                          for e in history],
         }
-        if self.nodes_dir is not None:
-            home = self._home_building(occupant_id)
-            if home is not None and (self.nodes_dir / home).exists():
-                with PointerStore(self.nodes_dir / home / "state") as store:
-                    result["pointer_history"] = store.lookup_history(occupant_id)
+        pointers = self.pointer_history(occupant_id)
+        if pointers is not None:
+            result["pointer_history"] = pointers
         if not self.explain:
             return result, None
 
@@ -1179,6 +1205,64 @@ def occupant_query_result(engine: QueryEngine, q_type: str, target_id: str, *, b
     raise ValueError(f"not a single-occupant trajectory query: {q_type}")
 
 
+def _outside_building_notes(engine: QueryEngine, q_type: str, target_id: str, building: str) -> list[str]:
+    """What a visitor-scoped answer leaves out: categories only, never the values."""
+    notes = []
+    if any(e.occupant_id == target_id and e.building != building for e in engine.events):
+        notes.append(f"sightings outside {building} (their events, zones and times): "
+                     "a visitor's history outside this building is not disclosed")
+    if q_type == "TRACK" and any(p["current_building"] != building for p in engine.pointer_history(target_id) or ()):
+        notes.append(f"visit-pointer entries for buildings other than {building}")
+    return notes
+
+
+def occupant_answer(engine: QueryEngine, q_type: str, target_id: str, decision: PolicyDecision, *,
+                    caller_building: str | None, at_time: str, building_id: str | None = None,
+                    before_time: str | None = None, t1: str | None = None, t2: str | None = None,
+                    zone: str | None = None) -> dict:
+    """The answer to a permitted single-occupant query, as the caller may see it.
+
+    Used by both run_occupant_query (CLI) and POST /api/query. Returns
+    query_text, answer, evidence, the redacted explanation, and ``withheld``:
+    what was removed from the answer and why.
+
+    For a Dean's view of a visitor (decision.visitor_status ==
+    VISITOR_IN_BUILDING) every trajectory query runs on the caller's building
+    only (``engine.in_building``): no event, zone or time from another
+    building, no visit pointer for another building, and no answer about
+    another building at all.
+    """
+    withheld: list[str] = []
+    if q_type in TRAJECTORY_QUERIES and decision.visitor_status == "VISITOR_IN_BUILDING":
+        if caller_building is None:
+            return {"query_text": None, "answer": None, "evidence": [],
+                    "explanation": refused_explanation(q_type),
+                    "withheld": ["entire answer: the caller's building is unresolved"]}
+        if q_type in BUILDING_PARAM_QUERIES:
+            if building_id not in (None, caller_building):
+                return {"query_text": None, "answer": None, "evidence": [],
+                        "explanation": refused_explanation(q_type),
+                        "withheld": [f"entire answer: {building_id} is outside {caller_building}, and a "
+                                     "visitor's history outside this building is not disclosed"]}
+            building_id = caller_building
+        withheld = _outside_building_notes(engine, q_type, target_id, caller_building)
+        engine = engine.in_building(caller_building)
+
+    evidence: list[str] = []
+    if q_type == "Q6":
+        answer, res = q6_disclosed(engine, target_id, decision.level, at_time, decision)
+        explanation, query_text = res.explanation, f"Where was {target_id} at t={at_time}?"
+    elif q_type == "TRACK":
+        answer, explanation = engine.track_explained(target_id)
+        query_text = f"Full historical trajectory for {target_id}"
+    else:
+        res = occupant_query_result(engine, q_type, target_id, building_id=building_id, before_time=before_time,
+                                    t1=t1, t2=t2, zone=zone)
+        answer, evidence, explanation, query_text = res.answer, res.evidence, res.explanation, res.query_text
+    return {"query_text": query_text, "answer": answer, "evidence": evidence,
+            "explanation": redact(explanation, decision, caller_building=caller_building), "withheld": withheld}
+
+
 def print_reasoning(redacted: dict) -> None:
     for line in format_explanation(redacted):
         print(line)
@@ -1407,25 +1491,17 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
              f"caller only holds {decision.level.name}")
         return _refused(q_type, explain)
 
-    evidence: list[str] = []
-    if q_type == "Q6":
-        answer, res = q6_disclosed(engine, target_id, decision.level, at_time, decision)
-        explanation, query_text = res.explanation, f"Where was {target_id} at t={at_time}?"
-        print(f"  Query:  {query_text}")
-        print(f"  Disclosed ({decision.level.name}): {answer}")
-    elif q_type == "TRACK":
-        answer, explanation = engine.track_explained(target_id)
-        query_text = f"Full historical trajectory for {target_id}"
-        print(f"  Query:  {query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): {answer}")
+    outcome = occupant_answer(engine, q_type, target_id, decision, caller_building=get_occupant_building(caller_id),
+                              at_time=at_time, building_id=building_id, before_time=before_time, t1=t1, t2=t2,
+                              zone=zone)
+    outcome["decision"] = decision
+    print(f"  Query:  {outcome['query_text']}")
+    if q_type in ("Q6", "TRACK"):
+        print(f"  Disclosed ({decision.level.name}): {outcome['answer']}")
     else:
-        res = occupant_query_result(engine, q_type, target_id, building_id=building_id, before_time=before_time,
-                                    t1=t1, t2=t2, zone=zone)
-        answer, evidence, explanation, query_text = res.answer, res.evidence, res.explanation, res.query_text
-        print(f"  Query:  {query_text}")
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={answer}  evidence={evidence}")
-    outcome = {"query_text": query_text, "answer": answer, "evidence": evidence, "decision": decision,
-               "explanation": redact(explanation, decision, caller_building=get_occupant_building(caller_id))}
+        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={outcome['answer']}  evidence={outcome['evidence']}")
+    if outcome["withheld"]:
+        print(f"  Withheld: {'; '.join(outcome['withheld'])}")
     if explain:
         print_reasoning(outcome["explanation"])
     return outcome

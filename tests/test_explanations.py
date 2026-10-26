@@ -490,3 +490,134 @@ def test_api_zone_query_explanation_for_teacher_is_counts_only(api):
     out = api(TEACHER5, query_type="Q10", zone="z1", building_id="building_5", time_t="12:00:00")
     assert out["explanation"]["evidence"] == []
     assert not {t for t in tokens(out["explanation"]) if t[0] in ("occupant", "event_id")}
+
+
+# ─── a Dean's view of a visitor: answers stay inside the caller's building ─
+
+SCOPED = ("Q3", "Q4", "Q5", "Q7", "Q8", "Q9", "Q11", "TRACK")
+VISITOR_RULES = ("RULE_A_VISITOR_IN_OWN_BUILDING", "RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION")
+SCOPED_PARAMS = {   # building_id is left out of Q8/Q9 on purpose: the scope must still apply
+    "Q3": dict(before_time="23:59:59"), "Q4": dict(t1="08:00:00", t2="18:00:00"), "Q5": {},
+    "Q7": dict(t1="08:00:00", t2="18:00:00"), "Q8": dict(zone="z8"), "Q9": dict(zone="z8"),
+    "Q11": dict(t1="08:00:00", t2="18:00:00"), "TRACK": {},
+}
+
+
+def _buildings_named(obj):
+    """Every value under a building / current_building / buildings_visited key."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in ("building", "current_building") and v is not None:
+                yield v
+            elif k == "buildings_visited":
+                yield from v
+            else:
+                yield from _buildings_named(v)
+    elif isinstance(obj, (list, tuple)):
+        for v in obj:
+            yield from _buildings_named(v)
+
+
+def assert_scoped_to(shown, building, events, target, params=()):
+    """No event, zone or time of ``target`` seen outside ``building`` appears in ``shown``
+    (times the caller passed in ``params`` excepted). ``shown[0]`` is the answer: its zones
+    carry no building, so they must all be zones the target was seen in inside ``building``."""
+    text = json.dumps(shown, default=str)
+    mine = [e for e in events if e.occupant_id == target]
+    inside_times = {e.timestamp for e in mine if e.building == building} | set(params)
+    inside_zones = {e.zone for e in mine if e.building == building} | set(params)
+    assert set(TOKEN_RE["zone"].findall(json.dumps(shown[0], default=str))) <= inside_zones
+    for e in mine:
+        if e.building != building:
+            assert e.event_id not in text, e
+            assert e.timestamp in inside_times or e.timestamp not in text, e
+    assert set(_buildings_named(shown)) <= {building}, set(_buildings_named(shown))
+
+
+def _visitor_decision():
+    return PolicyDecision(True, DisclosureLevel.L4_HISTORICAL_TRACK, visitor_status="VISITOR_IN_BUILDING",
+                          policy_rule="RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION")
+
+
+@pytest.mark.parametrize("q_type", SCOPED)
+def test_visitor_answer_uses_only_the_callers_building(engine, q_type):
+    from pipeline.query import occupant_answer
+    # A (home building_1) visits building_2 10:10-11:00; building_2's Dean looks at A.
+    kwargs = {**SCOPED_PARAMS[q_type], **({"building_id": "building_2"} if q_type in ("Q3", "Q4", "Q5") else {})}
+    out = occupant_answer(engine, q_type, "A", _visitor_decision(), caller_building="building_2",
+                          at_time="10:30:00", **kwargs)
+    shown = [out["answer"], out["evidence"], out["explanation"]]
+    assert_scoped_to(shown, "building_2", engine.events, "A", kwargs.values())
+    assert any("outside building_2" in w for w in out["withheld"])
+    assert not any("building_1" in w for w in out["withheld"])        # says what was removed, never the values
+
+
+def test_visitor_answers_match_the_building_only_log(engine):
+    from pipeline.query import occupant_answer
+    out = lambda q, **kw: occupant_answer(engine, q, "A", _visitor_decision(), caller_building="building_2",
+                                          at_time="10:30:00", **kw)["answer"]
+    assert out("Q7", t1="08:00:00", t2="18:00:00") == 2                       # zT and z8 in building_2 only
+    assert out("Q8", zone="z8") == "10:20:00"                                 # not 08:10:00 in building_1
+    assert out("Q9", zone="z8")["exit_time"] == "11:00:00"
+    assert [w["time"] for w in out("TRACK")["waypoints"]] == ["10:10:00", "10:20:00", "11:00:00"]
+    assert out("Q3", building_id="building_2", before_time="23:59:59") is True   # left via building_2's zT
+
+
+def test_visitor_question_about_another_building_is_withheld(engine):
+    from pipeline.query import occupant_answer
+    out = occupant_answer(engine, "Q5", "A", _visitor_decision(), caller_building="building_2",
+                          at_time="10:30:00", building_id="building_1")
+    assert out["answer"] is None and out["explanation"]["disclosure_level"] == "L0_NONE"
+    assert "outside building_2" in out["withheld"][0]
+    unresolved = occupant_answer(engine, "TRACK", "A", _visitor_decision(), caller_building=None, at_time="10:30:00")
+    assert unresolved["answer"] is None and unresolved["withheld"]
+
+
+def test_visitor_track_drops_other_buildings_pointers(tmp_path):
+    from pipeline.query import occupant_answer
+    eng = QueryEngine(_events(), REGISTRY, enforce_rbac=False, nodes_dir=tmp_path)
+    with PointerStore(tmp_path / "building_1" / "state") as pointers:
+        pointers.mint("A", "building_2", "10:10:00")
+        pointers.mint("A", "building_3", "12:00:00")
+    out = occupant_answer(eng, "TRACK", "A", _visitor_decision(), caller_building="building_2", at_time="10:30:00")
+    assert [p["current_building"] for p in out["answer"]["pointer_history"]] == ["building_2"]
+    assert [s["current_building"] for s in out["explanation"]["pointer_used"]["segments"]] == ["building_2"]
+    assert "visit-pointer entries for buildings other than building_2" in out["withheld"]
+    assert_scoped_to([out["answer"], out["explanation"]], "building_2", eng.events, "A")
+
+
+# Real data: a building_6 student who visits building_5 08:26-10:54 and is seen in building_6 and building_9.
+VISITOR, VISIT_TIME = "0000624", "10:00:00"
+
+
+def test_dean_investigating_a_visitor_via_cli_sees_only_their_building(demo, capsys):
+    from pipeline.query import ROLES_DIR, run_occupant_query
+    eng, _, _ = demo
+    dean = json.loads((ROLES_DIR / "deans_by_building.json").read_text())["building_5"]
+    assert any(e.occupant_id == VISITOR and e.building != "building_5" for e in eng.events)
+    for q_type in SCOPED:
+        kwargs = {**SCOPED_PARAMS[q_type], **({"building_id": "building_5"} if q_type in ("Q3", "Q4", "Q5") else {})}
+        out = run_occupant_query(eng, dean, VISITOR, q_type, purpose="security_investigation", is_office_hours=True,
+                                 authorized_investigation=True, at_time=VISIT_TIME, explain=True, **kwargs)
+        assert out["decision"].policy_rule in VISITOR_RULES, out["decision"]
+        assert out["answer"] is not None, q_type
+        assert_scoped_to([out["answer"], out["evidence"], out["explanation"]], "building_5", eng.events, VISITOR,
+                         [VISIT_TIME, *kwargs.values()])
+        assert out["withheld"], q_type
+        printed = capsys.readouterr().out
+        for e in eng.events:
+            if e.occupant_id == VISITOR and e.building != "building_5":
+                assert e.event_id not in printed
+
+
+def test_dean_investigating_a_visitor_via_api_sees_only_their_building(api):
+    from dsts.api.server import _get_engine
+    events = _get_engine().events
+    for q_type in SCOPED:
+        body = dict(query_type=q_type, target_id=VISITOR, purpose="security_investigation", time_t=VISIT_TIME,
+                    building_id="building_5", **{k: v for k, v in SCOPED_PARAMS[q_type].items() if k != "before_time"})
+        out = api(DEAN5, **body)
+        assert out["success"] and out["decision"]["policy_rule"] in VISITOR_RULES, out
+        assert_scoped_to([out["answer"], out["evidence"], out["explanation"]], "building_5", events, VISITOR,
+                         body.values())
+        assert out["withheld"], q_type

@@ -61,8 +61,7 @@ from pipeline.query import (
     building_scope_denial as _building_scope_denial,
     filter_zone_answer as _filter_zone_answer,
     investigation_rights,
-    occupant_query_result,
-    q6_disclosed,
+    occupant_answer,
     zone_disclosed_ids,
     zone_ids as _zone_ids,
 )
@@ -1064,17 +1063,9 @@ def execute_query_endpoint(
                               caller_role=f"occ|{caller_id}|{decision.level.name}|{decision.policy_rule}")
 
     def _run_occupant() -> dict:
-        if q_type == "Q6":
-            answer, res = q6_disclosed(engine, target_id, decision.level, at_time, decision)
-            answer, evidence, explanation = answer, [], res.explanation
-        elif q_type == "TRACK":
-            (answer, explanation), evidence = engine.track_explained(target_id), []
-        else:   # Q3 reads its cut-off from time_t
-            res = occupant_query_result(engine, q_type, target_id, building_id=building_id, before_time=at_time,
-                                        t1=t1, t2=t2, zone=zone)
-            answer, evidence, explanation = res.answer, res.evidence, res.explanation
-        return {"answer": answer, "evidence": evidence,
-                "explanation": redact(explanation, decision, caller_building=caller_bld)}
+        # Q3 reads its cut-off from time_t; a visitor's answer is scoped to the caller's building
+        return occupant_answer(engine, q_type, target_id, decision, caller_building=caller_bld, at_time=at_time,
+                               building_id=building_id, before_time=at_time, t1=t1, t2=t2, zone=zone)
 
     data, hit = _cached_exec(key, _run_occupant)
     m.queries_executed_total.labels(query_type=q_type, status="success").inc()
@@ -1088,6 +1079,7 @@ def execute_query_endpoint(
         "answer": data["answer"],
         "evidence": data["evidence"],
         "explanation": data["explanation"],
+        "withheld": data["withheld"],
     }
     if hit:
         result["_cache_hit"] = True
