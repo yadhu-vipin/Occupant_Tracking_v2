@@ -16,13 +16,18 @@ reports/explanation_flags.json
     many correct ones do -- false alarms), per flag. Then, over a grid of real
     answers (Q6 every hour, Q7 every two-hour window, TRACK per occupant), what
     share of answers carry a flag, and how many answers that rest on a wrong
-    identification are flagged.
+    identification are flagged. Answers are also scored against ground truth
+(an answer is wrong when it differs from the same query over the identified
+events with their true occupants): flag precision and recall overall, per
+query type and per flag, and for pointer_based on its own (per TRACK pointer
+segment and per Q6 pointer answer).
 """
 import argparse
 import json
 import statistics
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -149,52 +154,120 @@ def measure_flags():
     return {
         "identifications": {**summary(identified), "by_mode": {m: summary(rs) for m, rs in sorted(by_mode.items())},
                             "per_flag": per_flag},
-        "answers": measure_answer_flags(wrong_ids),
+        "answers": measure_answer_flags(wrong_ids, truth),
     }
 
 
-def measure_answer_flags(wrong_ids):
+def _ratio(a, b):
+    return round(a / b, 4) if b else None
+
+
+def _scores(answers, flagged, wrong, wrong_flagged):
+    """Flag precision (flagged answers that are wrong) and recall (wrong answers that are flagged)."""
+    return {"answers": answers, "flagged": flagged, "share_flagged": _ratio(flagged, answers),
+            "wrong": wrong, "wrong_and_flagged": wrong_flagged,
+            "precision": _ratio(wrong_flagged, flagged), "recall": _ratio(wrong_flagged, wrong)}
+
+
+def _truth_engine(engine, truth):
+    """The same identified events, each with its true occupant: what the answers should have been."""
+    events = [replace(e, occupant_id=truth[e.event_id]) for e in engine.events]
+    return QueryEngine(events, engine.registered, enforce_rbac=False, explain=False)
+
+
+def _seen_in(engine, occupant, building, start, end):
+    return any(e.occupant_id == occupant and e.building == building and start <= e.timestamp <= end
+               for e in engine.events)
+
+
+def measure_answer_flags(wrong_ids, truth):
+    """Answer-level flags against ground truth.
+
+    An answer is wrong when it differs from the same query over the identified
+    events with their true occupants: Q6 compares building and zone (building
+    only for a pointer answer, which has no zone), Q7 the count, TRACK the
+    waypoints. A TRACK answer counts as flagged when the answer or any of its
+    pointer segments carries a flag. Pointer segments are also scored on their
+    own: a segment is wrong when the occupant was truly never seen in that
+    building between its entry and exit.
+    """
     engine = QueryEngine.from_paths(enforce_rbac=False)
+    true = _truth_engine(engine, truth)
     occupants = sorted({e.occupant_id for e in engine.events})
+    windows = (("08:00:00", "10:00:00"), ("10:00:00", "12:00:00"), ("12:00:00", "14:00:00"), ("14:00:00", "16:00:00"))
+
+    def q6_key(res, from_pointer):
+        a = res.answer
+        return None if a is None else (a["building"],) if from_pointer else (a["building"], a["zone"])
+
+    def track_key(result):
+        return [(w["time"], w["building"], w["zone"]) for w in result.get("waypoints", [])]
+
     grids = {
-        "Q6": [(lambda o, t=t: engine.Q6(o, t)) for t in (f"{h:02d}:00:00" for h in range(9, 18))],
-        "Q7": [(lambda o, a=a, b=b: engine.Q7(o, a, b))
-               for a, b in (("08:00:00", "10:00:00"), ("10:00:00", "12:00:00"),
-                            ("12:00:00", "14:00:00"), ("14:00:00", "16:00:00"))],
-        "TRACK": [lambda o: engine.track_explained(o)],
+        "Q6": [(lambda o, t=t: engine.Q6(o, t), lambda o, ptr, t=t: q6_key(true.Q6(o, t), ptr), q6_key)
+               for t in (f"{h:02d}:00:00" for h in range(9, 18))],
+        "Q7": [(lambda o, a=a, b=b: engine.Q7(o, a, b), lambda o, ptr, a=a, b=b: true.Q7(o, a, b).answer,
+                lambda res, ptr: res.answer) for a, b in windows],
+        "TRACK": [(engine.track_explained, lambda o, ptr: track_key(true.track(o)), lambda res, ptr: track_key(res[0]))],
     }
-    out, overall = {}, {"answers": 0, "flagged": 0}
+    out, overall = {}, [0, 0, 0, 0]
+    per_flag = {f: [0, 0] for f in FLAG_ORDER}              # answers carrying the flag, of them wrong
+    segments = [0, 0, 0, 0]
+    q6_pointer = [0, 0]
     for qid, calls in grids.items():
-        answers = flagged = id_flagged = on_wrong = on_wrong_flagged = 0
+        counts = [0, 0, 0, 0]
+        id_flagged = on_wrong = on_wrong_flagged = 0
         flag_totals = {}
         for o in occupants:
-            for call in calls:
-                _, expl = _payload(call(o))
+            for call, true_key, key in calls:
+                res = call(o)
+                _, expl = _payload(res)
                 relied = [e for e in expl.evidence if e.role != "nearest_outside_window" and e.event_id]
-                if not relied and expl.pointer_used is None:
+                from_pointer = qid == "Q6" and expl.pointer_used is not None
+                if not relied and not from_pointer:
                     continue                       # nothing answered (no sighting yet)
-                answers += 1
-                flagged += bool(expl.uncertainty)
-                id_flagged += any(f in FLAG_ORDER[:4] for f in expl.uncertainty)
-                for f in expl.uncertainty:
+                flags = set(expl.uncertainty)
+                for seg in (expl.pointer_used or {}).get("segments", []):
+                    flags |= set(seg["uncertainty"])
+                    seg_wrong = not _seen_in(true, o, seg["current_building"], seg["entry_time"],
+                                             seg["exit_time"] or "23:59:59")
+                    seg_flagged = "pointer_based" in seg["uncertainty"]
+                    segments[0] += 1
+                    segments[1] += seg_flagged
+                    segments[2] += seg_wrong
+                    segments[3] += seg_flagged and seg_wrong
+                wrong = key(res, from_pointer) != true_key(o, from_pointer)
+                if from_pointer:
+                    q6_pointer[0] += 1
+                    q6_pointer[1] += wrong
+                for c, v in zip(range(4), (1, bool(flags), wrong, bool(flags) and wrong)):
+                    counts[c] += v
+                id_flagged += bool(flags & set(FLAG_ORDER[:4]))
+                for f in flags:
                     flag_totals[f] = flag_totals.get(f, 0) + 1
+                    per_flag[f][0] += 1
+                    per_flag[f][1] += wrong
                 if any(e.event_id in wrong_ids for e in relied):
                     on_wrong += 1
-                    on_wrong_flagged += bool(expl.uncertainty)
+                    on_wrong_flagged += bool(flags)
         out[qid] = {
-            "answers": answers,
-            "flagged": flagged,
-            "share_flagged": round(flagged / answers, 4) if answers else None,
-            "share_flagged_by_identification_flags": round(id_flagged / answers, 4) if answers else None,
+            **_scores(*counts),
+            "share_flagged_by_identification_flags": _ratio(id_flagged, counts[0]),
             "answers_resting_on_a_wrong_identification": on_wrong,
             "of_those_flagged": on_wrong_flagged,
             "flag_counts": {f: flag_totals[f] for f in FLAG_ORDER if f in flag_totals},
         }
-        overall["answers"] += answers
-        overall["flagged"] += flagged
-    overall["share_flagged"] = round(overall["flagged"] / overall["answers"], 4) if overall["answers"] else None
+        overall = [a + b for a, b in zip(overall, counts)]
     return {"grid": "Q6 at every hour 09:00-17:00, Q7 over four 2-hour windows, TRACK, for every identified occupant",
-            "per_query": out, "overall": overall}
+            "wrong_means": "differs from the same query over the identified events with their true occupant ids",
+            "per_query": out, "overall": _scores(*overall),
+            "per_flag_precision": {f: {"answers": n, "wrong": w, "precision": _ratio(w, n)}
+                                   for f, (n, w) in per_flag.items() if n},
+            "pointer_based": {
+                "track_segments": _scores(*segments),
+                "q6_pointer_answers": {"answers": q6_pointer[0], "wrong": q6_pointer[1],
+                                       "precision": _ratio(q6_pointer[1], q6_pointer[0])},
+            }}
 
 
 def main(argv=None):

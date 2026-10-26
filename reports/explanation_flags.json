@@ -65,11 +65,16 @@
   },
   "answers": {
     "grid": "Q6 at every hour 09:00-17:00, Q7 over four 2-hour windows, TRACK, for every identified occupant",
+    "wrong_means": "differs from the same query over the identified events with their true occupant ids",
     "per_query": {
       "Q6": {
         "answers": 4449,
         "flagged": 579,
         "share_flagged": 0.1301,
+        "wrong": 155,
+        "wrong_and_flagged": 101,
+        "precision": 0.1744,
+        "recall": 0.6516,
         "share_flagged_by_identification_flags": 0.0402,
         "answers_resting_on_a_wrong_identification": 74,
         "of_those_flagged": 65,
@@ -86,6 +91,10 @@
         "answers": 1998,
         "flagged": 371,
         "share_flagged": 0.1857,
+        "wrong": 90,
+        "wrong_and_flagged": 51,
+        "precision": 0.1375,
+        "recall": 0.5667,
         "share_flagged_by_identification_flags": 0.1857,
         "answers_resting_on_a_wrong_identification": 175,
         "of_those_flagged": 153,
@@ -98,24 +107,80 @@
       },
       "TRACK": {
         "answers": 500,
-        "flagged": 496,
-        "share_flagged": 0.992,
+        "flagged": 255,
+        "share_flagged": 0.51,
+        "wrong": 244,
+        "wrong_and_flagged": 169,
+        "precision": 0.6627,
+        "recall": 0.6926,
         "share_flagged_by_identification_flags": 0.51,
         "answers_resting_on_a_wrong_identification": 136,
-        "of_those_flagged": 136,
+        "of_those_flagged": 122,
         "flag_counts": {
           "vote_winner_not_nearest": 40,
           "low_votes": 108,
           "verified_by_lower_ranked_building": 94,
           "narrow_routing_margin": 181,
-          "pointer_based": 494
+          "pointer_based": 10
         }
       }
     },
     "overall": {
       "answers": 6947,
-      "flagged": 1446,
-      "share_flagged": 0.2081
+      "flagged": 1205,
+      "share_flagged": 0.1735,
+      "wrong": 489,
+      "wrong_and_flagged": 321,
+      "precision": 0.2664,
+      "recall": 0.6564
+    },
+    "per_flag_precision": {
+      "vote_winner_not_nearest": {
+        "answers": 107,
+        "wrong": 80,
+        "precision": 0.7477
+      },
+      "low_votes": {
+        "answers": 343,
+        "wrong": 147,
+        "precision": 0.4286
+      },
+      "verified_by_lower_ranked_building": {
+        "answers": 255,
+        "wrong": 93,
+        "precision": 0.3647
+      },
+      "narrow_routing_margin": {
+        "answers": 507,
+        "wrong": 161,
+        "precision": 0.3176
+      },
+      "stale_observation": {
+        "answers": 415,
+        "wrong": 45,
+        "precision": 0.1084
+      },
+      "pointer_based": {
+        "answers": 34,
+        "wrong": 28,
+        "precision": 0.8235
+      }
+    },
+    "pointer_based": {
+      "track_segments": {
+        "answers": 517,
+        "flagged": 10,
+        "share_flagged": 0.0193,
+        "wrong": 21,
+        "wrong_and_flagged": 10,
+        "precision": 1.0,
+        "recall": 0.4762
+      },
+      "q6_pointer_answers": {
+        "answers": 24,
+        "wrong": 18,
+        "precision": 0.75
+      }
     }
   }
 }

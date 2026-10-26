@@ -296,7 +296,7 @@ Every answer comes with the reasoning behind it (`pipeline/explain.py`). Each qu
 | `verified_by_lower_ranked_building` | the confirming building was not first on the shortlist |
 | `narrow_routing_margin` | the Bloom score gap between the top two buildings is below 5 |
 | `stale_observation` | a point-in-time answer rests on a sighting more than 60 minutes old |
-| `pointer_based` | the answer comes from a visit pointer (about 83% precise) |
+| `pointer_based` | a value comes from a visit pointer with no identified sighting behind it: Q6's pointer fast path, or a TRACK pointer segment with no sighting inside it (raised on that segment, not on the whole TRACK answer) |
 
 Explanations are redacted to the caller's disclosure level before they leave the engine (`redact()`), so they never show more than the answer: nothing at L0, only an availability sentence at L1, the current position with sector and hour-rounded time and no routing details at L2, exact zone without history at L3, everything at L4 (minus a visitor's history outside the Dean's building). Aggregates and zone queries show per-person evidence only to an investigating Dean; others get counts. `withheld` lists what was removed and why. `--explain` on the CLI prints the access decision and then the reasoning; `POST /api/query` returns it as `explanation`; the dashboard shows it under the answer.
 
@@ -312,7 +312,7 @@ $ python manage.py query --caller 0000362 --target 0000102 --query Q6 --purpose 
     Withheld:    event IDs; exact times: rounded to the hour; exact zone: functional sector only; identification details (votes, shortlist, verifying building, margins): the routing ones reveal the home building
 ```
 
-`python paper/explain_overhead.py` measures the cost (`reports/explanation_overhead.json`) and how well the flags catch wrong identifications against ground truth (`reports/explanation_flags.json`).
+`python paper/explain_overhead.py` measures the cost (`reports/explanation_overhead.json`) and how well the flags catch wrong identifications and wrong answers against ground truth (`reports/explanation_flags.json`: flag precision and recall overall, per query type, per flag, and per pointer segment).
 
 ---
 

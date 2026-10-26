@@ -274,6 +274,20 @@ def test_pointer_answer_is_flagged(tmp_path):
     assert expl.uncertainty == ["pointer_based"]
 
 
+def test_track_flags_only_pointer_segments_without_a_sighting(tmp_path):
+    eng = QueryEngine(_events(), REGISTRY, enforce_rbac=False, nodes_dir=tmp_path)
+    with PointerStore(tmp_path / "building_1" / "state") as pointers:
+        pointers.mint("A", "building_2", "10:10:00")        # A is seen in building_2 at 10:10 and 10:20
+        pointers.clear("A", "11:00:00")
+        pointers.mint("A", "building_3", "12:00:00")        # never seen in building_3
+    expl = eng.track_explained("A")[1]
+    segments = {s["current_building"]: s for s in expl.pointer_used["segments"]}
+    assert (segments["building_2"]["sightings"], segments["building_2"]["uncertainty"]) == (3, [])
+    assert (segments["building_3"]["sightings"], segments["building_3"]["uncertainty"]) == (0, ["pointer_based"])
+    assert expl.pointer_used["unbacked"] == 1
+    assert "pointer_based" not in expl.uncertainty           # on the segment, not the whole answer
+
+
 def test_old_result_files_without_provenance_raise_no_flags():
     old = IdentifiedEvent("X1", "09:00:00", "building_1", "z3", "A", "building_1", 1.0, None, "local_registered_gallery")
     eng = QueryEngine([old], REGISTRY, enforce_rbac=False)

@@ -15,7 +15,12 @@ An explanation holds:
     the query's own parameters
   - ``uncertainty``: flags computed from provenance and timing (below)
   - ``withheld``: what redaction removed, and why
-  - ``pointer_used``: the visit pointer, when one answered the query
+  - ``pointer_used``: the visit pointer, when one answered the query; for
+    TRACK, the pointer history, each segment with its own flags
+
+``pointer_based`` is raised only for a value that comes from a pointer and
+is not backed by an identified event: the Q6 fast-path answer, or a TRACK
+segment with no identified sighting in it (on that segment, not the answer).
 
 Uncertainty never uses ``identity_probability``: Definition 3.3 gives ~1.0
 for most misidentifications too, so it is not a confidence signal.
@@ -141,7 +146,9 @@ def uncertainty_flags(evidence: list[EvidenceItem], *, at_time: str | None = Non
     Context-only items (``nearest_outside_window``) do not carry the answer
     and raise no flag. ``at_time`` marks a point-in-time answer: any
     last-before-t sighting (or the pointer's entry) older than
-    STALE_OBSERVATION_SECONDS raises stale_observation.
+    STALE_OBSERVATION_SECONDS raises stale_observation. ``pointer_used`` is
+    the pointer the answer was read from, with no identified event behind
+    it; it raises pointer_based.
     """
     flags: set[str] = set()
     for item in evidence:
@@ -304,7 +311,8 @@ def redact(explanation: Explanation | None, decision, *, caller_building: str | 
 def _pointer_in_building(pointer: dict, building: str | None) -> dict | None:
     if "segments" in pointer:          # TRACK: keep only visits to this building
         segments = [s for s in pointer["segments"] if s["current_building"] == building]
-        return {"visits": len(segments), "segments": segments}
+        return {"visits": len(segments), "unbacked": sum(bool(s.get("uncertainty")) for s in segments),
+                "segments": segments}
     return pointer if pointer.get("current_building") == building else None
 
 
@@ -350,8 +358,15 @@ def format_explanation(redacted: dict, max_evidence: int = 12) -> list[str]:
             lines.append(f"      ... and {len(evidence) - max_evidence} more")
     elif "evidence" in redacted:
         lines.append("    Evidence:    none shown")
-    if redacted.get("pointer_used"):
-        lines.append(f"    Pointer:     {redacted['pointer_used']}")
+    pointer = redacted.get("pointer_used")
+    if pointer and "segments" in pointer:
+        lines.append(f"    Pointers:    {len(pointer['segments'])} visit segment(s)")
+        for seg in pointer["segments"][:max_evidence]:
+            flags = ", ".join(seg.get("uncertainty") or []) or "backed by sightings"
+            lines.append(f"      - {seg['current_building']} {seg['entry_time']}-{seg['exit_time'] or 'open'} "
+                         f"({seg['status']}, {seg.get('sightings', 0)} sighting(s)) -- {flags}")
+    elif pointer:
+        lines.append(f"    Pointer:     {pointer}")
     if redacted.get("details"):
         lines.append(f"    Details:     {redacted['details']}")
     if redacted.get("absence"):

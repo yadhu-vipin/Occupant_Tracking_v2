@@ -313,14 +313,15 @@ class QueryEngine:
 
     def _explanation(self, query_id: str, rule: str, evidence: list[EvidenceItem] | None = None, *,
                      absence: str | None = None, at_time: str | None = None, pointer_used: dict | None = None,
-                     details: dict | None = None) -> Explanation | None:
+                     answered_by_pointer: bool = False, details: dict | None = None) -> Explanation | None:
+        """``answered_by_pointer``: the answer was read from ``pointer_used`` with no
+        identified event behind it (Q6's fast path), which raises pointer_based."""
         if not self.explain:
             return None
         evidence = evidence or []
+        flags = uncertainty_flags(evidence, at_time=at_time, pointer_used=pointer_used if answered_by_pointer else None)
         return Explanation(query_id=query_id, query_class=QUERY_CLASS[query_id], rule=rule, evidence=evidence,
-                           absence=absence, uncertainty=uncertainty_flags(evidence, at_time=at_time,
-                                                                          pointer_used=pointer_used),
-                           pointer_used=pointer_used, details=details or {})
+                           absence=absence, uncertainty=flags, pointer_used=pointer_used, details=details or {})
 
     def _unknown_building(self, query_id: str, query_text: str, parameters: dict, building_id: str) -> QueryResult:
         return QueryResult(query_id=query_id, query_text=query_text, parameters=parameters,
@@ -642,7 +643,7 @@ class QueryEngine:
         explanation = self._explanation(
             "Q6", "location at t is the building of the open visit pointer minted at or before t "
                   "(answered without scanning the event log; pointers are about 83% precise)",
-            at_time=at_time,
+            at_time=at_time, answered_by_pointer=True,
             pointer_used={"visit_id": pointer["visit_id"], "current_building": pointer["current_building"],
                           "entry_time": pointer["entry_time"], "status": pointer["status"]})
         return QueryResult(query_id="Q6", query_text=query_text, parameters=parameters, answer=answer,
@@ -696,7 +697,14 @@ class QueryEngine:
         return self.track_explained(occupant_id)[0]
 
     def track_explained(self, occupant_id: str) -> tuple[dict, Explanation | None]:
-        """``track()`` plus its explanation, built from the same history."""
+        """``track()`` plus its explanation, built from the same history.
+
+        Each pointer segment in the explanation counts the identified sightings
+        inside it (same building, entry_time <= t <= exit_time); a segment with
+        none exists only in pointer history and carries pointer_based itself.
+        The waypoints are all identified sightings, so the answer as a whole
+        does not.
+        """
         rule = ("the trajectory is every identified sighting in time order, plus the visit-pointer "
                 "history recorded at the occupant's home building")
         history = sorted((e for e in self.events if e.occupant_id == occupant_id), key=lambda e: e.timestamp)
@@ -725,18 +733,23 @@ class QueryEngine:
         pointers = result.get("pointer_history") or []
         closed = [p for p in pointers if p["status"] == "CLOSED"]
 
-        def in_closed_visit(e: IdentifiedEvent) -> bool:
-            return any(p["current_building"] == e.building and p["entry_time"] <= e.timestamp
-                       <= (p["exit_time"] or DEFAULT_AT_TIME) for p in closed)
+        def in_visit(e: IdentifiedEvent, p: dict) -> bool:
+            return p["current_building"] == e.building and p["entry_time"] <= e.timestamp <= (
+                p["exit_time"] or DEFAULT_AT_TIME)
 
-        items = [EvidenceItem.from_event(e, "supporting", note="closed pointer segment" if in_closed_visit(e) else None)
+        items = [EvidenceItem.from_event(e, "supporting", note="closed pointer segment"
+                                         if any(in_visit(e, p) for p in closed) else None)
                  for e in history]
         pointer_used = None
         if pointers:
+            segments = []
+            for p in pointers:
+                sightings = sum(in_visit(e, p) for e in history)
+                segments.append({"visit_id": p["visit_id"], "current_building": p["current_building"],
+                                 "entry_time": p["entry_time"], "exit_time": p["exit_time"], "status": p["status"],
+                                 "sightings": sightings, "uncertainty": [] if sightings else ["pointer_based"]})
             pointer_used = {"visits": len(pointers), "closed": len(closed), "open": len(pointers) - len(closed),
-                            "segments": [{"visit_id": p["visit_id"], "current_building": p["current_building"],
-                                          "entry_time": p["entry_time"], "exit_time": p["exit_time"],
-                                          "status": p["status"]} for p in pointers]}
+                            "unbacked": sum(not s["sightings"] for s in segments), "segments": segments}
         return result, self._explanation("TRACK", rule, items, pointer_used=pointer_used)
 
     # ─── Q8: At what time did occupant o visit zone z for the first time? ─
