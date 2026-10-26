@@ -147,19 +147,30 @@ CASES = [
     ("Q11", lambda e: e.Q11("A", "07:00:00", "07:30:00"), {}, "empty"),
     ("Q12", lambda e: e.Q12("z1", "09:00:00", "09:10:00", "building_1"), {}, "yes"),
     ("Q12", lambda e: e.Q12("z8", "13:00:00", "14:00:00", "building_1"), {}, "yes"),     # carry-in only
+    ("Q12", lambda e: e.Q12("z5", "09:00:00", "09:20:00", "building_1"), {}, "no"),      # sightings, none in z5
     ("Q12", lambda e: e.Q12("z5", "08:00:00", "18:00:00", "building_2"), {}, "empty"),
     # whole history
     ("Q5", lambda e: e.Q5("B", "building_1"), {}, "yes"),
     ("Q5", lambda e: e.Q5("A", "building_1"), {}, "no"),
     ("Q5", lambda e: e.Q5("C", "building_2"), {}, "empty"),
     ("Q8", lambda e: e.Q8("A", "z1", "building_1"), {}, "yes"),
-    ("Q8", lambda e: e.Q8("A", "z5"), {}, "empty"),
+    ("Q8", lambda e: e.Q8("A", "z5"), {}, "no"),           # a history, never in z5
+    ("Q8", lambda e: e.Q8("C", "z1"), {}, "empty"),        # no history at all
     ("Q9", lambda e: e.Q9("A", "z1"), {}, "yes"),
     ("Q9", lambda e: e.Q9("B", "z8"), {}, "yes"),          # stay never ended: 30 s floor
-    ("Q9", lambda e: e.Q9("A", "z5"), {}, "empty"),
+    ("Q9", lambda e: e.Q9("A", "z5"), {}, "no"),
+    ("Q9", lambda e: e.Q9("C", "z1"), {}, "empty"),
     ("Q13", lambda e: e.Q13("z1", "building_1"), {}, "yes"),
-    ("Q13", lambda e: e.Q13("z5", "building_2"), {}, "empty"),
+    ("Q13", lambda e: e.Q13("z5", "building_2"), {}, "no"),       # building_2 has sightings, none in z5
+    ("Q13", lambda e: e.Q13("z1", "building_3"), {}, "empty"),    # building_3 has none
 ]
+
+
+def test_every_query_class_has_a_yes_a_no_and_an_empty_case():
+    from pipeline.explain import QUERY_CLASS, QUERY_CLASSES
+    for query_class in QUERY_CLASSES:
+        cases = {case for qid, _, _, case in CASES if QUERY_CLASS[qid] == query_class}
+        assert cases == {"yes", "no", "empty"}, (query_class, cases)
 
 
 @pytest.mark.parametrize("qid,call,params,case", CASES, ids=[f"{c[0]}-{c[3]}-{i}" for i, c in enumerate(CASES)])
