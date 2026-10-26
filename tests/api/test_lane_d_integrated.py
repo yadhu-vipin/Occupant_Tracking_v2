@@ -38,12 +38,10 @@ def test_page_and_assets_are_served_in_integrated_mode():
     assert client.get("/lane-d/static/style.css").status_code == 200
 
 
-def test_lane_d_is_the_front_page_and_the_console_is_opt_in(monkeypatch):
+def test_lane_d_is_the_front_page():
     r = client.get("/")
     assert 'content="integrated"' in r.text and "Command Center" not in r.text
-    assert "Command Center" in client.get("/console").text          # the older console stays reachable
-    monkeypatch.setenv("DSTS_DEFAULT_UI", "console")
-    assert "Command Center" in client.get("/").text
+    assert client.get("/console").status_code == 404                # the old console is gone
 
 
 # ---------------------------------------------------------------- authentication

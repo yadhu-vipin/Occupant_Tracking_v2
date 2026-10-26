@@ -27,10 +27,10 @@ So **replacing the repository's UI with the zip's would have deleted about 2,000
 
 ```
                          ┌───────────────────────────── real back end (dsts/api/server.py) ───────────────────────────┐
- console UI   (/)        │ tokens → building scope → Layer 1 → Layer 2 → query engine → disclosure  (runs/seed_XX data) │
- dsts/api/static/ ───────┤                                                                                              │
+ Lane D UI    (/)        │ tokens → building scope → Layer 1 → Layer 2 → query engine → disclosure  (runs/seed_XX data) │
+                         │                                                                                              │
                          │   dsts/api/lane_d.py  (adapter: /lane-d/api/*  →  the same helpers, same RBAC)               │
- Lane D UI    (/lane-d/) │                                                                                              │
+ (also /lane-d/)       │                                                                                              │
  dsts/api/static_lane_d/ ┴──────────────────────────────────────────────────────────────────────────────────────────────┘
 
  Lane D UI    (:8001/)  ── dsts/api/standalone.py ── dsts/orchestration (Campus, Building) ── dsts/testing.py (fakes)
@@ -179,12 +179,11 @@ Done by patching the original text, so the rest of the page is exactly the zip's
 ## 6. Running it
 
 ```bash
-# the real system, with the console at / and the Lane D dashboard at /lane-d/
+# the real system, Lane D dashboard at / (and /lane-d/)
 python manage.py run --seeds 42 --days 1        # once: builds runs/seed_42 (about a minute)
 DSTS_DEMO_MODE=1 python manage.py serve          # PowerShell: $env:DSTS_DEMO_MODE="1"; python manage.py serve
-#   http://127.0.0.1:8000/            console
-#   http://127.0.0.1:8000/lane-d/     Lane D dashboard on the real data
-DSTS_DEMO_MODE=1 python manage.py serve --ui lane_d      # the Lane D dashboard becomes the front page (/console still works)
+#   http://127.0.0.1:8000/            Lane D dashboard on the real data (also /lane-d/)
+DSTS_DEMO_MODE=1 python manage.py serve
 
 # the offline fallback (no corpus, no run folder, no login)
 python manage.py standalone                      # http://127.0.0.1:8001/
@@ -212,13 +211,13 @@ Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Build
   * Analyst, Q6 on the rostered student at noon → `RULE_B_ROSTER_STUDENT`, L2; at 23:59 → `RULE_B_OFFICE_HOURS_DENIED`; investigation purpose → HTTP 403.
   * Self, Q6 on a peer → `RULE_C_PEER_STALKING_DENIED`; on themselves → `RULE_SELF_LOOKUP`, L4; on a teacher → L1 "Away from Cabin".
   * Event Generator (30 events), B1 → B5 demo (20 events) and Reset work from the page; the Security tab lists the Dean's and own decisions.
-* **Unchanged on purpose:** the console at `/` and every one of its tests; `paper/` and its experiments.
+* **Unchanged on purpose:** the backend API and its tests (the old console UI was later removed); `paper/` and its experiments.
 
 ---
 
 ## 8. Limits and choices to be aware of
 
-* **The Lane D dashboard is the front page.** `/` serves it (also at `/lane-d/`). The older console is kept at `/console`; `--ui console` / `DSTS_DEFAULT_UI=console` makes it the front page again.
+* **The Lane D dashboard is the only UI.** `/` serves it (also at `/lane-d/`). The earlier console (`dsts/api/static/`, `/console`, `DSTS_DEFAULT_UI`) was removed.
 * **Role mapping is a demo mapping.** Officer / Analyst / Self are not the zip's old row filters any more; they are a Dean, a Teacher and a Student of the run. The zip's `dsts/security/access.py` (officer / analyst / self filters) is only used by the standalone demo.
 * **The standalone demo is not the project's security.** Its HMAC transport and role filters demonstrate behaviour on fakes; the real layers are `access_control/` and `secure_transfer/` (README §7–8).
 * **Persona login needs `DSTS_DEMO_MODE=1`**, like the console. With it off, `/lane-d/` shows the server's 403 message instead of data.
@@ -232,4 +231,4 @@ Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Build
 
 Created: `dsts/presence.py`, `dsts/api/lane_d.py`, `dsts/api/standalone.py`, `dsts/api/static_lane_d/{index.html,app.js,style.css}`, `dsts/contracts.py`, `dsts/testing.py`, `dsts/events/{__init__,mobility}.py`, `dsts/orchestration/{__init__,building,campus}.py`, `dsts/security/{__init__,access,transport}.py`, `config/campus.yaml`, `scripts/terminal_walk.py`, `scripts/run_demo.sh`, `tests/standalone/{test_lane_d,test_standalone_api}.py`, `tests/api/{test_lane_d_integrated,test_lane_d_unit}.py`, `INTEGRATION.md`.
 
-Modified: `dsts/api/server.py` (console route + `/console`, `DSTS_DEFAULT_UI`, mounts the adapter, audits Layer 2), `access_control/authorize.py` (`audit_policy_decision`), `pipeline/query.py` (audits Layer 2 in the CLI), `manage.py` (`serve --ui`, `standalone`, `walk`), `tests/conftest.py` (the new run-dependent module), `tests/access_control/test_access_hardening.py` (audit test), `.claude/launch.json` (standalone preview), `README.md`.
+Modified: `dsts/api/server.py` (front page is the Lane D page, old console removed, mounts the adapter, audits Layer 2), `access_control/authorize.py` (`audit_policy_decision`), `pipeline/query.py` (audits Layer 2 in the CLI), `manage.py` (`standalone`, `walk`), `tests/conftest.py` (the new run-dependent module), `tests/access_control/test_access_hardening.py` (audit test), `.claude/launch.json` (standalone preview), `README.md`.

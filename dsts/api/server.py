@@ -35,8 +35,7 @@ from fastapi import (
     Depends,
     status,
 )
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -91,7 +90,6 @@ from access_control.authorize import (
 
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent.parent
-STATIC_DIR = BASE_DIR / "static"
 NODES_DIR = run_paths().nodes_dir
 
 app = FastAPI(
@@ -372,29 +370,10 @@ def _compute_real_occupancy_locked(engine: QueryEngine) -> tuple[Dict[str, List[
 # STATIC & DASHBOARD
 # ================================================================
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-
-def _console_page() -> FileResponse:
-    index_file = STATIC_DIR / "index.html"
-    if not index_file.exists():
-        raise HTTPException(status_code=500, detail="Dashboard index.html is missing.")
-    return FileResponse(str(index_file))
-
-
 @app.get("/", include_in_schema=False)
 def index():
-    """The front page is the Lane D dashboard. ``DSTS_DEFAULT_UI=console`` brings the older Command Center console back
-    as the front page; either UI is always reachable at /lane-d/ and /console."""
-    if os.environ.get("DSTS_DEFAULT_UI", "").strip().lower() in ("console", "command_center"):
-        return _console_page()
+    """The front page is the Lane D dashboard (dsts/api/static_lane_d/, also served under /lane-d/)."""
     return HTMLResponse(_lane_d.render_index("integrated", "/lane-d/static"))
-
-
-@app.get("/console", include_in_schema=False)
-def console() -> FileResponse:
-    """The older Command Center console, always (the front page is the Lane D dashboard unless switched back)."""
-    return _console_page()
 
 
 # Brute-force protection for the credential login: per (client, occupant) and, more loosely, per occupant overall.
