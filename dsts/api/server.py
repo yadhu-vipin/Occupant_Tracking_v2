@@ -373,7 +373,7 @@ def _compute_real_occupancy_locked(engine: QueryEngine) -> tuple[Dict[str, List[
 @app.get("/", include_in_schema=False)
 def index():
     """The front page is the Lane D dashboard (dsts/api/static_lane_d/, also served under /lane-d/)."""
-    return HTMLResponse(_lane_d.render_index("integrated", "/lane-d/static"))
+    return HTMLResponse(_lane_d.render_index("integrated", "/lane-d/static"), headers={"Cache-Control": "no-store"})
 
 
 # Brute-force protection for the credential login: per (client, occupant) and, more loosely, per occupant overall.

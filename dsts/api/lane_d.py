@@ -63,7 +63,7 @@ def render_index(mode: str, static_url: str) -> str:
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
 def lane_d_index() -> HTMLResponse:
-    return HTMLResponse(render_index("integrated", f"{PREFIX}/static"))
+    return HTMLResponse(render_index("integrated", f"{PREFIX}/static"), headers={"Cache-Control": "no-store"})
 
 
 # ------------------------------------------------------------------ data views

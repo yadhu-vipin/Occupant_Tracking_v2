@@ -123,7 +123,7 @@ def index() -> HTMLResponse:
     # One dashboard, two back ends: the page learns from the mode placeholder whether it must log in (real server)
     # or call the open endpoints directly (this demo).
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(html.replace("__MODE__", "standalone").replace("__STATIC__", "/static"))
+    return HTMLResponse(html.replace("__MODE__", "standalone").replace("__STATIC__", "/static"), headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/layout")
