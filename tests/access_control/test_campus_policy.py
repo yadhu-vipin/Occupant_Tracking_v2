@@ -86,98 +86,36 @@ def test_self_query_exemption():
 
 
 def test_dean_matrix_rules():
-    """Dean has full_track/precise on staff & students under authorized investigation; current/zone on deans & visitors."""
-    ctx_inv = QueryContext(purpose=QueryPurpose.SECURITY_INVESTIGATION, authorized_investigation=True)
-    # Dean -> Teacher
-    d1 = evaluate_campus_query_policy("dean_01", "prof_smith", context=ctx_inv)
-    assert d1.permitted is True
-    assert d1.access == AccessScope.FULL_TRACK
-    assert d1.granularity == LocationGranularity.PRECISE
-
-    # Dean -> Student
-    d2 = evaluate_campus_query_policy("dean_01", "student_alice", context=ctx_inv)
-    assert d2.permitted is True
-    assert d2.access == AccessScope.FULL_TRACK
-    assert d2.granularity == LocationGranularity.PRECISE
-
-    # Dean -> Dean (peer)
-    d3 = evaluate_campus_query_policy("dean_01", "dean_02", target_role=CampusRole.DEAN, context=ctx_inv)
-    assert d3.permitted is True
-    assert d3.access == AccessScope.CURRENT
-    assert d3.granularity == LocationGranularity.ZONE
-
-    # Dean -> Visitor
-    d4 = evaluate_campus_query_policy("dean_01", "visitor_eve", context=ctx_inv)
-    assert d4.permitted is True
-    assert d4.access == AccessScope.CURRENT
-    assert d4.granularity == LocationGranularity.ZONE
+    """A Dean follows everything about their own campus teachers and students (no purpose needed) and other Deans;
+    visitors and other buildings people are closed."""
+    for target in ("prof_smith", "student_alice"):
+        d = evaluate_campus_query_policy("dean_01", target)
+        assert d.permitted is True and d.access == AccessScope.FULL_TRACK and d.granularity == LocationGranularity.PRECISE
+    d3 = evaluate_campus_query_policy("dean_01", "dean_02", target_role=CampusRole.DEAN)
+    assert d3.permitted is True and d3.level == DisclosureLevel.L4_HISTORICAL_TRACK
+    d4 = evaluate_campus_query_policy("dean_01", "visitor_eve")
+    assert d4.permitted is False and d4.level == DisclosureLevel.L0_NONE
 
 
 def test_teacher_matrix_and_roster_rules():
-    """Teacher sees peer teachers (current/zone), denied dean, students by default, and visitors."""
-    # Teacher -> Dean: CURRENT / ZONE (Dean availability check)
-    t1 = evaluate_campus_query_policy("prof_smith", "dean_01")
-    assert t1.permitted is True
-    assert t1.access == AccessScope.CURRENT
-    assert t1.granularity == LocationGranularity.ZONE
-
-    # Teacher -> Teacher (peer): current, zone
-    t2 = evaluate_campus_query_policy("prof_smith", "prof_jones")
-    assert t2.permitted is True
-    assert t2.access == AccessScope.CURRENT
-    assert t2.granularity == LocationGranularity.ZONE
-
-    # Teacher -> Student (general student on campus): CURRENT / ZONE
-    t3 = evaluate_campus_query_policy("prof_smith", "student_bob")
-    assert t3.permitted is True
-    assert t3.access == AccessScope.CURRENT
-    assert t3.granularity == LocationGranularity.ZONE
-    assert t3.level == DisclosureLevel.L2_CURRENT_ZONE
-
-    # Teacher -> Student (outside campus/office hours): DENIED (L0_NONE)
-    t3_off = evaluate_campus_query_policy("prof_smith", "student_bob", context=QueryContext(is_office_hours=False))
-    assert t3_off.permitted is False
-    assert t3_off.access == AccessScope.NONE
-    assert t3_off.level == DisclosureLevel.L0_NONE
-
-    # Teacher -> Student (IN roster): CURRENT / ZONE with roster notation
+    """A Teacher sees only the students assigned to them (class-teacher); nobody else, at any hour."""
     t4 = evaluate_campus_query_policy("prof_smith", "student_alice")
-    assert t4.permitted is True
-    assert t4.access == AccessScope.CURRENT
-    assert t4.granularity == LocationGranularity.ZONE
-    assert "roster" in t4.reason.lower()
-
-    # Teacher -> Visitor: NONE
-    t5 = evaluate_campus_query_policy("prof_smith", "visitor_eve")
-    assert t5.permitted is False
-    assert t5.access == AccessScope.NONE
+    assert t4.permitted is True and t4.level == DisclosureLevel.L4_HISTORICAL_TRACK
+    assert "assigned" in t4.reason.lower()
+    off_hours = evaluate_campus_query_policy("prof_smith", "student_alice", context=QueryContext(is_office_hours=False))
+    assert off_hours.permitted is True
+    for other in ("dean_01", "prof_jones", "student_bob", "visitor_eve"):
+        d = evaluate_campus_query_policy("prof_smith", other)
+        assert d.permitted is False and d.access == AccessScope.NONE, other
 
 
 def test_student_matrix_rules():
-    """Student can check teacher and dean presence/availability (L1), but denied peers and visitors."""
-    # Student -> Teacher: L1 presence (cabin availability)
-    s1 = evaluate_campus_query_policy("student_alice", "prof_smith")
-    assert s1.permitted is True
-    assert s1.level == DisclosureLevel.L1_PRESENCE
-    assert s1.access == AccessScope.PRESENCE
-
-    # Student -> Dean: L1 presence (office availability)
-    s2 = evaluate_campus_query_policy("student_alice", "dean_01")
-    assert s2.permitted is True
-    assert s2.level == DisclosureLevel.L1_PRESENCE
-    assert s2.access == AccessScope.PRESENCE
-
-    # Student -> Peer Student: L0 NONE (anti-stalking)
-    s3 = evaluate_campus_query_policy("student_alice", "student_bob")
-    assert s3.permitted is False
-    assert s3.level == DisclosureLevel.L0_NONE
-    assert s3.access == AccessScope.NONE
-
-    # Student -> Visitor: L0 NONE
-    s4 = evaluate_campus_query_policy("student_alice", "visitor_eve")
-    assert s4.permitted is False
-    assert s4.level == DisclosureLevel.L0_NONE
-    assert s4.access == AccessScope.NONE
+    """A Student sees where the teachers assigned to them are (L3, now); nobody else."""
+    s1 = evaluate_campus_query_policy("student_alice", "prof_smith")          # Smith roster lists Alice
+    assert s1.permitted is True and s1.level == DisclosureLevel.L3_PRECISE_CURRENT and s1.access == AccessScope.CURRENT
+    for other in ("prof_jones", "dean_01", "student_bob", "visitor_eve"):
+        d = evaluate_campus_query_policy("student_alice", other)
+        assert d.permitted is False and d.level == DisclosureLevel.L0_NONE, other
 
 
 def test_visitor_matrix_rules():
@@ -226,96 +164,58 @@ def test_presence_access_and_designated_office():
 # ─── 3. Contextual Purpose & ABAC Tests ──────────────────────────────────────
 
 def test_contextual_office_hours_gating():
-    """Student can only check teacher/dean availability during official office hours."""
-    # 1. During office hours: PERMITTED (L1_PRESENCE)
-    ctx_open = QueryContext(purpose=QueryPurpose.OFFICE_HOURS, is_office_hours=True)
-    d_open = evaluate_campus_query_policy("student_alice", "prof_smith", context=ctx_open)
-    assert d_open.permitted is True
-    assert d_open.level == DisclosureLevel.L1_PRESENCE
-
-    # 2. Outside office hours: DENIED (L0_NONE)
-    ctx_closed = QueryContext(purpose=QueryPurpose.OFFICE_HOURS, is_office_hours=False)
-    d_closed = evaluate_campus_query_policy("student_alice", "prof_smith", context=ctx_closed)
-    assert d_closed.permitted is False
-    assert d_closed.level == DisclosureLevel.L0_NONE
-    assert "restricted to official office/consultation hours" in d_closed.reason
+    """Assignments are not limited to office hours: a student own teacher is visible at any hour."""
+    for open_ in (True, False):
+        ctx = QueryContext(purpose=QueryPurpose.OFFICE_HOURS, is_office_hours=open_)
+        d = evaluate_campus_query_policy("student_alice", "prof_smith", context=ctx)
+        assert d.permitted is True and d.level == DisclosureLevel.L3_PRECISE_CURRENT
 
 
 def test_contextual_dean_routine_vs_investigation():
-    """Dean routine query is capped at L2; authorized investigation unlocks L4."""
-    # 1. Routine day-to-day general lookup: capped at L2_CURRENT_ZONE (anti-surveillance guard)
-    ctx_routine = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP, authorized_investigation=False)
-    d_routine = evaluate_campus_query_policy("dean_01", "student_alice", context=ctx_routine)
-    assert d_routine.permitted is True
-    assert d_routine.level == DisclosureLevel.L2_CURRENT_ZONE
-    assert "capped at L2_CURRENT_ZONE" in d_routine.reason
-
-    # 2. Formal security investigation with authorization: grants full L4_HISTORICAL_TRACK
-    ctx_investigation = QueryContext(purpose=QueryPurpose.SECURITY_INVESTIGATION, authorized_investigation=True)
-    d_investigation = evaluate_campus_query_policy("dean_01", "student_alice", context=ctx_investigation)
-    assert d_investigation.permitted is True
-    assert d_investigation.level == DisclosureLevel.L4_HISTORICAL_TRACK
-    assert "granted L4_HISTORICAL_TRACK" in d_investigation.reason
+    """The Dean rights over their own campus do not depend on the declared purpose."""
+    for purpose, inv in ((QueryPurpose.GENERAL_LOOKUP, False), (QueryPurpose.SECURITY_INVESTIGATION, True)):
+        d = evaluate_campus_query_policy("dean_01", "student_alice",
+                                         context=QueryContext(purpose=purpose, authorized_investigation=inv))
+        assert d.permitted is True and d.level == DisclosureLevel.L4_HISTORICAL_TRACK
+        assert d.policy_rule == "RULE_A_OWN_CAMPUS_FULL"
 
 
 def test_minimum_necessary_disclosure_principle():
     """Effective disclosure level is always min(requested_level, contextually_permitted_level)."""
-    # Teacher -> Dean has maximum ceiling L2_CURRENT_ZONE
-    # 1. Teacher requests L1 (least necessary): granted L1
-    d_l1 = evaluate_campus_query_policy("prof_smith", "dean_01", requested_level=DisclosureLevel.L1_PRESENCE)
-    assert d_l1.permitted is True
-    assert d_l1.level == DisclosureLevel.L1_PRESENCE
-
-    # 2. Teacher requests L4 (trajectory): capped by policy ceiling at L2
-    d_l4 = evaluate_campus_query_policy("prof_smith", "dean_01", requested_level=DisclosureLevel.L4_HISTORICAL_TRACK)
-    assert d_l4.permitted is True
-    assert d_l4.level == DisclosureLevel.L2_CURRENT_ZONE
+    d_l1 = evaluate_campus_query_policy("student_alice", "prof_smith", requested_level=DisclosureLevel.L1_PRESENCE)
+    assert d_l1.permitted is True and d_l1.level == DisclosureLevel.L1_PRESENCE
+    d_l4 = evaluate_campus_query_policy("student_alice", "prof_smith", requested_level=DisclosureLevel.L4_HISTORICAL_TRACK)
+    assert d_l4.permitted is True and d_l4.level == DisclosureLevel.L3_PRECISE_CURRENT        # capped at the ceiling
 
 
 # ─── 4. Building-Scoped Hierarchical RBAC (A > B > C) & Visitor Predicate ────
 
 def test_dean_building_scoped_local_occupant():
-    """Dean has full jurisdiction over occupants registered in their own building."""
+    """Dean has full jurisdiction over occupants registered in their own building, wherever they currently are."""
     register_occupant_building("dean_01", "B1")
     register_occupant_building("student_alice", "B1")
-
-    # Routine query on local student capped at L2
-    d_routine = evaluate_campus_query_policy("dean_01", "student_alice", purpose=QueryPurpose.GENERAL_LOOKUP)
-    assert d_routine.permitted is True
-    assert d_routine.level == DisclosureLevel.L2_CURRENT_ZONE
-    assert d_routine.policy_rule == "RULE_A_LOCAL_OCCUPANT_ROUTINE"
-    assert d_routine.visitor_status == "LOCAL_OCCUPANT"
-
-    # Authorized investigation on local student gets L4
-    ctx_inv = QueryContext(purpose=QueryPurpose.SECURITY_INVESTIGATION, authorized_investigation=True)
-    d_inv = evaluate_campus_query_policy("dean_01", "student_alice", context=ctx_inv)
-    assert d_inv.permitted is True
-    assert d_inv.level == DisclosureLevel.L4_HISTORICAL_TRACK
-    assert d_inv.policy_rule == "RULE_A_LOCAL_OCCUPANT_INVESTIGATION"
+    d = evaluate_campus_query_policy("dean_01", "student_alice", purpose=QueryPurpose.GENERAL_LOOKUP)
+    assert d.permitted is True and d.level == DisclosureLevel.L4_HISTORICAL_TRACK
+    assert d.policy_rule == "RULE_A_OWN_CAMPUS_FULL" and d.visitor_status == "LOCAL_OCCUPANT"
+    register_occupant_current_building("student_alice", "B2")                 # Alice is visiting B2: still the Dean's
+    d2 = evaluate_campus_query_policy("dean_01", "student_alice")
+    assert d2.level == DisclosureLevel.L4_HISTORICAL_TRACK and d2.policy_rule == "RULE_A_OWN_CAMPUS_FULL"
 
 
 def test_dean_visitor_predicate_in_own_building():
-    """
-    Dean can view visitors currently detected inside their building (Visitor Predicate),
-    with external history outside their building strictly redacted.
-    """
+    """The visitor predicate still holds, but a Dean gets nothing about another building people, visiting or not."""
     register_occupant_building("dean_01", "B1")
     register_occupant_building("student_carol", "B2")
     register_occupant_role("student_carol", CampusRole.STUDENT)
-
-    # Carol is detected in B1 (visiting B1)
-    register_occupant_current_building("student_carol", "B1")
+    register_occupant_current_building("student_carol", "B1")                 # Carol is detected in B1
 
     assert is_visitor("student_carol", "B1") is True
     assert is_visitor("student_carol", "B2") is False
 
     d_vis = evaluate_campus_query_policy("dean_01", "student_carol", purpose=QueryPurpose.GENERAL_LOOKUP)
-    assert d_vis.permitted is True
-    assert d_vis.level == DisclosureLevel.L2_CURRENT_ZONE
-    assert d_vis.policy_rule == "RULE_A_VISITOR_IN_OWN_BUILDING"
+    assert d_vis.permitted is False and d_vis.level == DisclosureLevel.L0_NONE
+    assert d_vis.policy_rule == "RULE_A_CROSS_BUILDING_B_C_DENIED"
     assert d_vis.visitor_status == "VISITOR_IN_BUILDING"
-    assert "history_outside_building" in d_vis.redacted_fields
-    assert "current_zone" in d_vis.exposed_fields
 
 
 def test_dean_cross_building_denied():
@@ -336,72 +236,49 @@ def test_dean_cross_building_denied():
 
 
 def test_dean_peer_dean_coarse_status():
-    """Dean can view peer Deans in other buildings at coarse administrative status."""
+    """A Dean can follow the movements of the Deans of other buildings."""
     register_occupant_building("dean_01", "B1")
     register_occupant_building("dean_02", "B2")
     register_occupant_role("dean_02", CampusRole.DEAN)
 
     d_peer = evaluate_campus_query_policy("dean_01", "dean_02", purpose=QueryPurpose.ADMIN_CONSULTATION)
-    assert d_peer.permitted is True
-    assert d_peer.level == DisclosureLevel.L2_CURRENT_ZONE
-    assert d_peer.policy_rule == "RULE_A_PEER_DEAN_COARSE"
-    assert "exact_zone" in d_peer.redacted_fields
-    assert "status" in d_peer.exposed_fields
+    assert d_peer.permitted is True and d_peer.level == DisclosureLevel.L4_HISTORICAL_TRACK
+    assert d_peer.policy_rule == "RULE_A_PEER_DEAN_TRACK"
 
 
 def test_teacher_building_scoping_and_roster():
-    """Teacher can view assigned students in own building; cross-building is strictly denied."""
-    register_occupant_building("prof_smith", "B1")
-    register_occupant_building("student_alice", "B1")  # in Smith's roster
-    register_occupant_building("student_bob", "B1")    # not in Smith's roster
-    register_occupant_building("student_carol", "B2")  # other building
+    """A teacher follows their assigned students in any building, and only them."""
+    register_occupant_building("student_carol", "B2")                         # assigned to Smith, but of another building
     register_occupant_role("student_carol", CampusRole.STUDENT)
+    register_class_roster("prof_smith", ["student_carol"])
+    register_occupant_building("student_dave", "B2")                          # not assigned
+    register_occupant_role("student_dave", CampusRole.STUDENT)
 
-    # 1. Assigned student in own building -> PERMITTED L2
     d_roster = evaluate_campus_query_policy("prof_smith", "student_alice")
-    assert d_roster.permitted is True
-    assert d_roster.level == DisclosureLevel.L2_CURRENT_ZONE
-    assert d_roster.policy_rule == "RULE_B_ROSTER_STUDENT"
-
-    # 2. Student in other building -> DENIED L0
-    d_cross = evaluate_campus_query_policy("prof_smith", "student_carol")
-    assert d_cross.permitted is False
-    assert d_cross.level == DisclosureLevel.L0_NONE
-    assert d_cross.policy_rule == "RULE_B_CROSS_BUILDING_DENIED"
-
-    # 3. Unassigned student with ACADEMIC_ROSTER purpose -> DENIED L0
-    ctx_roster = QueryContext(purpose=QueryPurpose.ACADEMIC_ROSTER)
-    d_unassigned = evaluate_campus_query_policy("prof_smith", "student_bob", context=ctx_roster)
-    assert d_unassigned.permitted is False
-    assert d_unassigned.level == DisclosureLevel.L0_NONE
-    assert d_unassigned.policy_rule == "RULE_B_UNASSIGNED_STUDENT_DENIED"
+    assert d_roster.level == DisclosureLevel.L4_HISTORICAL_TRACK and d_roster.policy_rule == "RULE_B_ROSTER_STUDENT"
+    d_far = evaluate_campus_query_policy("prof_smith", "student_carol")
+    assert d_far.level == DisclosureLevel.L4_HISTORICAL_TRACK and d_far.policy_rule == "RULE_B_ROSTER_STUDENT"
+    d_cross = evaluate_campus_query_policy("prof_smith", "student_dave")
+    assert d_cross.permitted is False and d_cross.policy_rule == "RULE_B_CROSS_BUILDING_DENIED"
+    d_unassigned = evaluate_campus_query_policy("prof_smith", "student_bob",
+                                                context=QueryContext(purpose=QueryPurpose.ACADEMIC_ROSTER))
+    assert d_unassigned.permitted is False and d_unassigned.policy_rule == "RULE_B_UNASSIGNED_DENIED"
 
 
 def test_student_building_scoping_and_anti_stalking():
-    """Student cannot track peers (anti-stalking) or query staff of other buildings."""
-    register_occupant_building("student_alice", "B1")
-    register_occupant_building("student_bob", "B1")
-    register_occupant_building("prof_smith", "B1")
+    """A student cannot track peers (anti-stalking); only teachers assigned to them, in any building."""
     register_occupant_building("prof_other", "B2")
     register_occupant_role("prof_other", CampusRole.TEACHER)
+    register_class_roster("prof_other", ["student_alice"])                    # assigned to Alice, in another building
 
-    # 1. Peer student -> hard DENY L0
     d_peer = evaluate_campus_query_policy("student_alice", "student_bob")
-    assert d_peer.permitted is False
-    assert d_peer.level == DisclosureLevel.L0_NONE
-    assert d_peer.policy_rule == "RULE_C_PEER_STALKING_DENIED"
-
-    # 2. Teacher in own building during office hours -> PERMITTED L1 (cabin presence)
+    assert d_peer.permitted is False and d_peer.policy_rule == "RULE_C_PEER_STALKING_DENIED"
     d_staff = evaluate_campus_query_policy("student_alice", "prof_smith")
-    assert d_staff.permitted is True
-    assert d_staff.level == DisclosureLevel.L1_PRESENCE
-    assert d_staff.policy_rule == "RULE_C_STAFF_COARSE_AVAILABILITY"
-
-    # 3. Teacher in other building -> DENIED L0
-    d_cross_staff = evaluate_campus_query_policy("student_alice", "prof_other")
-    assert d_cross_staff.permitted is False
-    assert d_cross_staff.level == DisclosureLevel.L0_NONE
-    assert d_cross_staff.policy_rule == "RULE_C_CROSS_BUILDING_DENIED"
+    assert d_staff.level == DisclosureLevel.L3_PRECISE_CURRENT and d_staff.policy_rule == "RULE_C_ASSIGNED_TEACHER"
+    d_far = evaluate_campus_query_policy("student_alice", "prof_other")
+    assert d_far.level == DisclosureLevel.L3_PRECISE_CURRENT and d_far.policy_rule == "RULE_C_ASSIGNED_TEACHER"
+    d_not = evaluate_campus_query_policy("student_bob", "prof_other")         # Bob is not on prof_other roster
+    assert d_not.permitted is False and d_not.policy_rule == "RULE_C_CROSS_BUILDING_DENIED"
 
 
 def test_policy_explainability_methods():

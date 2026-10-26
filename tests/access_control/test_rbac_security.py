@@ -134,14 +134,16 @@ def test_key_login_disabled_when_no_key_configured(monkeypatch):
 
 # ───────────────────────── cache can't bypass authorization ─────────────────────────
 
-def test_cache_does_not_upgrade_routine_dean_query_to_investigation_result():
+def test_cache_does_not_upgrade_a_denied_query_to_a_cached_result():
+    # the Dean follows their own campus whatever the purpose; a teacher not assigned to the target must never be
+    # served the Dean's cached answer
     base = {"query_type": "Q5", "target_id": TARGET5, "building_id": "building_5"}
-    audit = q(DEAN5, **base, purpose="audit").json()
-    assert audit["success"] and audit["decision"]["disclosure_level"] == "L4_HISTORICAL_TRACK"
-    routine = q(DEAN5, **base, purpose="general_lookup").json()
-    assert routine["success"] is False                                   # L2 only: trajectory refused
-    assert routine["decision"]["disclosure_level"] == "L2_CURRENT_ZONE"
-    assert "_cache_hit" not in routine
+    dean = q(DEAN5, **base, purpose="general_lookup").json()
+    assert dean["success"] and dean["decision"]["disclosure_level"] == "L4_HISTORICAL_TRACK"
+    unassigned = next(t for t in srv._roles if srv._roles[t] == "teacher" and get_occupant_building(t) == "building_5"
+                      and TARGET5 not in srv._rosters.get(t, []))
+    other = q(unassigned, **base).json()
+    assert other["success"] is False and "_cache_hit" not in other
 
 
 def test_cache_does_not_leak_across_buildings_for_deans():
@@ -188,12 +190,11 @@ def test_teacher_cannot_query_other_building_aggregates():
     assert r["success"] is False and r["decision"]["policy_rule"] == "RULE_B_CROSS_BUILDING_DENIED"
 
 
-def test_q1_evidence_only_for_dean_investigation():
+def test_q1_evidence_only_for_the_dean():
     body = {"query_type": "Q1", "building_id": "building_5", "time_t": "09:00:00"}
     assert q(STUDENT5, **body).json()["evidence"] == []
     assert q(TEACHER5, **body).json()["evidence"] == []
-    assert q(DEAN5, **body).json()["evidence"] == []                       # routine: aggregate only
-    assert len(q(DEAN5, **body, purpose="audit").json()["evidence"]) > 0   # investigation: IDs
+    assert len(q(DEAN5, **body).json()["evidence"]) > 0                    # the Dean of the building: IDs, any purpose
 
 
 # ───────────────────────── zone queries obey persona policy ─────────────────────────
@@ -204,14 +205,15 @@ def _zone_with_students():
     return "z1"
 
 
-def test_teacher_zone_queries_do_not_reveal_students():
+def test_teacher_zone_queries_only_reveal_assigned_students():
     zone = _zone_with_students()
+    assigned = set(srv._rosters.get(TEACHER5, [])) | {TEACHER5}       # plus themselves
     for qt in ("Q10", "Q12", "Q13"):
         r = q(TEACHER5, query_type=qt, zone=zone, building_id="building_5", time_t="17:00:00", t1="08:00:00", t2="18:00:00").json()
         assert r["success"] is True
         ids = r["answer"]["occupants"] if qt == "Q13" else r["answer"]
-        students = [o for o in ids if srv._roles.get(o) == "student"]
-        assert students == [], f"{qt} leaked student IDs to a teacher"
+        leaked = [o for o in ids if o not in assigned]
+        assert leaked == [], f"{qt} showed a teacher people who are not their assigned students"
 
 
 def test_student_zone_queries_denied():
@@ -225,14 +227,11 @@ def test_dean_zone_query_other_building_denied():
     assert r["success"] is False and r["decision"]["policy_rule"] == "RULE_A_CROSS_BUILDING_DENIED"
 
 
-def test_dean_routine_zone_query_is_counts_only_investigation_lists_ids():
-    routine = q(DEAN5, query_type="Q13", zone="z1", building_id="building_5").json()
-    assert routine["answer"]["occupants"] == [] and routine["answer"]["total_visitors"] > 0
-    invest = q(DEAN5, query_type="Q13", zone="z1", building_id="building_5", purpose="audit").json()
-    assert invest["answer"]["occupants"]
-    # investigation list only contains occupants the Dean is entitled to (home building_5 or visiting it)
-    for o in invest["answer"]["occupants"]:
-        assert get_occupant_building(o) == "building_5" or srv._roles.get(o) is not None
+def test_dean_zone_query_lists_only_their_own_campus_people():
+    r = q(DEAN5, query_type="Q13", zone="z1", building_id="building_5").json()
+    assert r["answer"]["occupants"]                                      # no purpose needed
+    for o in r["answer"]["occupants"]:
+        assert get_occupant_building(o) == "building_5"                  # visitors from other buildings are not listed
 
 
 def test_zone_cache_is_per_caller():
@@ -320,7 +319,7 @@ def test_policy_denies_when_building_unresolved():
     assert d.permitted is False and d.level.name == "L0_NONE"
 
 
-def test_policy_default_context_never_grants_investigation():
+def test_policy_default_context_gives_the_dean_their_own_campus_and_nobody_else_more():
     from access_control.campus_policy import evaluate_campus_query_policy
-    d = evaluate_campus_query_policy(DEAN5, TARGET5)
-    assert d.level.name == "L2_CURRENT_ZONE"
+    assert evaluate_campus_query_policy(DEAN5, TARGET5).level.name == "L4_HISTORICAL_TRACK"
+    assert evaluate_campus_query_policy(STUDENT5, TARGET5).level.name == "L0_NONE"

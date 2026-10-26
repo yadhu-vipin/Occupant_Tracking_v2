@@ -16,7 +16,7 @@ PEOPLE = {            # id: (role, home building)
     "D1": ("dean", "b1"), "D1b": ("dean", "b1"), "D2": ("dean", "b2"),
     "T1": ("teacher", "b1"), "T1b": ("teacher", "b1"), "T2": ("teacher", "b2"),
     "S1": ("student", "b1"), "S1b": ("student", "b1"), "S_roster": ("student", "b1"),
-    "S2": ("student", "b2"),
+    "S2": ("student", "b2"), "S_far": ("student", "b2"),          # S_far: assigned to T1 although at/from another building
 }
 
 
@@ -26,7 +26,7 @@ def registry():
     for person, (role, building) in PEOPLE.items():
         register_occupant_role(person, role)
         register_occupant_building(person, building)
-    register_class_roster("T1", ["S_roster"])
+    register_class_roster("T1", ["S_roster", "S_far"])
     yield
     clear_campus_registry()
 
@@ -43,34 +43,31 @@ def decide(caller, target, *, at=None, **kw):
 
 # (caller, target, where the target is now, context, expected rule, expected level)
 CELLS = [
-    # ---- Dean of b1
-    ("D1", "T1", "b1", ctx(), "RULE_A_LOCAL_OCCUPANT_ROUTINE", L.L2_CURRENT_ZONE),
-    ("D1", "S1", "b1", ctx(QueryPurpose.SECURITY_INVESTIGATION, investigation=True),
-     "RULE_A_LOCAL_OCCUPANT_INVESTIGATION", L.L4_HISTORICAL_TRACK),
-    ("D1", "S1", "b1", ctx(QueryPurpose.AUDIT), "RULE_A_LOCAL_OCCUPANT_INVESTIGATION", L.L4_HISTORICAL_TRACK),
-    ("D1", "S2", "b1", ctx(), "RULE_A_VISITOR_IN_OWN_BUILDING", L.L2_CURRENT_ZONE),                 # S2 visits b1
-    ("D1", "S2", "b1", ctx(QueryPurpose.SECURITY_INVESTIGATION, investigation=True),
-     "RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION", L.L4_HISTORICAL_TRACK),
-    ("D1", "S2", "b2", ctx(), "RULE_A_CROSS_BUILDING_B_C_DENIED", L.L0_NONE),                       # S2 is at home
-    ("D1", "S2", None, ctx(), "RULE_A_CROSS_BUILDING_B_C_DENIED", L.L0_NONE),                       # location unknown: closed
-    ("D1", "T2", "b1", ctx(), "RULE_A_VISITOR_IN_OWN_BUILDING", L.L2_CURRENT_ZONE),
-    ("D1", "D2", "b2", ctx(), "RULE_A_PEER_DEAN_COARSE", L.L2_CURRENT_ZONE),
-    ("D1", "D1b", "b1", ctx(), "RULE_A_LOCAL_DEAN", L.L2_CURRENT_ZONE),
-    # ---- Teacher of b1
-    ("T1", "S_roster", "b1", ctx(), "RULE_B_ROSTER_STUDENT", L.L2_CURRENT_ZONE),
-    ("T1", "S_roster", "b1", ctx(office=False), "RULE_B_OFFICE_HOURS_DENIED", L.L0_NONE),
-    ("T1", "S1", "b1", ctx(), "RULE_B_CAMPUS_SUPERVISION", L.L2_CURRENT_ZONE),
-    ("T1", "S1", "b1", ctx(QueryPurpose.ACADEMIC_ROSTER), "RULE_B_UNASSIGNED_STUDENT_DENIED", L.L0_NONE),
-    ("T1", "S2", "b1", ctx(), "RULE_B_CAMPUS_SUPERVISION", L.L2_CURRENT_ZONE),                      # visiting student
-    ("T1", "S2", "b1", ctx(QueryPurpose.ACADEMIC_ROSTER), "RULE_B_UNASSIGNED_STUDENT_DENIED", L.L0_NONE),
-    ("T1", "S2", "b2", ctx(), "RULE_B_CROSS_BUILDING_DENIED", L.L0_NONE),
-    ("T1", "T1b", "b1", ctx(), "RULE_B_PEER_TEACHER", L.L2_CURRENT_ZONE),
-    ("T1", "D1", "b1", ctx(), "RULE_B_DEAN_AVAILABILITY", L.L2_CURRENT_ZONE),
+    # ---- Dean of b1: everything about b1's teachers and students, any purpose, wherever they are; other Deans; nobody else
+    ("D1", "T1", "b1", ctx(), "RULE_A_OWN_CAMPUS_FULL", L.L4_HISTORICAL_TRACK),
+    ("D1", "S1", "b1", ctx(), "RULE_A_OWN_CAMPUS_FULL", L.L4_HISTORICAL_TRACK),
+    ("D1", "S1", "b2", ctx(), "RULE_A_OWN_CAMPUS_FULL", L.L4_HISTORICAL_TRACK),                    # b1's student visiting b2
+    ("D1", "S1", None, ctx(), "RULE_A_OWN_CAMPUS_FULL", L.L4_HISTORICAL_TRACK),
+    ("D1", "S2", "b1", ctx(), "RULE_A_CROSS_BUILDING_B_C_DENIED", L.L0_NONE),                      # S2 (b2) visits b1: not theirs
+    ("D1", "S2", "b2", ctx(), "RULE_A_CROSS_BUILDING_B_C_DENIED", L.L0_NONE),
+    ("D1", "T2", "b1", ctx(), "RULE_A_CROSS_BUILDING_B_C_DENIED", L.L0_NONE),
+    ("D1", "D2", "b2", ctx(), "RULE_A_PEER_DEAN_TRACK", L.L4_HISTORICAL_TRACK),
+    ("D1", "D1b", "b1", ctx(), "RULE_A_LOCAL_DEAN", L.L4_HISTORICAL_TRACK),
+    # ---- Teacher of b1: only the students assigned to them, in any building
+    ("T1", "S_roster", "b1", ctx(), "RULE_B_ROSTER_STUDENT", L.L4_HISTORICAL_TRACK),
+    ("T1", "S_roster", "b1", ctx(office=False), "RULE_B_ROSTER_STUDENT", L.L4_HISTORICAL_TRACK),
+    ("T1", "S_far", "b2", ctx(), "RULE_B_ROSTER_STUDENT", L.L4_HISTORICAL_TRACK),                  # assigned, other building
+    ("T1", "S1", "b1", ctx(), "RULE_B_UNASSIGNED_DENIED", L.L0_NONE),
+    ("T1", "S2", "b1", ctx(), "RULE_B_CROSS_BUILDING_DENIED", L.L0_NONE),
+    ("T1", "T1b", "b1", ctx(), "RULE_B_UNASSIGNED_DENIED", L.L0_NONE),
+    ("T1", "D1", "b1", ctx(), "RULE_B_UNASSIGNED_DENIED", L.L0_NONE),
     ("T1", "T2", "b2", ctx(), "RULE_B_CROSS_BUILDING_DENIED", L.L0_NONE),
-    # ---- Student of b1
-    ("S1", "T1", "b1", ctx(), "RULE_C_STAFF_COARSE_AVAILABILITY", L.L1_PRESENCE),
-    ("S1", "D1", "b1", ctx(), "RULE_C_STAFF_COARSE_AVAILABILITY", L.L1_PRESENCE),
-    ("S1", "T1", "b1", ctx(office=False), "RULE_C_OFFICE_HOURS_DENIED", L.L0_NONE),
+    # ---- Student of b1: only the teachers assigned to them, in any building
+    ("S_roster", "T1", "b1", ctx(), "RULE_C_ASSIGNED_TEACHER", L.L3_PRECISE_CURRENT),
+    ("S_roster", "T1", "b2", ctx(office=False), "RULE_C_ASSIGNED_TEACHER", L.L3_PRECISE_CURRENT),
+    ("S_far", "T1", "b1", ctx(), "RULE_C_ASSIGNED_TEACHER", L.L3_PRECISE_CURRENT),               # assigned, other building
+    ("S1", "T1", "b1", ctx(), "RULE_C_NOT_ASSIGNED_DENIED", L.L0_NONE),
+    ("S1", "D1", "b1", ctx(), "RULE_C_NOT_ASSIGNED_DENIED", L.L0_NONE),
     ("S1", "S1b", "b1", ctx(), "RULE_C_PEER_STALKING_DENIED", L.L0_NONE),
     ("S1", "S2", "b1", ctx(), "RULE_C_PEER_STALKING_DENIED", L.L0_NONE),
     ("S1", "T2", "b2", ctx(), "RULE_C_CROSS_BUILDING_DENIED", L.L0_NONE),
@@ -91,17 +88,16 @@ def test_policy_cell(caller, target, at, context, rule, level):
         assert d.reason
 
 
-def test_roster_flag_off_downgrades_a_rostered_student_to_supervision():
+def test_roster_flag_off_removes_the_assignment():
     assert decide("T1", "S_roster", at="b1").policy_rule == "RULE_B_ROSTER_STUDENT"
-    assert decide("T1", "S_roster", at="b1", check_roster=False).policy_rule == "RULE_B_CAMPUS_SUPERVISION"
+    assert decide("T1", "S_roster", at="b1", check_roster=False).policy_rule == "RULE_B_UNASSIGNED_DENIED"
 
 
 def test_requested_level_can_only_lower_the_ceiling():
-    investigation = ctx(QueryPurpose.SECURITY_INVESTIGATION, investigation=True)
-    assert decide("D1", "S1", at="b1", context=investigation).level == L.L4_HISTORICAL_TRACK
-    d = decide("D1", "S1", at="b1", context=investigation, requested_level=L.L2_CURRENT_ZONE)
+    assert decide("D1", "S1", at="b1").level == L.L4_HISTORICAL_TRACK
+    d = decide("D1", "S1", at="b1", requested_level=L.L2_CURRENT_ZONE)
     assert d.level == L.L2_CURRENT_ZONE and "full_trajectory" in d.redacted_fields
-    assert decide("S1", "T1", at="b1", requested_level=L.L4_HISTORICAL_TRACK).level == L.L1_PRESENCE
+    assert decide("S_roster", "T1", at="b1", requested_level=L.L4_HISTORICAL_TRACK).level == L.L3_PRECISE_CURRENT
 
 
 def test_unresolved_people_and_buildings_fail_closed():
@@ -112,7 +108,7 @@ def test_unresolved_people_and_buildings_fail_closed():
     assert d.policy_rule == "RULE_BUILDING_SCOPE_UNRESOLVED_DENIED" and not d.permitted
 
 
-def test_investigation_rights_are_never_granted_by_a_missing_context():
+def test_the_dean_needs_no_purpose_and_a_missing_context_never_widens_anything_else():
     d = evaluate_campus_query_policy("D1", "S1", purpose=QueryPurpose.GENERAL_LOOKUP, target_current_building="b1")
-    assert d.level == L.L2_CURRENT_ZONE
-    assert evaluate_campus_query_policy("D1", "S1", target_current_building="b1").level == L.L2_CURRENT_ZONE
+    assert d.level == L.L4_HISTORICAL_TRACK
+    assert evaluate_campus_query_policy("T1", "S1", target_current_building="b1").level == L.L0_NONE

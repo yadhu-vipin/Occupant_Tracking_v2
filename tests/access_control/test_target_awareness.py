@@ -157,14 +157,14 @@ def test_occupant_target_campus_policy_enforcement():
     # 3. Student queries Teacher: Alice queries Smith -> PERMITTED (office hours)
     assert authorize("student_alice", "QUERY", "occupant:prof_smith") is True
 
-    # 4. Student queries Dean -> PERMITTED (L1 office availability check)
-    assert authorize("student_alice", "QUERY", "occupant:dean_01") is True
+    # 4. Student queries a Dean they are not assigned to -> DENIED
+    assert authorize("student_alice", "QUERY", "occupant:dean_01") is False
 
     # 5. Teacher queries enrolled student (Alice) -> PERMITTED (Current / Zone)
     assert authorize("prof_smith", "QUERY", "occupant:student_alice") is True
 
-    # 6. Teacher queries non-enrolled student (Bob) -> PERMITTED (Current / Zone)
-    assert authorize("prof_smith", "QUERY", "occupant:student_bob") is True
+    # 6. Teacher queries a student not assigned to them (Bob) -> DENIED
+    assert authorize("prof_smith", "QUERY", "occupant:student_bob") is False
 
     # 6b. Teacher queries visitor -> DENIED (L0 None)
     assert authorize("prof_smith", "QUERY", "occupant:visitor_eve") is False

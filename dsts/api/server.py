@@ -905,7 +905,7 @@ def execute_query_endpoint(
             return _denied_response(q_type, template_fmt, caller_meta, "RULE_INFRA_RBAC_DENIED",
                                     f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
 
-        include_evidence = auth_inv  # only a Dean on an investigation/audit, in their own building
+        include_evidence = caller_role == "dean"  # only a Dean (building scope above keeps it to their own campus)
         key = QueryCache.make_key(*base_key, caller_role=f"agg|evidence={include_evidence}")
 
         def _run_building() -> dict:
@@ -924,7 +924,7 @@ def execute_query_endpoint(
                 "permitted": True,
                 "disclosure_level": "L4_HISTORICAL_TRACK" if include_evidence else "L2_CURRENT_ZONE",
                 "policy_rule": "RULE_BUILDING_AGGREGATE",
-                "reason": "Building-level aggregate permitted; individual occupant IDs redacted unless an authorized investigation",
+                "reason": "Building-level aggregate permitted; individual occupant IDs are listed for the Dean of the building only",
                 "visitor_status": "AGGREGATE",
                 "exposed_fields": ["building_id", "counts", "aggregate_metrics"],
                 "redacted_fields": ["individual_trajectories", "individual_occupant_ids", "biometric_data"],

@@ -67,7 +67,8 @@ def test_heatmap_is_campus_wide_but_occupancy_follows_the_role():
     dean_rows = [r for rows in dean.values() for r in rows]
     student_rows = [r for rows in student.values() for r in rows]
     assert dean_rows and all("time" in r and r["building_id"] for r in dean_rows)
-    assert {r["occupant"] for r in student_rows} <= {P.student}        # a student sees nobody but themselves
+    my_teachers = {t for t, students in srv._rosters.items() if P.student in students}
+    assert {r["occupant"] for r in student_rows} <= {P.student} | my_teachers      # themselves and their assigned teachers
 
 
 def test_recent_events_are_disclosed_per_role():
@@ -75,7 +76,8 @@ def test_recent_events_are_disclosed_per_role():
     student = client.get("/lane-d/api/events", headers=auth(P.student)).json()
     assert dean and len(dean) <= 200
     assert {"building_id", "zone", "occupant", "time", "timestamp", "disclosure"} <= set(dean[0])
-    assert {e["occupant"] for e in student} <= {P.student}
+    my_teachers = {t for t, students in srv._rosters.items() if P.student in students}
+    assert {e["occupant"] for e in student} <= {P.student} | my_teachers
     assert all(e["probability"] is None for e in dean if e["disclosure"] == "L2_CURRENT_ZONE")   # L2 hides the raw number
 
 
@@ -100,8 +102,8 @@ def ask(person, **body):
 def test_officer_gets_a_located_answer_with_the_policy_decision():
     d = ask(P.dean, query_id="Q6", occupant=P.target, time="12:00")
     assert d["success"] and d["rows"] and d["rows"][0]["occupant"] == P.target
-    assert d["decision"]["policy_rule"] == "RULE_A_LOCAL_OCCUPANT_ROUTINE"
-    assert d["decision"]["disclosure_level"] == "L2_CURRENT_ZONE"
+    assert d["decision"]["policy_rule"] == "RULE_A_OWN_CAMPUS_FULL"
+    assert d["decision"]["disclosure_level"] == "L4_HISTORICAL_TRACK"
 
 
 def test_the_same_query_is_refused_or_reduced_for_other_roles():
@@ -114,14 +116,16 @@ def test_the_same_query_is_refused_or_reduced_for_other_roles():
     assert teacher["decision"]["policy_rule"] == "RULE_B_ROSTER_STUDENT" and teacher["success"]
 
 
-def test_trajectory_queries_need_an_authorised_investigation():
-    routine = ask(P.dean, query_id="Q3", occupant=P.target, building=P.building)
-    assert routine["success"] is False and "L4_HISTORICAL_TRACK" in routine["answer"]
-    inquiry = ask(P.dean, query_id="TRACK", occupant=P.target, purpose="security_investigation")
-    assert inquiry["success"] and inquiry["rows"] and "detection" in inquiry["answer"]
+def test_trajectory_queries_follow_the_role_not_the_request():
+    own = ask(P.dean, query_id="Q3", occupant=P.target, building=P.building)       # the Dean needs no purpose for their own campus
+    assert own["success"] is True
+    track = ask(P.dean, query_id="TRACK", occupant=P.target)
+    assert track["success"] and track["rows"] and "detection" in track["answer"]
+    denied = ask(P.student, query_id="TRACK", occupant=P.target)                      # a student has no rights over a peer
+    assert denied["success"] is False
     forged = client.post("/lane-d/api/query", headers=auth(P.teacher),
                          json={"query_id": "Q3", "occupant": P.target, "purpose": "security_investigation"})
-    assert forged.status_code == 403                                     # investigation rights come from the role
+    assert forged.status_code == 403                                     # investigation rights still come from the role
 
 
 def test_building_queries_accept_the_pages_shorthand_and_stay_in_the_callers_building():

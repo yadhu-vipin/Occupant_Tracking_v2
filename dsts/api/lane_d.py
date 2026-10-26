@@ -129,8 +129,8 @@ def zone_presence(building: str, start: Optional[str] = None, end: Optional[str]
 
     Counts per zone are aggregates and are shown to every signed-in role, like the heat map. The *names* are disclosed
     occupant by occupant through the persona policy: only those the caller may see at L3+ (exact zone) are listed, the
-    rest are counted as withheld. A Dean sees names of local occupants (and visitors in the building) for a
-    ``security_investigation`` or ``audit`` purpose; a Student sees only themselves."""
+    rest are counted as withheld. A Dean sees the names of their own campus's teachers and students (and other Deans) with any purpose; a Teacher only
+    their assigned students; a Student themselves and their assigned teachers."""
     from access_control.authorize import audit_policy_decision
     from access_control.campus_policy import DisclosureLevel, QueryContext, QueryPurpose, evaluate_campus_query_policy
     from dsts.presence import DAY, presence_in_window

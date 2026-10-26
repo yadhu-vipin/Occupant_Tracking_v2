@@ -160,14 +160,16 @@ def test_occupancy_rows_are_never_more_precise_than_policy_allows():
                 assert r["disclosure"] in ("L3_PRECISE_CURRENT", "L4_HISTORICAL_TRACK") and zone in ZONES
 
 
-def test_occupancy_teacher_confined_to_own_building_and_sector_level_for_students():
+def test_occupancy_teacher_sees_only_assigned_students():
     from pipeline.query import get_real_role
+    import dsts.api.server as srv
+    assigned = set(srv._rosters.get(P.teacher, [])) | {P.teacher}
     rows = _occupancy(TEACHER_TOKEN)
-    assert rows, "teacher should see at least their roster/building at sector level"
+    assert rows, "teacher should see at least their assigned students"
     for zone, r in rows:
-        assert r["building_id"] == "building_5" or r["home_building"] == "building_5"
+        assert r["occupant"] in assigned, r                      # class-teacher: assigned students (and themselves) only
         if get_real_role(r["occupant"]) == "student":
-            assert r["disclosure"] == "L2_CURRENT_ZONE"          # teacher -> student is capped at L2
+            assert r["disclosure"] == "L4_HISTORICAL_TRACK"
 
 
 def test_occupancy_dean_confined_to_own_building_scope():

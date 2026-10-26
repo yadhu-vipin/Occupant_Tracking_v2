@@ -36,17 +36,15 @@ def test_needs_a_token_and_a_known_building():
     assert get(P.dean, building=P.building, start="18:00", end="08:00").status_code == 400
 
 
-def test_counts_are_for_everyone_but_the_dean_only_gets_names_on_an_investigation():
+def test_counts_are_for_everyone_and_the_dean_gets_the_names_of_their_own_campus():
     routine = get(P.dean, building=P.building, start="08:00", end="18:00").json()
-    inquiry = get(P.dean, building=P.building, start="08:00", end="18:00", purpose="security_investigation").json()
     assert routine["total"] > 0 and set(routine["zones"]) >= {"z1", "zT"}
-    routine_names = {o["occupant"] for z in routine["zones"].values() for o in z["occupants"]}
-    assert routine_names <= {P.dean}                                                       # L2 for a routine query: only the Dean himself (self-lookup)
-    assert routine["withheld"] >= routine["total"] - 1
-    assert inquiry["total"] == routine["total"] and inquiry["named"] > routine["named"]
-    named = [o for z in inquiry["zones"].values() for o in z["occupants"]]
+    named = [o for z in routine["zones"].values() for o in z["occupants"]]
+    assert named and routine["named"] > 0                                    # no purpose needed
+    assert all(o["home_building"] == P.building or srv._roles.get(o["occupant"]) == "dean" for o in named)   # other people stay withheld
     assert all({"occupant", "first_seen", "last_seen", "visits", "visitor"} <= set(o) for o in named)
-    for z in inquiry["zones"].values():
+    assert routine["withheld"] == routine["total"] - routine["named"]
+    for z in routine["zones"].values():
         assert z["count"] >= z["disclosed"] == len(z["occupants"])
 
 
@@ -59,17 +57,20 @@ def test_a_narrower_window_never_has_more_people_than_a_wider_one():
 
 
 def test_other_roles_only_see_what_their_policy_allows():
+    my_teachers = {t for t, students in srv._rosters.items() if P.student in students}
     student = get(P.student, building=P.building, start="08:00", end="18:00").json()
     names = {o["occupant"] for z in student["zones"].values() for o in z["occupants"]}
-    assert names <= {P.student} and student["total"] > 0
+    assert names <= {P.student} | my_teachers and student["total"] > 0
     teacher = get(P.teacher, building=P.building, start="08:00", end="18:00").json()
-    assert {o["occupant"] for z in teacher["zones"].values() for o in z["occupants"]} <= {P.teacher}   # students are L2 for a teacher
+    seen = {o["occupant"] for z in teacher["zones"].values() for o in z["occupants"]}
+    assert seen <= set(srv._rosters.get(P.teacher, [])) | {P.teacher}         # their assigned students, and themselves
     assert get(P.teacher, building=P.building, purpose="security_investigation").status_code == 403
 
 
-def test_a_dean_gets_counts_but_no_names_for_another_building():
+def test_a_dean_gets_counts_but_only_their_own_people_by_name_in_another_building():
     other = "building_1" if P.building != "building_1" else "building_2"
-    d = get(P.dean, building=other, start="08:00", end="18:00", purpose="security_investigation").json()
+    d = get(P.dean, building=other, start="08:00", end="18:00").json()
     named = {o["occupant"]: o for z in d["zones"].values() for o in z["occupants"]}
-    assert d["total"] > 0 and d["withheld"] > 0                                            # most people there are not the Dean's
-    assert all(o["home_building"] == P.building for o in named.values())                  # only his own occupants, wherever they are
+    assert d["total"] > 0 and d["withheld"] > 0                                            # most people there are not the Dean
+    for occupant, o in named.items():
+        assert o["home_building"] == P.building or srv._roles.get(occupant) == "dean"     # own occupants, or another Dean
