@@ -39,7 +39,7 @@ SANITY = MODE == "sanity"
 SMALL = MODE == "small"
 P9 = MODE == "p9"
 K10 = MODE.startswith("k10")                       # `k10 [n_seeds]`: only the K=10/L=88 comparison
-N_SEEDS = 1 if SANITY else 20 if (SMALL or P9 or MODE in ("rpsmall", "openset", "scale", "member", "clean")) else int(sys.argv[2] if K10 and len(sys.argv) > 2 else (20 if K10 else MODE))
+N_SEEDS = 1 if SANITY else 20 if (SMALL or P9 or MODE in ("rpsmall", "openset", "scale", "member", "clean", "visitor", "ksweep")) else int(sys.argv[2] if K10 and len(sys.argv) > 2 else (20 if K10 else MODE))
 MIN_VOTES, S, N_OCC, R_REFS, B = 12, 5, 50, 20, 10
 MIN_VOTES = int(os.environ.get('DSTS_V', MIN_VOTES))   # vote threshold V (default 12 of 20)
 TAU = float(os.environ.get("DSTS_TAU") or json.loads((REPO / "shared" / "routing_params.json").read_text())["accept_angle_deg"])
@@ -305,6 +305,14 @@ def event_stream(seed, pb, scores_by_P, Ps, nb=B, enrolled=None, S_eff=S):
     w = np.where(enrolled[None, :], key[qr], -1e18).argmax(axis=1)
     out["central_correct"] = float(((votes[qr, w] >= MIN_VOTES) & (w == pr)).mean())
     out["central_correct_n"] = int(((votes[qr, w] >= MIN_VOTES) & (w == pr)).sum())
+    # centralized baseline for visitors: vote only over the enrolled persons NOT registered in the capturing building
+    # (450 of 500 at B=10), since a visitor is by definition not registered there
+    allowed = enrolled[None, :] & (pb[None, :] != cr[:, None])
+    w2 = np.where(allowed, key[qr], -1e18).argmax(axis=1)
+    acc2 = votes[qr, w2] >= MIN_VOTES
+    co2 = acc2 & (w2 == pr)
+    out["central_vis"] = dict(n_searched=int(allowed.sum(axis=1).mean()), correct=float(co2.mean()),
+                              misidentified=float((acc2 & ~co2).mean()), abstained=float((~acc2).mean()))
     return out
 
 
@@ -448,6 +456,88 @@ if MODE == "clean":
         json.dump(dict(tau=TAU, central=central, runs=runs_c), open(OUTDIR / "dacs_clean_runs.json", "w"), indent=1)
     shipped = clean_one(42, shipped_assignment())
     json.dump(dict(tau=TAU, central=central, runs=runs_c, shipped=shipped), open(OUTDIR / "dacs_clean_runs.json", "w"), indent=1)
+    log("done")
+elif MODE == "ksweep":
+    # Code-length sweep: how the effective Bloom FPR, filter size and routing accuracy move with K. For each K the number of
+    # slots L is the smallest that gives the same mean same-person match probability P_match as the paper's K=11, L=122
+    # (iso-recall; P_match from the random-hyperplane formula over reference-image vs leave-one-out centroid angles), plus
+    # K=15 with L fixed at 122 (no compensation). Query protocol, B=10, P=3, all 10,000 held-out photos routed over all
+    # buildings. Run with DSTS_MEAN_FROM=refs and DSTS_TAU set; DSTS_KSEEDS sets the number of seeds (default 20).
+    sums = refs.sum(axis=1)
+    loo = sums[:, None, :] - refs
+    loo /= np.linalg.norm(loo, axis=2, keepdims=True)
+    theta = np.degrees(np.arccos(np.clip((refs * loo).sum(axis=2), -1, 1))).ravel()
+
+    def p_match(K_, L_):
+        return float((1 - (1 - (1 - theta / 180.0) ** K_) ** L_).mean())
+
+    def iso_L(K_, target):
+        L_ = 1
+        while p_match(K_, L_) < target:
+            L_ += 1
+        return L_
+
+    target = p_match(11, 122)
+    configs = [(9, iso_L(9, target)), (11, 122), (13, iso_L(13, target)), (15, iso_L(15, target)), (15, 122)]
+    log(f"mean angle ref->LOO centroid {theta.mean():.1f} deg; target P_match(K=11, L=122) = {target:.3f}")
+    log("configs (K, L):", configs)
+    central = central_rates(np.arange(nq), np.ones(500, dtype=bool))
+    allq = np.arange(nq)
+    runs_k = []
+    t0 = time.time()
+    for seed in range(int(os.environ.get("DSTS_KSEEDS", 20))):
+        perm = np.random.default_rng(seed).permutation(500)
+        pb10 = np.empty(500, dtype=np.int64)
+        pb10[perm] = np.repeat(np.arange(B), N_OCC)
+        rec = dict(seed=seed, cfg={})
+        for K_, L_ in configs:
+            sc, filt, items, sp = score_all(K_, L_, seed, pb10, B, 3)
+            fp = fpr_stats(filt, items, pb10, B, seed, L_, sp)
+            fp["code_collision"] = float(np.mean([np.isin(items[pb10 != b_].ravel(), items[pb10 == b_].ravel()).mean()
+                                                  for b_ in range(B)]))
+            fp["filter_kb"] = filt[0].m / 8 / 1024
+            fp["n_hashes"] = filt[0].n_hashes
+            rec["cfg"][f"K{K_}_L{L_}"] = dict(K=K_, L=L_, fpr=fp, p3=shortlist_rates(sc[3], allq, pb10, B, S),
+                                              p0=shortlist_rates(sc[0], allq, pb10, B, S))
+        runs_k.append(rec)
+        log(f"ksweep seed {seed} [{time.time() - t0:.0f}s] " + " ".join(
+            f"K{c['K']}/L{c['L']}: {c['p3']['correct']:.4f} fpr {c['fpr']['effective_fpr']:.4f}" for c in rec["cfg"].values()))
+    names = list(runs_k[0]["cfg"])
+    summary = {n: dict(K=runs_k[0]["cfg"][n]["K"], L=runs_k[0]["cfg"][n]["L"],
+                       **{f"p3_{m}": ms([r["cfg"][n]["p3"][m] for r in runs_k]) for m in
+                          ("correct", "misidentified", "abstained_reject", "abstained_routing")},
+                       **{f"p0_correct": ms([r["cfg"][n]["p0"]["correct"] for r in runs_k])},
+                       **{k: ms([r["cfg"][n]["fpr"][k] for r in runs_k]) for k in
+                          ("effective_fpr", "bloom_only", "code_collision", "filter_kb", "fill")})
+               for n in names}
+    json.dump(dict(tau=TAU, target_p_match=target, central=central, runs=runs_k, summary=summary),
+              open(OUTDIR / "dacs_ksweep.json", "w"), indent=1)
+    log(f"{'config':<12}{'correct':>9}{'effFPR':>9}{'collision':>11}{'KB':>7}   (central {central['correct']:.4f})")
+    for n in names:
+        s_ = summary[n]
+        log(f"{n:<12}{s_['p3_correct']['mean']:>9.4f}{s_['effective_fpr']['mean']:>9.4f}"
+            f"{s_['code_collision']['mean']:>11.4f}{s_['filter_kb']['mean']:>7.1f}")
+    log("done")
+elif MODE == "visitor":
+    # Visitor-event protocol at B=10, K=11, L=122, P=3: one simulated day per seed (local + visitor events). A visitor is
+    # first matched against the capturing building's own 50 occupants; only locally rejected visitors are routed over the
+    # other 9 buildings (the capturing building is not a candidate). Run with DSTS_MEAN_FROM=refs and DSTS_TAU set.
+    runs_v = []
+    t0 = time.time()
+    for seed in range(20):
+        perm = np.random.default_rng(seed).permutation(500)
+        pb10 = np.empty(500, dtype=np.int64)
+        pb10[perm] = np.repeat(np.arange(B), N_OCC)
+        sc, *_ = score_all(11, 122, seed, pb10, B, 7)
+        ev = event_stream(seed, pb10, {P_: sc[P_] for P_ in (0, 3, 5, 7)}, [0, 3, 5, 7])
+        ev["seed"] = seed
+        ev["by_P"] = {str(k): v for k, v in ev["by_P"].items()}
+        runs_v.append(ev)
+        a = ev["by_P"]["3"]["adaptive_g5"]
+        log(f"visitor seed {seed} [{time.time() - t0:.0f}s] events {ev['n_events']} visitors {ev['n_visitor']} "
+            f"accepted locally {ev['visitor_accepted_locally']} routed {ev['routed']} "
+            f"adaptive correct {a['correct']:.4f} asked {a['buildings_queried']:.2f} central {ev['central_correct']:.4f}")
+        json.dump(dict(tau=TAU, runs=runs_v), open(OUTDIR / "dacs_visitor_events.json", "w"), indent=1)
     log("done")
 elif MODE == "openset":
     # Per seed: a different set of 400 enrolled people (8 buildings of 50) and 100 people enrolled nowhere (unknown).

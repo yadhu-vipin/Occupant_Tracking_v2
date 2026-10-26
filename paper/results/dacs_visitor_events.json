@@ -1,0 +1,4145 @@
+{
+ "tau": 80.43167114257812,
+ "runs": [
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.958875,
+   "visitor_accepted_locally": 77,
+   "routed": 1923,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.876235049401976,
+      "correct_n": 1685,
+      "misidentified": 0.030681227249089962,
+      "misidentified_n": 59,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.825273010920437,
+      "escalated": 0.0,
+      "ranking_failures_n": 32,
+      "mis_true_shortlisted_n": 36,
+      "ranking_failures_strict_n": 31,
+      "mis_fixed_by_query_all_n": 29,
+      "mis_remaining_wrong_under_query_all_n": 30
+     },
+     "adaptive_g2": {
+      "correct": 0.889755590223609,
+      "correct_n": 1711,
+      "misidentified": 0.0171606864274571,
+      "misidentified_n": 33,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 36,
+      "buildings_queried": 2.99739989599584,
+      "escalated": 0.4706188247529901
+     },
+     "adaptive_g5": {
+      "correct": 0.891315652626105,
+      "correct_n": 1714,
+      "misidentified": 0.015600624024960999,
+      "misidentified_n": 30,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 36,
+      "buildings_queried": 3.8335933437337495,
+      "escalated": 0.7072282891315652
+     },
+     "query_all": {
+      "correct": 0.889755590223609,
+      "correct_n": 1711,
+      "misidentified": 0.0171606864274571,
+      "misidentified_n": 33,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 36,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.921996879875195,
+      "correct_n": 1773,
+      "misidentified": 0.0187207488299532,
+      "misidentified_n": 36,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 40,
+      "buildings_queried": 1.4940197607904315,
+      "escalated": 0.0,
+      "ranking_failures_n": 19,
+      "mis_true_shortlisted_n": 21,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 19
+     },
+     "adaptive_g2": {
+      "correct": 0.9277171086843474,
+      "correct_n": 1784,
+      "misidentified": 0.013000520020800831,
+      "misidentified_n": 25,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 40,
+      "buildings_queried": 2.014040561622465,
+      "escalated": 0.20852834113364535
+     },
+     "adaptive_g5": {
+      "correct": 0.9297971918876755,
+      "correct_n": 1788,
+      "misidentified": 0.0109204368174727,
+      "misidentified_n": 21,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 40,
+      "buildings_queried": 2.5200208008320333,
+      "escalated": 0.3666146645865835
+     },
+     "query_all": {
+      "correct": 0.9287571502860115,
+      "correct_n": 1786,
+      "misidentified": 0.011960478419136765,
+      "misidentified_n": 23,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 40,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9318772750910036,
+      "correct_n": 1792,
+      "misidentified": 0.0171606864274571,
+      "misidentified_n": 33,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 32,
+      "buildings_queried": 1.437857514300572,
+      "escalated": 0.0,
+      "ranking_failures_n": 21,
+      "mis_true_shortlisted_n": 24,
+      "ranking_failures_strict_n": 19,
+      "mis_fixed_by_query_all_n": 19,
+      "mis_remaining_wrong_under_query_all_n": 14
+     },
+     "adaptive_g2": {
+      "correct": 0.9375975039001561,
+      "correct_n": 1803,
+      "misidentified": 0.011440457618304731,
+      "misidentified_n": 22,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 32,
+      "buildings_queried": 1.9256370254810193,
+      "escalated": 0.1892875715028601
+     },
+     "adaptive_g5": {
+      "correct": 0.9401976079043162,
+      "correct_n": 1808,
+      "misidentified": 0.008840353614144566,
+      "misidentified_n": 17,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 32,
+      "buildings_queried": 2.343213728549142,
+      "escalated": 0.3218928757150286
+     },
+     "query_all": {
+      "correct": 0.9396775871034841,
+      "correct_n": 1807,
+      "misidentified": 0.0093603744149766,
+      "misidentified_n": 18,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 32,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9334373374934998,
+      "correct_n": 1795,
+      "misidentified": 0.01924076963078523,
+      "misidentified_n": 37,
+      "abstained_routing_n": 56,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.4581383255330214,
+      "escalated": 0.0,
+      "ranking_failures_n": 25,
+      "mis_true_shortlisted_n": 29,
+      "ranking_failures_strict_n": 23,
+      "mis_fixed_by_query_all_n": 22,
+      "mis_remaining_wrong_under_query_all_n": 15
+     },
+     "adaptive_g2": {
+      "correct": 0.9407176287051482,
+      "correct_n": 1809,
+      "misidentified": 0.011960478419136765,
+      "misidentified_n": 23,
+      "abstained_routing_n": 56,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.8819552782111284,
+      "escalated": 0.17004680187207488
+     },
+     "adaptive_g5": {
+      "correct": 0.9438377535101404,
+      "correct_n": 1815,
+      "misidentified": 0.008840353614144566,
+      "misidentified_n": 17,
+      "abstained_routing_n": 56,
+      "abstained_reject_n": 35,
+      "buildings_queried": 2.294331773270931,
+      "escalated": 0.3094123764950598
+     },
+     "query_all": {
+      "correct": 0.9433177327093084,
+      "correct_n": 1814,
+      "misidentified": 0.0093603744149766,
+      "misidentified_n": 18,
+      "abstained_routing_n": 56,
+      "abstained_reject_n": 35,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9583983359334374,
+   "central_correct_n": 1843,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9583983359334374,
+    "misidentified": 0.010400416016640665,
+    "abstained": 0.031201248049921998
+   },
+   "seed": 0
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.958625,
+   "visitor_accepted_locally": 71,
+   "routed": 1929,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8973561430793157,
+      "correct_n": 1731,
+      "misidentified": 0.029030585795749093,
+      "misidentified_n": 56,
+      "abstained_routing_n": 107,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.727319854847071,
+      "escalated": 0.0,
+      "ranking_failures_n": 31,
+      "mis_true_shortlisted_n": 33,
+      "ranking_failures_strict_n": 27,
+      "mis_fixed_by_query_all_n": 26,
+      "mis_remaining_wrong_under_query_all_n": 30
+     },
+     "adaptive_g2": {
+      "correct": 0.9082426127527217,
+      "correct_n": 1752,
+      "misidentified": 0.018144116122343183,
+      "misidentified_n": 35,
+      "abstained_routing_n": 107,
+      "abstained_reject_n": 35,
+      "buildings_queried": 2.931570762052877,
+      "escalated": 0.4556765163297045
+     },
+     "adaptive_g5": {
+      "correct": 0.9097978227060654,
+      "correct_n": 1755,
+      "misidentified": 0.01658890616899948,
+      "misidentified_n": 32,
+      "abstained_routing_n": 107,
+      "abstained_reject_n": 35,
+      "buildings_queried": 3.785381026438569,
+      "escalated": 0.6956972524624158
+     },
+     "query_all": {
+      "correct": 0.9087610160705029,
+      "correct_n": 1753,
+      "misidentified": 0.01762571280456195,
+      "misidentified_n": 34,
+      "abstained_routing_n": 107,
+      "abstained_reject_n": 35,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9243131156039399,
+      "correct_n": 1783,
+      "misidentified": 0.02021772939346812,
+      "misidentified_n": 39,
+      "abstained_routing_n": 77,
+      "abstained_reject_n": 30,
+      "buildings_queried": 1.465526179367548,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 25,
+      "ranking_failures_strict_n": 18,
+      "mis_fixed_by_query_all_n": 16,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.9284603421461898,
+      "correct_n": 1791,
+      "misidentified": 0.01607050285121825,
+      "misidentified_n": 31,
+      "abstained_routing_n": 77,
+      "abstained_reject_n": 30,
+      "buildings_queried": 1.9543805080352514,
+      "escalated": 0.20165889061689996
+     },
+     "adaptive_g5": {
+      "correct": 0.9315707620528771,
+      "correct_n": 1797,
+      "misidentified": 0.012960082944530845,
+      "misidentified_n": 25,
+      "abstained_routing_n": 77,
+      "abstained_reject_n": 30,
+      "buildings_queried": 2.4955935717988593,
+      "escalated": 0.36702954898911355
+     },
+     "query_all": {
+      "correct": 0.9305339554173147,
+      "correct_n": 1795,
+      "misidentified": 0.013996889580093312,
+      "misidentified_n": 27,
+      "abstained_routing_n": 77,
+      "abstained_reject_n": 30,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9258683255572836,
+      "correct_n": 1786,
+      "misidentified": 0.019699326075686883,
+      "misidentified_n": 38,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 37,
+      "buildings_queried": 1.4204250907205807,
+      "escalated": 0.0,
+      "ranking_failures_n": 23,
+      "mis_true_shortlisted_n": 27,
+      "ranking_failures_strict_n": 19,
+      "mis_fixed_by_query_all_n": 19,
+      "mis_remaining_wrong_under_query_all_n": 19
+     },
+     "adaptive_g2": {
+      "correct": 0.9326075686884396,
+      "correct_n": 1799,
+      "misidentified": 0.012960082944530845,
+      "misidentified_n": 25,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 37,
+      "buildings_queried": 1.8729911871435978,
+      "escalated": 0.17522032141005703
+     },
+     "adaptive_g5": {
+      "correct": 0.935717988595127,
+      "correct_n": 1805,
+      "misidentified": 0.009849663037843442,
+      "misidentified_n": 19,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 37,
+      "buildings_queried": 2.3649559357179886,
+      "escalated": 0.3286677034733022
+     },
+     "query_all": {
+      "correct": 0.933644375324002,
+      "correct_n": 1801,
+      "misidentified": 0.011923276308968377,
+      "misidentified_n": 23,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 37,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9279419388284085,
+      "correct_n": 1790,
+      "misidentified": 0.019699326075686883,
+      "misidentified_n": 38,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.430274753758424,
+      "escalated": 0.0,
+      "ranking_failures_n": 24,
+      "mis_true_shortlisted_n": 28,
+      "ranking_failures_strict_n": 20,
+      "mis_fixed_by_query_all_n": 20,
+      "mis_remaining_wrong_under_query_all_n": 18
+     },
+     "adaptive_g2": {
+      "correct": 0.9341627786417833,
+      "correct_n": 1802,
+      "misidentified": 0.01347848626231208,
+      "misidentified_n": 26,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.847071021254536,
+      "escalated": 0.16381544841886989
+     },
+     "adaptive_g5": {
+      "correct": 0.935717988595127,
+      "correct_n": 1805,
+      "misidentified": 0.011923276308968377,
+      "misidentified_n": 23,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 35,
+      "buildings_queried": 2.2623120787973043,
+      "escalated": 0.3022291342664593
+     },
+     "query_all": {
+      "correct": 0.935717988595127,
+      "correct_n": 1805,
+      "misidentified": 0.011923276308968377,
+      "misidentified_n": 23,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 35,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9574909279419388,
+   "central_correct_n": 1847,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9574909279419388,
+    "misidentified": 0.011404872991187144,
+    "abstained": 0.03110419906687403
+   },
+   "seed": 1
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.959625,
+   "visitor_accepted_locally": 57,
+   "routed": 1943,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8811116829644879,
+      "correct_n": 1712,
+      "misidentified": 0.032938754503345345,
+      "misidentified_n": 64,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 33,
+      "buildings_queried": 1.8373648996397323,
+      "escalated": 0.0,
+      "ranking_failures_n": 32,
+      "mis_true_shortlisted_n": 38,
+      "ranking_failures_strict_n": 32,
+      "mis_fixed_by_query_all_n": 27,
+      "mis_remaining_wrong_under_query_all_n": 37
+     },
+     "adaptive_g2": {
+      "correct": 0.8924343798250128,
+      "correct_n": 1734,
+      "misidentified": 0.02161605764282038,
+      "misidentified_n": 42,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 33,
+      "buildings_queried": 3.017498713329902,
+      "escalated": 0.4770972722593927
+     },
+     "adaptive_g5": {
+      "correct": 0.8924343798250128,
+      "correct_n": 1734,
+      "misidentified": 0.02161605764282038,
+      "misidentified_n": 42,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 33,
+      "buildings_queried": 3.7992794647452395,
+      "escalated": 0.6984045290787442
+     },
+     "query_all": {
+      "correct": 0.8929490478641277,
+      "correct_n": 1735,
+      "misidentified": 0.02110138960370561,
+      "misidentified_n": 41,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 33,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.925887802367473,
+      "correct_n": 1799,
+      "misidentified": 0.02007205352547607,
+      "misidentified_n": 39,
+      "abstained_routing_n": 70,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.471950591868245,
+      "escalated": 0.0,
+      "ranking_failures_n": 19,
+      "mis_true_shortlisted_n": 28,
+      "ranking_failures_strict_n": 18,
+      "mis_fixed_by_query_all_n": 16,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.9315491507977355,
+      "correct_n": 1810,
+      "misidentified": 0.014410705095213588,
+      "misidentified_n": 28,
+      "abstained_routing_n": 70,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.9994853319608852,
+      "escalated": 0.20432321152856409
+     },
+     "adaptive_g5": {
+      "correct": 0.9336078229541945,
+      "correct_n": 1814,
+      "misidentified": 0.012352032938754504,
+      "misidentified_n": 24,
+      "abstained_routing_n": 70,
+      "abstained_reject_n": 35,
+      "buildings_queried": 2.469891919711786,
+      "escalated": 0.35563561502830676
+     },
+     "query_all": {
+      "correct": 0.9315491507977355,
+      "correct_n": 1810,
+      "misidentified": 0.014410705095213588,
+      "misidentified_n": 28,
+      "abstained_routing_n": 70,
+      "abstained_reject_n": 35,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9243437982501287,
+      "correct_n": 1796,
+      "misidentified": 0.019042717447246525,
+      "misidentified_n": 37,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.4575398867730314,
+      "escalated": 0.0,
+      "ranking_failures_n": 12,
+      "mis_true_shortlisted_n": 20,
+      "ranking_failures_strict_n": 12,
+      "mis_fixed_by_query_all_n": 11,
+      "mis_remaining_wrong_under_query_all_n": 26
+     },
+     "adaptive_g2": {
+      "correct": 0.9279464745239321,
+      "correct_n": 1803,
+      "misidentified": 0.01544004117344313,
+      "misidentified_n": 30,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.8687596500257333,
+      "escalated": 0.17292846114256305
+     },
+     "adaptive_g5": {
+      "correct": 0.9294904786412764,
+      "correct_n": 1806,
+      "misidentified": 0.013896037056098817,
+      "misidentified_n": 27,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 36,
+      "buildings_queried": 2.324240864642306,
+      "escalated": 0.3185795162120432
+     },
+     "query_all": {
+      "correct": 0.9274318064848173,
+      "correct_n": 1802,
+      "misidentified": 0.0159547092125579,
+      "misidentified_n": 31,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 36,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9320638188368502,
+      "correct_n": 1811,
+      "misidentified": 0.016984045290787442,
+      "misidentified_n": 33,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.431806484817293,
+      "escalated": 0.0,
+      "ranking_failures_n": 11,
+      "mis_true_shortlisted_n": 18,
+      "ranking_failures_strict_n": 11,
+      "mis_fixed_by_query_all_n": 10,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.9361811631497684,
+      "correct_n": 1819,
+      "misidentified": 0.012866700977869275,
+      "misidentified_n": 25,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.8821410190427175,
+      "escalated": 0.17395779722079258
+     },
+     "adaptive_g5": {
+      "correct": 0.9361811631497684,
+      "correct_n": 1819,
+      "misidentified": 0.012866700977869275,
+      "misidentified_n": 25,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 2.3293875450334536,
+      "escalated": 0.31806484817292846
+     },
+     "query_all": {
+      "correct": 0.9336078229541945,
+      "correct_n": 1814,
+      "misidentified": 0.01544004117344313,
+      "misidentified_n": 30,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9547092125579002,
+   "central_correct_n": 1855,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9547092125579002,
+    "misidentified": 0.014410705095213588,
+    "abstained": 0.03088008234688626
+   },
+   "seed": 2
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.959125,
+   "visitor_accepted_locally": 73,
+   "routed": 1927,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8930980799169694,
+      "correct_n": 1721,
+      "misidentified": 0.027503892060197196,
+      "misidentified_n": 53,
+      "abstained_routing_n": 120,
+      "abstained_reject_n": 33,
+      "buildings_queried": 1.7654385054488844,
+      "escalated": 0.0,
+      "ranking_failures_n": 35,
+      "mis_true_shortlisted_n": 37,
+      "ranking_failures_strict_n": 28,
+      "mis_fixed_by_query_all_n": 25,
+      "mis_remaining_wrong_under_query_all_n": 28
+     },
+     "adaptive_g2": {
+      "correct": 0.9050337311883757,
+      "correct_n": 1744,
+      "misidentified": 0.015568240788790867,
+      "misidentified_n": 30,
+      "abstained_routing_n": 120,
+      "abstained_reject_n": 33,
+      "buildings_queried": 2.978723404255319,
+      "escalated": 0.46497145822522057
+     },
+     "adaptive_g5": {
+      "correct": 0.9060716139076285,
+      "correct_n": 1746,
+      "misidentified": 0.014530358069538143,
+      "misidentified_n": 28,
+      "abstained_routing_n": 120,
+      "abstained_reject_n": 33,
+      "buildings_queried": 3.7747794499221587,
+      "escalated": 0.6922677737415672
+     },
+     "query_all": {
+      "correct": 0.9055526725480021,
+      "correct_n": 1745,
+      "misidentified": 0.015049299429164505,
+      "misidentified_n": 29,
+      "abstained_routing_n": 120,
+      "abstained_reject_n": 33,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9278671510119356,
+      "correct_n": 1788,
+      "misidentified": 0.024909185262065387,
+      "misidentified_n": 48,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 1.4649714582252205,
+      "escalated": 0.0,
+      "ranking_failures_n": 23,
+      "mis_true_shortlisted_n": 30,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 31
+     },
+     "adaptive_g2": {
+      "correct": 0.9320186818889465,
+      "correct_n": 1796,
+      "misidentified": 0.02075765438505449,
+      "misidentified_n": 40,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 2.0295796574987026,
+      "escalated": 0.21795537104307214
+     },
+     "adaptive_g5": {
+      "correct": 0.9346133886870783,
+      "correct_n": 1801,
+      "misidentified": 0.01816294758692268,
+      "misidentified_n": 35,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 2.5500778412039438,
+      "escalated": 0.38038401660612353
+     },
+     "query_all": {
+      "correct": 0.9356512714063311,
+      "correct_n": 1803,
+      "misidentified": 0.017125064867669952,
+      "misidentified_n": 33,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9299429164504411,
+      "correct_n": 1792,
+      "misidentified": 0.0233523611831863,
+      "misidentified_n": 45,
+      "abstained_routing_n": 55,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.4317592112091333,
+      "escalated": 0.0,
+      "ranking_failures_n": 28,
+      "mis_true_shortlisted_n": 34,
+      "ranking_failures_strict_n": 22,
+      "mis_fixed_by_query_all_n": 21,
+      "mis_remaining_wrong_under_query_all_n": 24
+     },
+     "adaptive_g2": {
+      "correct": 0.9361702127659575,
+      "correct_n": 1804,
+      "misidentified": 0.017125064867669952,
+      "misidentified_n": 33,
+      "abstained_routing_n": 55,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.8879086663207059,
+      "escalated": 0.18318629994810587
+     },
+     "adaptive_g5": {
+      "correct": 0.939802802283342,
+      "correct_n": 1811,
+      "misidentified": 0.013492475350285417,
+      "misidentified_n": 26,
+      "abstained_routing_n": 55,
+      "abstained_reject_n": 35,
+      "buildings_queried": 2.3876491956408925,
+      "escalated": 0.33731188375713544
+     },
+     "query_all": {
+      "correct": 0.9403217436429684,
+      "correct_n": 1812,
+      "misidentified": 0.012973533990659055,
+      "misidentified_n": 25,
+      "abstained_routing_n": 55,
+      "abstained_reject_n": 35,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9294239750908148,
+      "correct_n": 1791,
+      "misidentified": 0.023871302542812663,
+      "misidentified_n": 46,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.4286455630513752,
+      "escalated": 0.0,
+      "ranking_failures_n": 33,
+      "mis_true_shortlisted_n": 39,
+      "ranking_failures_strict_n": 27,
+      "mis_fixed_by_query_all_n": 26,
+      "mis_remaining_wrong_under_query_all_n": 20
+     },
+     "adaptive_g2": {
+      "correct": 0.9366891541255838,
+      "correct_n": 1805,
+      "misidentified": 0.01660612350804359,
+      "misidentified_n": 32,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.9237156201349248,
+      "escalated": 0.18785677218474311
+     },
+     "adaptive_g5": {
+      "correct": 0.941359626362221,
+      "correct_n": 1814,
+      "misidentified": 0.011935651271406332,
+      "misidentified_n": 23,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 36,
+      "buildings_queried": 2.4073689673066943,
+      "escalated": 0.33679294239750907
+     },
+     "query_all": {
+      "correct": 0.941359626362221,
+      "correct_n": 1814,
+      "misidentified": 0.011935651271406332,
+      "misidentified_n": 23,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 36,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.958484691229891,
+   "central_correct_n": 1847,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.958484691229891,
+    "misidentified": 0.013492475350285417,
+    "abstained": 0.02802283341982356
+   },
+   "seed": 3
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.960625,
+   "visitor_accepted_locally": 56,
+   "routed": 1944,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8652263374485597,
+      "correct_n": 1682,
+      "misidentified": 0.03497942386831276,
+      "misidentified_n": 68,
+      "abstained_routing_n": 149,
+      "abstained_reject_n": 45,
+      "buildings_queried": 1.853395061728395,
+      "escalated": 0.0,
+      "ranking_failures_n": 39,
+      "mis_true_shortlisted_n": 45,
+      "ranking_failures_strict_n": 37,
+      "mis_fixed_by_query_all_n": 34,
+      "mis_remaining_wrong_under_query_all_n": 34
+     },
+     "adaptive_g2": {
+      "correct": 0.8786008230452675,
+      "correct_n": 1708,
+      "misidentified": 0.021604938271604937,
+      "misidentified_n": 42,
+      "abstained_routing_n": 149,
+      "abstained_reject_n": 45,
+      "buildings_queried": 3.072530864197531,
+      "escalated": 0.485082304526749
+     },
+     "adaptive_g5": {
+      "correct": 0.8811728395061729,
+      "correct_n": 1713,
+      "misidentified": 0.01903292181069959,
+      "misidentified_n": 37,
+      "abstained_routing_n": 149,
+      "abstained_reject_n": 45,
+      "buildings_queried": 3.8621399176954734,
+      "escalated": 0.7139917695473251
+     },
+     "query_all": {
+      "correct": 0.8806584362139918,
+      "correct_n": 1712,
+      "misidentified": 0.01954732510288066,
+      "misidentified_n": 38,
+      "abstained_routing_n": 149,
+      "abstained_reject_n": 45,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9125514403292181,
+      "correct_n": 1774,
+      "misidentified": 0.023148148148148147,
+      "misidentified_n": 45,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 1.5282921810699588,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 29,
+      "ranking_failures_strict_n": 19,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 28
+     },
+     "adaptive_g2": {
+      "correct": 0.9182098765432098,
+      "correct_n": 1785,
+      "misidentified": 0.01748971193415638,
+      "misidentified_n": 34,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 2.0519547325102883,
+      "escalated": 0.2109053497942387
+     },
+     "adaptive_g5": {
+      "correct": 0.9202674897119342,
+      "correct_n": 1789,
+      "misidentified": 0.015432098765432098,
+      "misidentified_n": 30,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 2.664094650205761,
+      "escalated": 0.4038065843621399
+     },
+     "query_all": {
+      "correct": 0.918724279835391,
+      "correct_n": 1786,
+      "misidentified": 0.016975308641975308,
+      "misidentified_n": 33,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9135802469135802,
+      "correct_n": 1776,
+      "misidentified": 0.022119341563786008,
+      "misidentified_n": 43,
+      "abstained_routing_n": 82,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.5185185185185186,
+      "escalated": 0.0,
+      "ranking_failures_n": 25,
+      "mis_true_shortlisted_n": 33,
+      "ranking_failures_strict_n": 22,
+      "mis_fixed_by_query_all_n": 20,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.918724279835391,
+      "correct_n": 1786,
+      "misidentified": 0.016975308641975308,
+      "misidentified_n": 33,
+      "abstained_routing_n": 82,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.014917695473251,
+      "escalated": 0.2001028806584362
+     },
+     "adaptive_g5": {
+      "correct": 0.9212962962962963,
+      "correct_n": 1791,
+      "misidentified": 0.01440329218106996,
+      "misidentified_n": 28,
+      "abstained_routing_n": 82,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.492283950617284,
+      "escalated": 0.3549382716049383
+     },
+     "query_all": {
+      "correct": 0.9202674897119342,
+      "correct_n": 1789,
+      "misidentified": 0.015432098765432098,
+      "misidentified_n": 30,
+      "abstained_routing_n": 82,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9192386831275721,
+      "correct_n": 1787,
+      "misidentified": 0.023662551440329218,
+      "misidentified_n": 46,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.5174897119341564,
+      "escalated": 0.0,
+      "ranking_failures_n": 26,
+      "mis_true_shortlisted_n": 36,
+      "ranking_failures_strict_n": 24,
+      "mis_fixed_by_query_all_n": 22,
+      "mis_remaining_wrong_under_query_all_n": 24
+     },
+     "adaptive_g2": {
+      "correct": 0.9254115226337448,
+      "correct_n": 1799,
+      "misidentified": 0.01748971193415638,
+      "misidentified_n": 34,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.9979423868312758,
+      "escalated": 0.1918724279835391
+     },
+     "adaptive_g5": {
+      "correct": 0.9290123456790124,
+      "correct_n": 1806,
+      "misidentified": 0.013888888888888888,
+      "misidentified_n": 27,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.4465020576131686,
+      "escalated": 0.3425925925925926
+     },
+     "query_all": {
+      "correct": 0.926440329218107,
+      "correct_n": 1801,
+      "misidentified": 0.01646090534979424,
+      "misidentified_n": 32,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 44,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9459876543209876,
+   "central_correct_n": 1839,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9459876543209876,
+    "misidentified": 0.01800411522633745,
+    "abstained": 0.0360082304526749
+   },
+   "seed": 4
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.959,
+   "visitor_accepted_locally": 59,
+   "routed": 1941,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8845955692941783,
+      "correct_n": 1717,
+      "misidentified": 0.02730551262235961,
+      "misidentified_n": 53,
+      "abstained_routing_n": 131,
+      "abstained_reject_n": 40,
+      "buildings_queried": 1.8088614116434827,
+      "escalated": 0.0,
+      "ranking_failures_n": 31,
+      "mis_true_shortlisted_n": 35,
+      "ranking_failures_strict_n": 26,
+      "mis_fixed_by_query_all_n": 25,
+      "mis_remaining_wrong_under_query_all_n": 28
+     },
+     "adaptive_g2": {
+      "correct": 0.8943843379701185,
+      "correct_n": 1736,
+      "misidentified": 0.01751674394641937,
+      "misidentified_n": 34,
+      "abstained_routing_n": 131,
+      "abstained_reject_n": 40,
+      "buildings_queried": 2.983513652756311,
+      "escalated": 0.46625450798557444
+     },
+     "adaptive_g5": {
+      "correct": 0.895414734672849,
+      "correct_n": 1738,
+      "misidentified": 0.01648634724368882,
+      "misidentified_n": 32,
+      "abstained_routing_n": 131,
+      "abstained_reject_n": 40,
+      "buildings_queried": 3.8212261720762495,
+      "escalated": 0.7027305512622359
+     },
+     "query_all": {
+      "correct": 0.895414734672849,
+      "correct_n": 1738,
+      "misidentified": 0.01648634724368882,
+      "misidentified_n": 32,
+      "abstained_routing_n": 131,
+      "abstained_reject_n": 40,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9242658423493045,
+      "correct_n": 1794,
+      "misidentified": 0.02266872746007213,
+      "misidentified_n": 44,
+      "abstained_routing_n": 71,
+      "abstained_reject_n": 32,
+      "buildings_queried": 1.4904688304997424,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 25,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 27
+     },
+     "adaptive_g2": {
+      "correct": 0.9299330242143226,
+      "correct_n": 1805,
+      "misidentified": 0.017001545595054096,
+      "misidentified_n": 33,
+      "abstained_routing_n": 71,
+      "abstained_reject_n": 32,
+      "buildings_queried": 2.017001545595054,
+      "escalated": 0.21277691911385885
+     },
+     "adaptive_g5": {
+      "correct": 0.9314786192684184,
+      "correct_n": 1808,
+      "misidentified": 0.015455950540958269,
+      "misidentified_n": 30,
+      "abstained_routing_n": 71,
+      "abstained_reject_n": 32,
+      "buildings_queried": 2.51365275631118,
+      "escalated": 0.3693972179289026
+     },
+     "query_all": {
+      "correct": 0.9309634209170531,
+      "correct_n": 1807,
+      "misidentified": 0.015971148892323546,
+      "misidentified_n": 31,
+      "abstained_routing_n": 71,
+      "abstained_reject_n": 32,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9273570324574961,
+      "correct_n": 1800,
+      "misidentified": 0.02215352910870685,
+      "misidentified_n": 43,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 30,
+      "buildings_queried": 1.437403400309119,
+      "escalated": 0.0,
+      "ranking_failures_n": 19,
+      "mis_true_shortlisted_n": 23,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 13,
+      "mis_remaining_wrong_under_query_all_n": 30
+     },
+     "adaptive_g2": {
+      "correct": 0.9314786192684184,
+      "correct_n": 1808,
+      "misidentified": 0.018031942297784646,
+      "misidentified_n": 35,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 30,
+      "buildings_queried": 1.8928387429160227,
+      "escalated": 0.17825862957238536
+     },
+     "adaptive_g5": {
+      "correct": 0.9325090159711489,
+      "correct_n": 1810,
+      "misidentified": 0.017001545595054096,
+      "misidentified_n": 33,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 30,
+      "buildings_queried": 2.3632148377125195,
+      "escalated": 0.3286965481710459
+     },
+     "query_all": {
+      "correct": 0.9319938176197836,
+      "correct_n": 1809,
+      "misidentified": 0.01751674394641937,
+      "misidentified_n": 34,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 30,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9294178258629573,
+      "correct_n": 1804,
+      "misidentified": 0.02009273570324575,
+      "misidentified_n": 39,
+      "abstained_routing_n": 65,
+      "abstained_reject_n": 33,
+      "buildings_queried": 1.4435857805255023,
+      "escalated": 0.0,
+      "ranking_failures_n": 16,
+      "mis_true_shortlisted_n": 20,
+      "ranking_failures_strict_n": 11,
+      "mis_fixed_by_query_all_n": 10,
+      "mis_remaining_wrong_under_query_all_n": 29
+     },
+     "adaptive_g2": {
+      "correct": 0.9319938176197836,
+      "correct_n": 1809,
+      "misidentified": 0.01751674394641937,
+      "misidentified_n": 34,
+      "abstained_routing_n": 65,
+      "abstained_reject_n": 33,
+      "buildings_queried": 1.8969603297269448,
+      "escalated": 0.17671303451828954
+     },
+     "adaptive_g5": {
+      "correct": 0.9330242143225141,
+      "correct_n": 1811,
+      "misidentified": 0.01648634724368882,
+      "misidentified_n": 32,
+      "abstained_routing_n": 65,
+      "abstained_reject_n": 33,
+      "buildings_queried": 2.3575476558475015,
+      "escalated": 0.3240597630087584
+     },
+     "query_all": {
+      "correct": 0.9330242143225141,
+      "correct_n": 1811,
+      "misidentified": 0.01648634724368882,
+      "misidentified_n": 32,
+      "abstained_routing_n": 65,
+      "abstained_reject_n": 33,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9562081401339516,
+   "central_correct_n": 1856,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9562081401339516,
+    "misidentified": 0.013395157135497167,
+    "abstained": 0.030396702730551263
+   },
+   "seed": 5
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.96,
+   "visitor_accepted_locally": 70,
+   "routed": 1930,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8756476683937824,
+      "correct_n": 1690,
+      "misidentified": 0.04145077720207254,
+      "misidentified_n": 80,
+      "abstained_routing_n": 124,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.794300518134715,
+      "escalated": 0.0,
+      "ranking_failures_n": 42,
+      "mis_true_shortlisted_n": 46,
+      "ranking_failures_strict_n": 42,
+      "mis_fixed_by_query_all_n": 39,
+      "mis_remaining_wrong_under_query_all_n": 41
+     },
+     "adaptive_g2": {
+      "correct": 0.8937823834196891,
+      "correct_n": 1725,
+      "misidentified": 0.023316062176165803,
+      "misidentified_n": 45,
+      "abstained_routing_n": 124,
+      "abstained_reject_n": 36,
+      "buildings_queried": 3.0196891191709843,
+      "escalated": 0.47461139896373056
+     },
+     "adaptive_g5": {
+      "correct": 0.8948186528497409,
+      "correct_n": 1727,
+      "misidentified": 0.02227979274611399,
+      "misidentified_n": 43,
+      "abstained_routing_n": 124,
+      "abstained_reject_n": 36,
+      "buildings_queried": 3.878238341968912,
+      "escalated": 0.7191709844559585
+     },
+     "query_all": {
+      "correct": 0.8937823834196891,
+      "correct_n": 1725,
+      "misidentified": 0.023316062176165803,
+      "misidentified_n": 45,
+      "abstained_routing_n": 124,
+      "abstained_reject_n": 36,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9202072538860103,
+      "correct_n": 1776,
+      "misidentified": 0.022797927461139896,
+      "misidentified_n": 44,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.4860103626943004,
+      "escalated": 0.0,
+      "ranking_failures_n": 16,
+      "mis_true_shortlisted_n": 21,
+      "ranking_failures_strict_n": 16,
+      "mis_fixed_by_query_all_n": 15,
+      "mis_remaining_wrong_under_query_all_n": 29
+     },
+     "adaptive_g2": {
+      "correct": 0.9243523316062177,
+      "correct_n": 1784,
+      "misidentified": 0.01865284974093264,
+      "misidentified_n": 36,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.0590673575129532,
+      "escalated": 0.22642487046632123
+     },
+     "adaptive_g5": {
+      "correct": 0.927979274611399,
+      "correct_n": 1791,
+      "misidentified": 0.015025906735751295,
+      "misidentified_n": 29,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.560621761658031,
+      "escalated": 0.38341968911917096
+     },
+     "query_all": {
+      "correct": 0.9264248704663213,
+      "correct_n": 1788,
+      "misidentified": 0.016580310880829015,
+      "misidentified_n": 32,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9227979274611399,
+      "correct_n": 1781,
+      "misidentified": 0.021761658031088083,
+      "misidentified_n": 42,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.4735751295336788,
+      "escalated": 0.0,
+      "ranking_failures_n": 18,
+      "mis_true_shortlisted_n": 20,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 25
+     },
+     "adaptive_g2": {
+      "correct": 0.9264248704663213,
+      "correct_n": 1788,
+      "misidentified": 0.018134715025906734,
+      "misidentified_n": 35,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.917616580310881,
+      "escalated": 0.18393782383419688
+     },
+     "adaptive_g5": {
+      "correct": 0.9300518134715026,
+      "correct_n": 1795,
+      "misidentified": 0.014507772020725389,
+      "misidentified_n": 28,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.3984455958549225,
+      "escalated": 0.34145077720207256
+     },
+     "query_all": {
+      "correct": 0.9300518134715026,
+      "correct_n": 1795,
+      "misidentified": 0.014507772020725389,
+      "misidentified_n": 28,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9202072538860103,
+      "correct_n": 1776,
+      "misidentified": 0.024352331606217616,
+      "misidentified_n": 47,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.4544041450777203,
+      "escalated": 0.0,
+      "ranking_failures_n": 25,
+      "mis_true_shortlisted_n": 29,
+      "ranking_failures_strict_n": 24,
+      "mis_fixed_by_query_all_n": 23,
+      "mis_remaining_wrong_under_query_all_n": 24
+     },
+     "adaptive_g2": {
+      "correct": 0.927979274611399,
+      "correct_n": 1791,
+      "misidentified": 0.016580310880829015,
+      "misidentified_n": 32,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.8948186528497408,
+      "escalated": 0.17823834196891192
+     },
+     "adaptive_g5": {
+      "correct": 0.9310880829015544,
+      "correct_n": 1797,
+      "misidentified": 0.013471502590673576,
+      "misidentified_n": 26,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 39,
+      "buildings_queried": 2.383937823834197,
+      "escalated": 0.33264248704663213
+     },
+     "query_all": {
+      "correct": 0.9305699481865285,
+      "correct_n": 1796,
+      "misidentified": 0.013989637305699482,
+      "misidentified_n": 27,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 39,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9554404145077721,
+   "central_correct_n": 1844,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9554404145077721,
+    "misidentified": 0.011917098445595855,
+    "abstained": 0.032642487046632127
+   },
+   "seed": 6
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.959,
+   "visitor_accepted_locally": 55,
+   "routed": 1945,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8904884318766066,
+      "correct_n": 1732,
+      "misidentified": 0.02982005141388175,
+      "misidentified_n": 58,
+      "abstained_routing_n": 118,
+      "abstained_reject_n": 37,
+      "buildings_queried": 1.7912596401028278,
+      "escalated": 0.0,
+      "ranking_failures_n": 32,
+      "mis_true_shortlisted_n": 34,
+      "ranking_failures_strict_n": 32,
+      "mis_fixed_by_query_all_n": 31,
+      "mis_remaining_wrong_under_query_all_n": 27
+     },
+     "adaptive_g2": {
+      "correct": 0.9048843187660668,
+      "correct_n": 1760,
+      "misidentified": 0.015424164524421594,
+      "misidentified_n": 30,
+      "abstained_routing_n": 118,
+      "abstained_reject_n": 37,
+      "buildings_queried": 3.04987146529563,
+      "escalated": 0.48586118251928023
+     },
+     "adaptive_g5": {
+      "correct": 0.9043701799485862,
+      "correct_n": 1759,
+      "misidentified": 0.015938303341902313,
+      "misidentified_n": 31,
+      "abstained_routing_n": 118,
+      "abstained_reject_n": 37,
+      "buildings_queried": 3.8894601542416454,
+      "escalated": 0.7208226221079691
+     },
+     "query_all": {
+      "correct": 0.9033419023136247,
+      "correct_n": 1757,
+      "misidentified": 0.01696658097686375,
+      "misidentified_n": 33,
+      "abstained_routing_n": 118,
+      "abstained_reject_n": 37,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9290488431876607,
+      "correct_n": 1807,
+      "misidentified": 0.02005141388174807,
+      "misidentified_n": 39,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.4637532133676092,
+      "escalated": 0.0,
+      "ranking_failures_n": 20,
+      "mis_true_shortlisted_n": 25,
+      "ranking_failures_strict_n": 20,
+      "mis_fixed_by_query_all_n": 19,
+      "mis_remaining_wrong_under_query_all_n": 20
+     },
+     "adaptive_g2": {
+      "correct": 0.9341902313624678,
+      "correct_n": 1817,
+      "misidentified": 0.014910025706940874,
+      "misidentified_n": 29,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 36,
+      "buildings_queried": 2.0046272493573265,
+      "escalated": 0.2154241645244216
+     },
+     "adaptive_g5": {
+      "correct": 0.9377892030848329,
+      "correct_n": 1824,
+      "misidentified": 0.011311053984575836,
+      "misidentified_n": 22,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 36,
+      "buildings_queried": 2.5732647814910026,
+      "escalated": 0.3861182519280206
+     },
+     "query_all": {
+      "correct": 0.9352185089974293,
+      "correct_n": 1819,
+      "misidentified": 0.013881748071979434,
+      "misidentified_n": 27,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 36,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9341902313624678,
+      "correct_n": 1817,
+      "misidentified": 0.02005141388174807,
+      "misidentified_n": 39,
+      "abstained_routing_n": 52,
+      "abstained_reject_n": 37,
+      "buildings_queried": 1.4179948586118252,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 28,
+      "ranking_failures_strict_n": 22,
+      "mis_fixed_by_query_all_n": 20,
+      "mis_remaining_wrong_under_query_all_n": 19
+     },
+     "adaptive_g2": {
+      "correct": 0.9403598971722366,
+      "correct_n": 1829,
+      "misidentified": 0.013881748071979434,
+      "misidentified_n": 27,
+      "abstained_routing_n": 52,
+      "abstained_reject_n": 37,
+      "buildings_queried": 1.8930591259640104,
+      "escalated": 0.1820051413881748
+     },
+     "adaptive_g5": {
+      "correct": 0.9429305912596401,
+      "correct_n": 1834,
+      "misidentified": 0.011311053984575836,
+      "misidentified_n": 22,
+      "abstained_routing_n": 52,
+      "abstained_reject_n": 37,
+      "buildings_queried": 2.4154241645244214,
+      "escalated": 0.34498714652956297
+     },
+     "query_all": {
+      "correct": 0.9413881748071979,
+      "correct_n": 1831,
+      "misidentified": 0.012853470437017995,
+      "misidentified_n": 25,
+      "abstained_routing_n": 52,
+      "abstained_reject_n": 37,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9352185089974293,
+      "correct_n": 1819,
+      "misidentified": 0.017480719794344474,
+      "misidentified_n": 34,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.444215938303342,
+      "escalated": 0.0,
+      "ranking_failures_n": 16,
+      "mis_true_shortlisted_n": 21,
+      "ranking_failures_strict_n": 16,
+      "mis_fixed_by_query_all_n": 14,
+      "mis_remaining_wrong_under_query_all_n": 20
+     },
+     "adaptive_g2": {
+      "correct": 0.9393316195372751,
+      "correct_n": 1827,
+      "misidentified": 0.013367609254498715,
+      "misidentified_n": 26,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.906426735218509,
+      "escalated": 0.18560411311053984
+     },
+     "adaptive_g5": {
+      "correct": 0.9419023136246787,
+      "correct_n": 1832,
+      "misidentified": 0.010796915167095116,
+      "misidentified_n": 21,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 35,
+      "buildings_queried": 2.4082262210796914,
+      "escalated": 0.3393316195372751
+     },
+     "query_all": {
+      "correct": 0.9383033419023136,
+      "correct_n": 1825,
+      "misidentified": 0.014395886889460155,
+      "misidentified_n": 28,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 35,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9598971722365038,
+   "central_correct_n": 1867,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9598971722365038,
+    "misidentified": 0.010796915167095116,
+    "abstained": 0.02930591259640103
+   },
+   "seed": 7
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.95975,
+   "visitor_accepted_locally": 56,
+   "routed": 1944,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8863168724279835,
+      "correct_n": 1723,
+      "misidentified": 0.029320987654320986,
+      "misidentified_n": 57,
+      "abstained_routing_n": 129,
+      "abstained_reject_n": 35,
+      "buildings_queried": 1.8024691358024691,
+      "escalated": 0.0,
+      "ranking_failures_n": 30,
+      "mis_true_shortlisted_n": 32,
+      "ranking_failures_strict_n": 27,
+      "mis_fixed_by_query_all_n": 26,
+      "mis_remaining_wrong_under_query_all_n": 31
+     },
+     "adaptive_g2": {
+      "correct": 0.897633744855967,
+      "correct_n": 1745,
+      "misidentified": 0.01800411522633745,
+      "misidentified_n": 35,
+      "abstained_routing_n": 129,
+      "abstained_reject_n": 35,
+      "buildings_queried": 2.9768518518518516,
+      "escalated": 0.463477366255144
+     },
+     "adaptive_g5": {
+      "correct": 0.8981481481481481,
+      "correct_n": 1746,
+      "misidentified": 0.01748971193415638,
+      "misidentified_n": 34,
+      "abstained_routing_n": 129,
+      "abstained_reject_n": 35,
+      "buildings_queried": 3.8132716049382718,
+      "escalated": 0.7016460905349794
+     },
+     "query_all": {
+      "correct": 0.8960905349794238,
+      "correct_n": 1742,
+      "misidentified": 0.01954732510288066,
+      "misidentified_n": 38,
+      "abstained_routing_n": 129,
+      "abstained_reject_n": 35,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.918724279835391,
+      "correct_n": 1786,
+      "misidentified": 0.01954732510288066,
+      "misidentified_n": 38,
+      "abstained_routing_n": 78,
+      "abstained_reject_n": 42,
+      "buildings_queried": 1.5102880658436213,
+      "escalated": 0.0,
+      "ranking_failures_n": 25,
+      "mis_true_shortlisted_n": 31,
+      "ranking_failures_strict_n": 21,
+      "mis_fixed_by_query_all_n": 21,
+      "mis_remaining_wrong_under_query_all_n": 17
+     },
+     "adaptive_g2": {
+      "correct": 0.9248971193415638,
+      "correct_n": 1798,
+      "misidentified": 0.013374485596707819,
+      "misidentified_n": 26,
+      "abstained_routing_n": 78,
+      "abstained_reject_n": 42,
+      "buildings_queried": 2.0540123456790123,
+      "escalated": 0.22067901234567902
+     },
+     "adaptive_g5": {
+      "correct": 0.9274691358024691,
+      "correct_n": 1803,
+      "misidentified": 0.010802469135802469,
+      "misidentified_n": 21,
+      "abstained_routing_n": 78,
+      "abstained_reject_n": 42,
+      "buildings_queried": 2.5262345679012346,
+      "escalated": 0.37448559670781895
+     },
+     "query_all": {
+      "correct": 0.9259259259259259,
+      "correct_n": 1800,
+      "misidentified": 0.012345679012345678,
+      "misidentified_n": 24,
+      "abstained_routing_n": 78,
+      "abstained_reject_n": 42,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.918724279835391,
+      "correct_n": 1786,
+      "misidentified": 0.02263374485596708,
+      "misidentified_n": 44,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 38,
+      "buildings_queried": 1.4727366255144032,
+      "escalated": 0.0,
+      "ranking_failures_n": 32,
+      "mis_true_shortlisted_n": 37,
+      "ranking_failures_strict_n": 28,
+      "mis_fixed_by_query_all_n": 26,
+      "mis_remaining_wrong_under_query_all_n": 18
+     },
+     "adaptive_g2": {
+      "correct": 0.926440329218107,
+      "correct_n": 1801,
+      "misidentified": 0.014917695473251029,
+      "misidentified_n": 29,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 38,
+      "buildings_queried": 1.9593621399176955,
+      "escalated": 0.1918724279835391
+     },
+     "adaptive_g5": {
+      "correct": 0.9300411522633745,
+      "correct_n": 1808,
+      "misidentified": 0.01131687242798354,
+      "misidentified_n": 22,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 38,
+      "buildings_queried": 2.375514403292181,
+      "escalated": 0.3297325102880658
+     },
+     "query_all": {
+      "correct": 0.926954732510288,
+      "correct_n": 1802,
+      "misidentified": 0.01440329218106996,
+      "misidentified_n": 28,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 38,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9254115226337448,
+      "correct_n": 1799,
+      "misidentified": 0.018518518518518517,
+      "misidentified_n": 36,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.456275720164609,
+      "escalated": 0.0,
+      "ranking_failures_n": 26,
+      "mis_true_shortlisted_n": 28,
+      "ranking_failures_strict_n": 22,
+      "mis_fixed_by_query_all_n": 21,
+      "mis_remaining_wrong_under_query_all_n": 15
+     },
+     "adaptive_g2": {
+      "correct": 0.9320987654320988,
+      "correct_n": 1812,
+      "misidentified": 0.011831275720164609,
+      "misidentified_n": 23,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.9356995884773662,
+      "escalated": 0.17849794238683128
+     },
+     "adaptive_g5": {
+      "correct": 0.9351851851851852,
+      "correct_n": 1818,
+      "misidentified": 0.00874485596707819,
+      "misidentified_n": 17,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.3641975308641974,
+      "escalated": 0.32613168724279834
+     },
+     "query_all": {
+      "correct": 0.9315843621399177,
+      "correct_n": 1811,
+      "misidentified": 0.012345679012345678,
+      "misidentified_n": 24,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9537037037037037,
+   "central_correct_n": 1854,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9537037037037037,
+    "misidentified": 0.014917695473251029,
+    "abstained": 0.03137860082304527
+   },
+   "seed": 8
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.957625,
+   "visitor_accepted_locally": 71,
+   "routed": 1929,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8797304302747537,
+      "correct_n": 1697,
+      "misidentified": 0.03576982892690513,
+      "misidentified_n": 69,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 29,
+      "buildings_queried": 1.8014515292897875,
+      "escalated": 0.0,
+      "ranking_failures_n": 32,
+      "mis_true_shortlisted_n": 38,
+      "ranking_failures_strict_n": 30,
+      "mis_fixed_by_query_all_n": 29,
+      "mis_remaining_wrong_under_query_all_n": 40
+     },
+     "adaptive_g2": {
+      "correct": 0.8916537065837221,
+      "correct_n": 1720,
+      "misidentified": 0.023846552617936754,
+      "misidentified_n": 46,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 29,
+      "buildings_queried": 3.008812856402281,
+      "escalated": 0.4774494556765163
+     },
+     "adaptive_g5": {
+      "correct": 0.8932089165370658,
+      "correct_n": 1723,
+      "misidentified": 0.022291342664593053,
+      "misidentified_n": 43,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 29,
+      "buildings_queried": 3.8548470710212546,
+      "escalated": 0.7133229652669777
+     },
+     "query_all": {
+      "correct": 0.8921721099015034,
+      "correct_n": 1721,
+      "misidentified": 0.02332814930015552,
+      "misidentified_n": 45,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 29,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9305339554173147,
+      "correct_n": 1795,
+      "misidentified": 0.01866251944012442,
+      "misidentified_n": 36,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 34,
+      "buildings_queried": 1.439087610160705,
+      "escalated": 0.0,
+      "ranking_failures_n": 20,
+      "mis_true_shortlisted_n": 26,
+      "ranking_failures_strict_n": 18,
+      "mis_fixed_by_query_all_n": 15,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9331259720062208,
+      "correct_n": 1800,
+      "misidentified": 0.01607050285121825,
+      "misidentified_n": 31,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 34,
+      "buildings_queried": 1.9481596682218767,
+      "escalated": 0.19699326075686885
+     },
+     "adaptive_g5": {
+      "correct": 0.9372731985484707,
+      "correct_n": 1808,
+      "misidentified": 0.011923276308968377,
+      "misidentified_n": 23,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 34,
+      "buildings_queried": 2.561430793157076,
+      "escalated": 0.3805080352514256
+     },
+     "query_all": {
+      "correct": 0.935717988595127,
+      "correct_n": 1805,
+      "misidentified": 0.01347848626231208,
+      "misidentified_n": 26,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 34,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.933644375324002,
+      "correct_n": 1801,
+      "misidentified": 0.01918092275790565,
+      "misidentified_n": 37,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 1.4307931570762054,
+      "escalated": 0.0,
+      "ranking_failures_n": 24,
+      "mis_true_shortlisted_n": 28,
+      "ranking_failures_strict_n": 20,
+      "mis_fixed_by_query_all_n": 18,
+      "mis_remaining_wrong_under_query_all_n": 19
+     },
+     "adaptive_g2": {
+      "correct": 0.937791601866252,
+      "correct_n": 1809,
+      "misidentified": 0.01503369621565578,
+      "misidentified_n": 29,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 1.9035769828926905,
+      "escalated": 0.184033177812338
+     },
+     "adaptive_g5": {
+      "correct": 0.9409020217729394,
+      "correct_n": 1815,
+      "misidentified": 0.011923276308968377,
+      "misidentified_n": 23,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 2.3592534992223952,
+      "escalated": 0.3260756868843961
+     },
+     "query_all": {
+      "correct": 0.9409020217729394,
+      "correct_n": 1815,
+      "misidentified": 0.011923276308968377,
+      "misidentified_n": 23,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 31,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9331259720062208,
+      "correct_n": 1800,
+      "misidentified": 0.02280974598237429,
+      "misidentified_n": 44,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 28,
+      "buildings_queried": 1.427682737169518,
+      "escalated": 0.0,
+      "ranking_failures_n": 27,
+      "mis_true_shortlisted_n": 31,
+      "ranking_failures_strict_n": 23,
+      "mis_fixed_by_query_all_n": 21,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.937791601866252,
+      "correct_n": 1809,
+      "misidentified": 0.018144116122343183,
+      "misidentified_n": 35,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 28,
+      "buildings_queried": 1.889061689994816,
+      "escalated": 0.1767755313634007
+     },
+     "adaptive_g5": {
+      "correct": 0.942457231726283,
+      "correct_n": 1818,
+      "misidentified": 0.01347848626231208,
+      "misidentified_n": 26,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 28,
+      "buildings_queried": 2.3447382063245206,
+      "escalated": 0.31985484707102124
+     },
+     "query_all": {
+      "correct": 0.9414204250907205,
+      "correct_n": 1816,
+      "misidentified": 0.014515292897874546,
+      "misidentified_n": 28,
+      "abstained_routing_n": 57,
+      "abstained_reject_n": 28,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9616381544841887,
+   "central_correct_n": 1855,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9616381544841887,
+    "misidentified": 0.012960082944530845,
+    "abstained": 0.025401762571280455
+   },
+   "seed": 9
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.96,
+   "visitor_accepted_locally": 79,
+   "routed": 1921,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8818323789692868,
+      "correct_n": 1694,
+      "misidentified": 0.024466423737636647,
+      "misidentified_n": 47,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 37,
+      "buildings_queried": 1.84487246225924,
+      "escalated": 0.0,
+      "ranking_failures_n": 17,
+      "mis_true_shortlisted_n": 21,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 16,
+      "mis_remaining_wrong_under_query_all_n": 31
+     },
+     "adaptive_g2": {
+      "correct": 0.8885996876626757,
+      "correct_n": 1707,
+      "misidentified": 0.017699115044247787,
+      "misidentified_n": 34,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 37,
+      "buildings_queried": 2.9942738157209785,
+      "escalated": 0.47006767308693387
+     },
+     "adaptive_g5": {
+      "correct": 0.8896408120770432,
+      "correct_n": 1709,
+      "misidentified": 0.01665799062988027,
+      "misidentified_n": 32,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 37,
+      "buildings_queried": 3.8152004164497657,
+      "escalated": 0.7017178552837064
+     },
+     "query_all": {
+      "correct": 0.8896408120770432,
+      "correct_n": 1709,
+      "misidentified": 0.01665799062988027,
+      "misidentified_n": 32,
+      "abstained_routing_n": 143,
+      "abstained_reject_n": 37,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.91827173347215,
+      "correct_n": 1764,
+      "misidentified": 0.015616866215512754,
+      "misidentified_n": 30,
+      "abstained_routing_n": 83,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.5111920874544509,
+      "escalated": 0.0,
+      "ranking_failures_n": 13,
+      "mis_true_shortlisted_n": 18,
+      "ranking_failures_strict_n": 12,
+      "mis_fixed_by_query_all_n": 12,
+      "mis_remaining_wrong_under_query_all_n": 18
+     },
+     "adaptive_g2": {
+      "correct": 0.9213951067152525,
+      "correct_n": 1770,
+      "misidentified": 0.012493492972410203,
+      "misidentified_n": 24,
+      "abstained_routing_n": 83,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.0359187922956794,
+      "escalated": 0.215512753774076
+     },
+     "adaptive_g5": {
+      "correct": 0.9229567933368037,
+      "correct_n": 1773,
+      "misidentified": 0.010931806350858927,
+      "misidentified_n": 21,
+      "abstained_routing_n": 83,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.5507548152004165,
+      "escalated": 0.3800104112441437
+     },
+     "query_all": {
+      "correct": 0.9219156689224363,
+      "correct_n": 1771,
+      "misidentified": 0.011972930765226444,
+      "misidentified_n": 23,
+      "abstained_routing_n": 83,
+      "abstained_reject_n": 44,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.92243623112962,
+      "correct_n": 1772,
+      "misidentified": 0.014055179593961478,
+      "misidentified_n": 27,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 50,
+      "buildings_queried": 1.480478917230609,
+      "escalated": 0.0,
+      "ranking_failures_n": 14,
+      "mis_true_shortlisted_n": 18,
+      "ranking_failures_strict_n": 13,
+      "mis_fixed_by_query_all_n": 12,
+      "mis_remaining_wrong_under_query_all_n": 15
+     },
+     "adaptive_g2": {
+      "correct": 0.9250390421655388,
+      "correct_n": 1777,
+      "misidentified": 0.011452368558042686,
+      "misidentified_n": 22,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 50,
+      "buildings_queried": 1.9724102030192607,
+      "escalated": 0.19625195210827695
+     },
+     "adaptive_g5": {
+      "correct": 0.9271212909942738,
+      "correct_n": 1781,
+      "misidentified": 0.009370119729307652,
+      "misidentified_n": 18,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 50,
+      "buildings_queried": 2.402915148360229,
+      "escalated": 0.338365434669443
+     },
+     "query_all": {
+      "correct": 0.9255596043727226,
+      "correct_n": 1778,
+      "misidentified": 0.010931806350858927,
+      "misidentified_n": 21,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 50,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9208745445080687,
+      "correct_n": 1769,
+      "misidentified": 0.01717855283706403,
+      "misidentified_n": 33,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.4862051015096305,
+      "escalated": 0.0,
+      "ranking_failures_n": 15,
+      "mis_true_shortlisted_n": 22,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 12,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9239979177511712,
+      "correct_n": 1775,
+      "misidentified": 0.014055179593961478,
+      "misidentified_n": 27,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.9364914107235816,
+      "escalated": 0.18115564809994794
+     },
+     "adaptive_g5": {
+      "correct": 0.9260801665799063,
+      "correct_n": 1779,
+      "misidentified": 0.011972930765226444,
+      "misidentified_n": 23,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.333680374804789,
+      "escalated": 0.3144195731389901
+     },
+     "query_all": {
+      "correct": 0.9250390421655388,
+      "correct_n": 1777,
+      "misidentified": 0.013014055179593961,
+      "misidentified_n": 25,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9541905257678293,
+   "central_correct_n": 1833,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9541905257678293,
+    "misidentified": 0.014055179593961478,
+    "abstained": 0.031754294638209266
+   },
+   "seed": 10
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.962,
+   "visitor_accepted_locally": 66,
+   "routed": 1934,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8774560496380558,
+      "correct_n": 1697,
+      "misidentified": 0.02843846949327818,
+      "misidentified_n": 55,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 48,
+      "buildings_queried": 1.8547052740434333,
+      "escalated": 0.0,
+      "ranking_failures_n": 28,
+      "mis_true_shortlisted_n": 35,
+      "ranking_failures_strict_n": 28,
+      "mis_fixed_by_query_all_n": 27,
+      "mis_remaining_wrong_under_query_all_n": 28
+     },
+     "adaptive_g2": {
+      "correct": 0.8883143743536711,
+      "correct_n": 1718,
+      "misidentified": 0.017580144777662874,
+      "misidentified_n": 34,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 48,
+      "buildings_queried": 3.0398138572905893,
+      "escalated": 0.47466390899689764
+     },
+     "adaptive_g5": {
+      "correct": 0.890382626680455,
+      "correct_n": 1722,
+      "misidentified": 0.015511892450879007,
+      "misidentified_n": 30,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 48,
+      "buildings_queried": 3.8252326783867634,
+      "escalated": 0.704756980351603
+     },
+     "query_all": {
+      "correct": 0.8883143743536711,
+      "correct_n": 1718,
+      "misidentified": 0.017580144777662874,
+      "misidentified_n": 34,
+      "abstained_routing_n": 134,
+      "abstained_reject_n": 48,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9157187176835574,
+      "correct_n": 1771,
+      "misidentified": 0.022750775594622543,
+      "misidentified_n": 44,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.5232678386763185,
+      "escalated": 0.0,
+      "ranking_failures_n": 24,
+      "mis_true_shortlisted_n": 30,
+      "ranking_failures_strict_n": 23,
+      "mis_fixed_by_query_all_n": 22,
+      "mis_remaining_wrong_under_query_all_n": 22
+     },
+     "adaptive_g2": {
+      "correct": 0.921923474663909,
+      "correct_n": 1783,
+      "misidentified": 0.016546018614270942,
+      "misidentified_n": 32,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.0734229576008274,
+      "escalated": 0.2218200620475698
+     },
+     "adaptive_g5": {
+      "correct": 0.9265770423991727,
+      "correct_n": 1792,
+      "misidentified": 0.011892450879007239,
+      "misidentified_n": 23,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.5884177869700102,
+      "escalated": 0.3877973112719752
+     },
+     "query_all": {
+      "correct": 0.9234746639089969,
+      "correct_n": 1786,
+      "misidentified": 0.01499482936918304,
+      "misidentified_n": 29,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9167528438469493,
+      "correct_n": 1773,
+      "misidentified": 0.020682523267838676,
+      "misidentified_n": 40,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 45,
+      "buildings_queried": 1.5036194415718718,
+      "escalated": 0.0,
+      "ranking_failures_n": 20,
+      "mis_true_shortlisted_n": 27,
+      "ranking_failures_strict_n": 19,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.922440537745605,
+      "correct_n": 1784,
+      "misidentified": 0.01499482936918304,
+      "misidentified_n": 29,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 45,
+      "buildings_queried": 1.9498448810754911,
+      "escalated": 0.18821096173733196
+     },
+     "adaptive_g5": {
+      "correct": 0.9250258531540848,
+      "correct_n": 1789,
+      "misidentified": 0.012409513960703205,
+      "misidentified_n": 24,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 45,
+      "buildings_queried": 2.4281282316442607,
+      "escalated": 0.3428128231644261
+     },
+     "query_all": {
+      "correct": 0.922440537745605,
+      "correct_n": 1784,
+      "misidentified": 0.01499482936918304,
+      "misidentified_n": 29,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 45,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9208893485005171,
+      "correct_n": 1781,
+      "misidentified": 0.021199586349534644,
+      "misidentified_n": 41,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 45,
+      "buildings_queried": 1.4912099276111686,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 30,
+      "ranking_failures_strict_n": 21,
+      "mis_fixed_by_query_all_n": 20,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9281282316442606,
+      "correct_n": 1795,
+      "misidentified": 0.013960703205791106,
+      "misidentified_n": 27,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 45,
+      "buildings_queried": 1.9632885211995863,
+      "escalated": 0.18614270941054809
+     },
+     "adaptive_g5": {
+      "correct": 0.9301964839710445,
+      "correct_n": 1799,
+      "misidentified": 0.011892450879007239,
+      "misidentified_n": 23,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 45,
+      "buildings_queried": 2.4136504653567736,
+      "escalated": 0.3376421923474664
+     },
+     "query_all": {
+      "correct": 0.9286452947259566,
+      "correct_n": 1796,
+      "misidentified": 0.01344364012409514,
+      "misidentified_n": 26,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 45,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9467425025853154,
+   "central_correct_n": 1831,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9467425025853154,
+    "misidentified": 0.014477766287487074,
+    "abstained": 0.03877973112719752
+   },
+   "seed": 11
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.95825,
+   "visitor_accepted_locally": 63,
+   "routed": 1937,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8874548270521425,
+      "correct_n": 1719,
+      "misidentified": 0.029943211151264842,
+      "misidentified_n": 58,
+      "abstained_routing_n": 123,
+      "abstained_reject_n": 37,
+      "buildings_queried": 1.7423851316468766,
+      "escalated": 0.0,
+      "ranking_failures_n": 32,
+      "mis_true_shortlisted_n": 35,
+      "ranking_failures_strict_n": 29,
+      "mis_fixed_by_query_all_n": 28,
+      "mis_remaining_wrong_under_query_all_n": 30
+     },
+     "adaptive_g2": {
+      "correct": 0.9013939081053175,
+      "correct_n": 1746,
+      "misidentified": 0.01600413009808983,
+      "misidentified_n": 31,
+      "abstained_routing_n": 123,
+      "abstained_reject_n": 37,
+      "buildings_queried": 2.9173980382034075,
+      "escalated": 0.4527620030975736
+     },
+     "adaptive_g5": {
+      "correct": 0.9013939081053175,
+      "correct_n": 1746,
+      "misidentified": 0.01600413009808983,
+      "misidentified_n": 31,
+      "abstained_routing_n": 123,
+      "abstained_reject_n": 37,
+      "buildings_queried": 3.8239545689210117,
+      "escalated": 0.7041817243159525
+     },
+     "query_all": {
+      "correct": 0.8998451213216314,
+      "correct_n": 1743,
+      "misidentified": 0.017552916881775942,
+      "misidentified_n": 34,
+      "abstained_routing_n": 123,
+      "abstained_reject_n": 37,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9313371192565824,
+      "correct_n": 1804,
+      "misidentified": 0.020650490449148167,
+      "misidentified_n": 40,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 30,
+      "buildings_queried": 1.453794527620031,
+      "escalated": 0.0,
+      "ranking_failures_n": 20,
+      "mis_true_shortlisted_n": 23,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 14,
+      "mis_remaining_wrong_under_query_all_n": 26
+     },
+     "adaptive_g2": {
+      "correct": 0.9370160041300981,
+      "correct_n": 1815,
+      "misidentified": 0.014971605575632421,
+      "misidentified_n": 29,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 30,
+      "buildings_queried": 2.028394424367579,
+      "escalated": 0.2225090345895715
+     },
+     "adaptive_g5": {
+      "correct": 0.9380485286525555,
+      "correct_n": 1817,
+      "misidentified": 0.013939081053175014,
+      "misidentified_n": 27,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 30,
+      "buildings_queried": 2.4878678368611253,
+      "escalated": 0.36344863190500776
+     },
+     "query_all": {
+      "correct": 0.9364997418688694,
+      "correct_n": 1814,
+      "misidentified": 0.015487867836861126,
+      "misidentified_n": 30,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 30,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9349509550851832,
+      "correct_n": 1811,
+      "misidentified": 0.01600413009808983,
+      "misidentified_n": 31,
+      "abstained_routing_n": 69,
+      "abstained_reject_n": 26,
+      "buildings_queried": 1.4279814145585958,
+      "escalated": 0.0,
+      "ranking_failures_n": 17,
+      "mis_true_shortlisted_n": 19,
+      "ranking_failures_strict_n": 11,
+      "mis_fixed_by_query_all_n": 10,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9380485286525555,
+      "correct_n": 1817,
+      "misidentified": 0.012906556530717605,
+      "misidentified_n": 25,
+      "abstained_routing_n": 69,
+      "abstained_reject_n": 26,
+      "buildings_queried": 1.8998451213216314,
+      "escalated": 0.1853381517811048
+     },
+     "adaptive_g5": {
+      "correct": 0.9390810531750129,
+      "correct_n": 1819,
+      "misidentified": 0.011874032008260196,
+      "misidentified_n": 23,
+      "abstained_routing_n": 69,
+      "abstained_reject_n": 26,
+      "buildings_queried": 2.3784202374806402,
+      "escalated": 0.33557046979865773
+     },
+     "query_all": {
+      "correct": 0.9375322663913268,
+      "correct_n": 1816,
+      "misidentified": 0.013422818791946308,
+      "misidentified_n": 26,
+      "abstained_routing_n": 69,
+      "abstained_reject_n": 26,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9395973154362416,
+      "correct_n": 1820,
+      "misidentified": 0.018069179143004648,
+      "misidentified_n": 35,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 28,
+      "buildings_queried": 1.4233350542075374,
+      "escalated": 0.0,
+      "ranking_failures_n": 19,
+      "mis_true_shortlisted_n": 22,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 13,
+      "mis_remaining_wrong_under_query_all_n": 22
+     },
+     "adaptive_g2": {
+      "correct": 0.9437274135260713,
+      "correct_n": 1828,
+      "misidentified": 0.013939081053175014,
+      "misidentified_n": 27,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 28,
+      "buildings_queried": 1.8936499741868869,
+      "escalated": 0.17656169334021682
+     },
+     "adaptive_g5": {
+      "correct": 0.9463087248322147,
+      "correct_n": 1833,
+      "misidentified": 0.011357769747031492,
+      "misidentified_n": 22,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 28,
+      "buildings_queried": 2.345379452762003,
+      "escalated": 0.3216313887454827
+     },
+     "query_all": {
+      "correct": 0.9437274135260713,
+      "correct_n": 1828,
+      "misidentified": 0.013939081053175014,
+      "misidentified_n": 27,
+      "abstained_routing_n": 54,
+      "abstained_reject_n": 28,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.963345379452762,
+   "central_correct_n": 1866,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.963345379452762,
+    "misidentified": 0.011357769747031492,
+    "abstained": 0.025296850800206504
+   },
+   "seed": 12
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.959,
+   "visitor_accepted_locally": 67,
+   "routed": 1933,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.875840662183135,
+      "correct_n": 1693,
+      "misidentified": 0.03310915675116399,
+      "misidentified_n": 64,
+      "abstained_routing_n": 145,
+      "abstained_reject_n": 31,
+      "buildings_queried": 1.8137609932747025,
+      "escalated": 0.0,
+      "ranking_failures_n": 31,
+      "mis_true_shortlisted_n": 35,
+      "ranking_failures_strict_n": 31,
+      "mis_fixed_by_query_all_n": 29,
+      "mis_remaining_wrong_under_query_all_n": 35
+     },
+     "adaptive_g2": {
+      "correct": 0.8872219348163477,
+      "correct_n": 1715,
+      "misidentified": 0.02172788411795137,
+      "misidentified_n": 42,
+      "abstained_routing_n": 145,
+      "abstained_reject_n": 31,
+      "buildings_queried": 3.007242628039317,
+      "escalated": 0.47594412829798244
+     },
+     "adaptive_g5": {
+      "correct": 0.8898085876875323,
+      "correct_n": 1720,
+      "misidentified": 0.019141231246766685,
+      "misidentified_n": 37,
+      "abstained_routing_n": 145,
+      "abstained_reject_n": 31,
+      "buildings_queried": 3.8023797206414898,
+      "escalated": 0.6994309363683394
+     },
+     "query_all": {
+      "correct": 0.8887739265390585,
+      "correct_n": 1718,
+      "misidentified": 0.02017589239524056,
+      "misidentified_n": 39,
+      "abstained_routing_n": 145,
+      "abstained_reject_n": 31,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9317123642007242,
+      "correct_n": 1801,
+      "misidentified": 0.01603724780134506,
+      "misidentified_n": 31,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 38,
+      "buildings_queried": 1.4681841696844284,
+      "escalated": 0.0,
+      "ranking_failures_n": 17,
+      "mis_true_shortlisted_n": 21,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 14
+     },
+     "adaptive_g2": {
+      "correct": 0.9363683393688567,
+      "correct_n": 1810,
+      "misidentified": 0.011381272633212623,
+      "misidentified_n": 22,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 38,
+      "buildings_queried": 1.9606828763579927,
+      "escalated": 0.19710294878427315
+     },
+     "adaptive_g5": {
+      "correct": 0.9389549922400414,
+      "correct_n": 1815,
+      "misidentified": 0.008794619762027936,
+      "misidentified_n": 17,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 38,
+      "buildings_queried": 2.456285566476979,
+      "escalated": 0.35644076564924987
+     },
+     "query_all": {
+      "correct": 0.9384376616658044,
+      "correct_n": 1814,
+      "misidentified": 0.009311950336264873,
+      "misidentified_n": 18,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 38,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9327470253491982,
+      "correct_n": 1803,
+      "misidentified": 0.01758923952405587,
+      "misidentified_n": 34,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.4180031039834453,
+      "escalated": 0.0,
+      "ranking_failures_n": 21,
+      "mis_true_shortlisted_n": 25,
+      "ranking_failures_strict_n": 20,
+      "mis_fixed_by_query_all_n": 20,
+      "mis_remaining_wrong_under_query_all_n": 14
+     },
+     "adaptive_g2": {
+      "correct": 0.9394723228142783,
+      "correct_n": 1816,
+      "misidentified": 0.010863942058975685,
+      "misidentified_n": 21,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.8794619762027935,
+      "escalated": 0.17537506466632177
+     },
+     "adaptive_g5": {
+      "correct": 0.942058975685463,
+      "correct_n": 1821,
+      "misidentified": 0.008277289187790998,
+      "misidentified_n": 16,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 36,
+      "buildings_queried": 2.3243662700465597,
+      "escalated": 0.31971029487842734
+     },
+     "query_all": {
+      "correct": 0.9415416451112261,
+      "correct_n": 1820,
+      "misidentified": 0.008794619762027936,
+      "misidentified_n": 17,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 36,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.934299017071909,
+      "correct_n": 1806,
+      "misidentified": 0.014485256078634247,
+      "misidentified_n": 28,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.4330056906363167,
+      "escalated": 0.0,
+      "ranking_failures_n": 16,
+      "mis_true_shortlisted_n": 19,
+      "ranking_failures_strict_n": 15,
+      "mis_fixed_by_query_all_n": 14,
+      "mis_remaining_wrong_under_query_all_n": 14
+     },
+     "adaptive_g2": {
+      "correct": 0.9379203310915675,
+      "correct_n": 1813,
+      "misidentified": 0.010863942058975685,
+      "misidentified_n": 21,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.8820486290739782,
+      "escalated": 0.1727884117951371
+     },
+     "adaptive_g5": {
+      "correct": 0.9399896533885153,
+      "correct_n": 1817,
+      "misidentified": 0.008794619762027936,
+      "misidentified_n": 17,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 2.271598551474392,
+      "escalated": 0.30056906363166064
+     },
+     "query_all": {
+      "correct": 0.9394723228142783,
+      "correct_n": 1816,
+      "misidentified": 0.009311950336264873,
+      "misidentified_n": 18,
+      "abstained_routing_n": 60,
+      "abstained_reject_n": 39,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9617175375064666,
+   "central_correct_n": 1859,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9617175375064666,
+    "misidentified": 0.00982928091050181,
+    "abstained": 0.028453181583031558
+   },
+   "seed": 13
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.961375,
+   "visitor_accepted_locally": 65,
+   "routed": 1935,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.882687338501292,
+      "correct_n": 1708,
+      "misidentified": 0.03307493540051679,
+      "misidentified_n": 64,
+      "abstained_routing_n": 119,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.7824289405684755,
+      "escalated": 0.0,
+      "ranking_failures_n": 35,
+      "mis_true_shortlisted_n": 40,
+      "ranking_failures_strict_n": 33,
+      "mis_fixed_by_query_all_n": 29,
+      "mis_remaining_wrong_under_query_all_n": 35
+     },
+     "adaptive_g2": {
+      "correct": 0.8925064599483205,
+      "correct_n": 1727,
+      "misidentified": 0.023255813953488372,
+      "misidentified_n": 45,
+      "abstained_routing_n": 119,
+      "abstained_reject_n": 44,
+      "buildings_queried": 3.0310077519379846,
+      "escalated": 0.4754521963824289
+     },
+     "adaptive_g5": {
+      "correct": 0.8940568475452196,
+      "correct_n": 1730,
+      "misidentified": 0.021705426356589147,
+      "misidentified_n": 42,
+      "abstained_routing_n": 119,
+      "abstained_reject_n": 44,
+      "buildings_queried": 3.7891472868217053,
+      "escalated": 0.6940568475452197
+     },
+     "query_all": {
+      "correct": 0.8930232558139535,
+      "correct_n": 1728,
+      "misidentified": 0.022739018087855296,
+      "misidentified_n": 44,
+      "abstained_routing_n": 119,
+      "abstained_reject_n": 44,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.917312661498708,
+      "correct_n": 1775,
+      "misidentified": 0.020671834625323,
+      "misidentified_n": 40,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.5162790697674418,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 26,
+      "ranking_failures_strict_n": 19,
+      "mis_fixed_by_query_all_n": 19,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9219638242894057,
+      "correct_n": 1784,
+      "misidentified": 0.016020671834625324,
+      "misidentified_n": 31,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.0516795865633073,
+      "escalated": 0.21291989664082686
+     },
+     "adaptive_g5": {
+      "correct": 0.9255813953488372,
+      "correct_n": 1791,
+      "misidentified": 0.012403100775193798,
+      "misidentified_n": 24,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.572093023255814,
+      "escalated": 0.38036175710594317
+     },
+     "query_all": {
+      "correct": 0.9229974160206719,
+      "correct_n": 1786,
+      "misidentified": 0.014987080103359173,
+      "misidentified_n": 29,
+      "abstained_routing_n": 76,
+      "abstained_reject_n": 44,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.924547803617571,
+      "correct_n": 1789,
+      "misidentified": 0.019121447028423774,
+      "misidentified_n": 37,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 41,
+      "buildings_queried": 1.462015503875969,
+      "escalated": 0.0,
+      "ranking_failures_n": 19,
+      "mis_true_shortlisted_n": 23,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 20
+     },
+     "adaptive_g2": {
+      "correct": 0.9302325581395349,
+      "correct_n": 1800,
+      "misidentified": 0.013436692506459949,
+      "misidentified_n": 26,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 41,
+      "buildings_queried": 1.9441860465116279,
+      "escalated": 0.1896640826873385
+     },
+     "adaptive_g5": {
+      "correct": 0.9322997416020672,
+      "correct_n": 1804,
+      "misidentified": 0.011369509043927648,
+      "misidentified_n": 22,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 41,
+      "buildings_queried": 2.4046511627906977,
+      "escalated": 0.3385012919896641
+     },
+     "query_all": {
+      "correct": 0.9286821705426357,
+      "correct_n": 1797,
+      "misidentified": 0.014987080103359173,
+      "misidentified_n": 29,
+      "abstained_routing_n": 68,
+      "abstained_reject_n": 41,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.924031007751938,
+      "correct_n": 1788,
+      "misidentified": 0.020671834625323,
+      "misidentified_n": 40,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.463049095607235,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 24,
+      "ranking_failures_strict_n": 20,
+      "mis_fixed_by_query_all_n": 20,
+      "mis_remaining_wrong_under_query_all_n": 20
+     },
+     "adaptive_g2": {
+      "correct": 0.9291989664082687,
+      "correct_n": 1798,
+      "misidentified": 0.015503875968992248,
+      "misidentified_n": 30,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.916279069767442,
+      "escalated": 0.18242894056847545
+     },
+     "adaptive_g5": {
+      "correct": 0.9333333333333333,
+      "correct_n": 1806,
+      "misidentified": 0.011369509043927648,
+      "misidentified_n": 22,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.3545219638242894,
+      "escalated": 0.3219638242894057
+     },
+     "query_all": {
+      "correct": 0.930749354005168,
+      "correct_n": 1801,
+      "misidentified": 0.013953488372093023,
+      "misidentified_n": 27,
+      "abstained_routing_n": 64,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.945219638242894,
+   "central_correct_n": 1829,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.945219638242894,
+    "misidentified": 0.016020671834625324,
+    "abstained": 0.03875968992248062
+   },
+   "seed": 14
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.95925,
+   "visitor_accepted_locally": 69,
+   "routed": 1931,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.887622993267737,
+      "correct_n": 1714,
+      "misidentified": 0.025375453133091662,
+      "misidentified_n": 49,
+      "abstained_routing_n": 126,
+      "abstained_reject_n": 42,
+      "buildings_queried": 1.767477990678405,
+      "escalated": 0.0,
+      "ranking_failures_n": 25,
+      "mis_true_shortlisted_n": 26,
+      "ranking_failures_strict_n": 20,
+      "mis_fixed_by_query_all_n": 19,
+      "mis_remaining_wrong_under_query_all_n": 30
+     },
+     "adaptive_g2": {
+      "correct": 0.8948731227343345,
+      "correct_n": 1728,
+      "misidentified": 0.018125323666494046,
+      "misidentified_n": 35,
+      "abstained_routing_n": 126,
+      "abstained_reject_n": 42,
+      "buildings_queried": 2.9119627136198862,
+      "escalated": 0.4520973588814086
+     },
+     "adaptive_g5": {
+      "correct": 0.8959088555152771,
+      "correct_n": 1730,
+      "misidentified": 0.017089590885551526,
+      "misidentified_n": 33,
+      "abstained_routing_n": 126,
+      "abstained_reject_n": 42,
+      "buildings_queried": 3.7726566545831175,
+      "escalated": 0.6929052304505438
+     },
+     "query_all": {
+      "correct": 0.8953909891248057,
+      "correct_n": 1729,
+      "misidentified": 0.017607457276022784,
+      "misidentified_n": 34,
+      "abstained_routing_n": 126,
+      "abstained_reject_n": 42,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9155877783531848,
+      "correct_n": 1768,
+      "misidentified": 0.02278612118073537,
+      "misidentified_n": 44,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 45,
+      "buildings_queried": 1.5157949249093734,
+      "escalated": 0.0,
+      "ranking_failures_n": 21,
+      "mis_true_shortlisted_n": 27,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 16,
+      "mis_remaining_wrong_under_query_all_n": 28
+     },
+     "adaptive_g2": {
+      "correct": 0.9212843086483687,
+      "correct_n": 1779,
+      "misidentified": 0.017089590885551526,
+      "misidentified_n": 33,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 45,
+      "buildings_queried": 2.040911444847229,
+      "escalated": 0.21491455204557225
+     },
+     "adaptive_g5": {
+      "correct": 0.9223200414293112,
+      "correct_n": 1781,
+      "misidentified": 0.01605385810460901,
+      "misidentified_n": 31,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 45,
+      "buildings_queried": 2.5323666494044534,
+      "escalated": 0.3770067322630761
+     },
+     "query_all": {
+      "correct": 0.9207664422578975,
+      "correct_n": 1778,
+      "misidentified": 0.017607457276022784,
+      "misidentified_n": 34,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 45,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9243915069911963,
+      "correct_n": 1785,
+      "misidentified": 0.02019678922837908,
+      "misidentified_n": 39,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 40,
+      "buildings_queried": 1.4583117555670637,
+      "escalated": 0.0,
+      "ranking_failures_n": 23,
+      "mis_true_shortlisted_n": 27,
+      "ranking_failures_strict_n": 18,
+      "mis_fixed_by_query_all_n": 18,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9311237700673226,
+      "correct_n": 1798,
+      "misidentified": 0.013464526152252718,
+      "misidentified_n": 26,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 40,
+      "buildings_queried": 1.9249093733816676,
+      "escalated": 0.18746763335059555
+     },
+     "adaptive_g5": {
+      "correct": 0.9321595028482651,
+      "correct_n": 1800,
+      "misidentified": 0.012428793371310202,
+      "misidentified_n": 24,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 40,
+      "buildings_queried": 2.3842568617296735,
+      "escalated": 0.3376488865872605
+     },
+     "query_all": {
+      "correct": 0.9311237700673226,
+      "correct_n": 1798,
+      "misidentified": 0.013464526152252718,
+      "misidentified_n": 26,
+      "abstained_routing_n": 67,
+      "abstained_reject_n": 40,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9254272397721388,
+      "correct_n": 1787,
+      "misidentified": 0.018125323666494046,
+      "misidentified_n": 35,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.4603832211289487,
+      "escalated": 0.0,
+      "ranking_failures_n": 22,
+      "mis_true_shortlisted_n": 25,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 16,
+      "mis_remaining_wrong_under_query_all_n": 19
+     },
+     "adaptive_g2": {
+      "correct": 0.9290523045054376,
+      "correct_n": 1794,
+      "misidentified": 0.014500258933195235,
+      "misidentified_n": 28,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.909891248058001,
+      "escalated": 0.17866390471258414
+     },
+     "adaptive_g5": {
+      "correct": 0.9311237700673226,
+      "correct_n": 1798,
+      "misidentified": 0.012428793371310202,
+      "misidentified_n": 24,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.3019161056447435,
+      "escalated": 0.3138270326255826
+     },
+     "query_all": {
+      "correct": 0.9311237700673226,
+      "correct_n": 1798,
+      "misidentified": 0.012428793371310202,
+      "misidentified_n": 24,
+      "abstained_routing_n": 66,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9518384256861729,
+   "central_correct_n": 1838,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9518384256861729,
+    "misidentified": 0.01294665976178146,
+    "abstained": 0.03521491455204557
+   },
+   "seed": 15
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.960375,
+   "visitor_accepted_locally": 59,
+   "routed": 1941,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8758371973209685,
+      "correct_n": 1700,
+      "misidentified": 0.028851107676455434,
+      "misidentified_n": 56,
+      "abstained_routing_n": 146,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.8377125193199382,
+      "escalated": 0.0,
+      "ranking_failures_n": 36,
+      "mis_true_shortlisted_n": 40,
+      "ranking_failures_strict_n": 35,
+      "mis_fixed_by_query_all_n": 33,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.8892323544564658,
+      "correct_n": 1726,
+      "misidentified": 0.015455950540958269,
+      "misidentified_n": 30,
+      "abstained_routing_n": 146,
+      "abstained_reject_n": 39,
+      "buildings_queried": 2.976300875837197,
+      "escalated": 0.45337454920144254
+     },
+     "adaptive_g5": {
+      "correct": 0.8928387429160227,
+      "correct_n": 1733,
+      "misidentified": 0.01184956208140134,
+      "misidentified_n": 23,
+      "abstained_routing_n": 146,
+      "abstained_reject_n": 39,
+      "buildings_queried": 3.8258629572385368,
+      "escalated": 0.7053065430190624
+     },
+     "query_all": {
+      "correct": 0.8928387429160227,
+      "correct_n": 1733,
+      "misidentified": 0.01184956208140134,
+      "misidentified_n": 23,
+      "abstained_routing_n": 146,
+      "abstained_reject_n": 39,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9134466769706336,
+      "correct_n": 1773,
+      "misidentified": 0.02215352910870685,
+      "misidentified_n": 43,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 1.5373518804739825,
+      "escalated": 0.0,
+      "ranking_failures_n": 21,
+      "mis_true_shortlisted_n": 29,
+      "ranking_failures_strict_n": 20,
+      "mis_fixed_by_query_all_n": 18,
+      "mis_remaining_wrong_under_query_all_n": 25
+     },
+     "adaptive_g2": {
+      "correct": 0.9201442555383823,
+      "correct_n": 1786,
+      "misidentified": 0.015455950540958269,
+      "misidentified_n": 30,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 2.0607934054611023,
+      "escalated": 0.21689850592478105
+     },
+     "adaptive_g5": {
+      "correct": 0.9222050489438434,
+      "correct_n": 1790,
+      "misidentified": 0.013395157135497167,
+      "misidentified_n": 26,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 2.572385368366821,
+      "escalated": 0.3848531684698609
+     },
+     "query_all": {
+      "correct": 0.9211746522411128,
+      "correct_n": 1788,
+      "misidentified": 0.014425553838227717,
+      "misidentified_n": 28,
+      "abstained_routing_n": 84,
+      "abstained_reject_n": 41,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.919629057187017,
+      "correct_n": 1785,
+      "misidentified": 0.018031942297784646,
+      "misidentified_n": 35,
+      "abstained_routing_n": 79,
+      "abstained_reject_n": 42,
+      "buildings_queried": 1.491499227202473,
+      "escalated": 0.0,
+      "ranking_failures_n": 15,
+      "mis_true_shortlisted_n": 19,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 14,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9242658423493045,
+      "correct_n": 1794,
+      "misidentified": 0.013395157135497167,
+      "misidentified_n": 26,
+      "abstained_routing_n": 79,
+      "abstained_reject_n": 42,
+      "buildings_queried": 1.9592993302421433,
+      "escalated": 0.18650180319422976
+     },
+     "adaptive_g5": {
+      "correct": 0.9247810407006698,
+      "correct_n": 1795,
+      "misidentified": 0.01287995878413189,
+      "misidentified_n": 25,
+      "abstained_routing_n": 79,
+      "abstained_reject_n": 42,
+      "buildings_queried": 2.386913961875322,
+      "escalated": 0.33487892838742916
+     },
+     "query_all": {
+      "correct": 0.9242658423493045,
+      "correct_n": 1794,
+      "misidentified": 0.013395157135497167,
+      "misidentified_n": 26,
+      "abstained_routing_n": 79,
+      "abstained_reject_n": 42,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9247810407006698,
+      "correct_n": 1795,
+      "misidentified": 0.015971148892323546,
+      "misidentified_n": 31,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 40,
+      "buildings_queried": 1.4848016486347244,
+      "escalated": 0.0,
+      "ranking_failures_n": 11,
+      "mis_true_shortlisted_n": 15,
+      "ranking_failures_strict_n": 10,
+      "mis_fixed_by_query_all_n": 10,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9273570324574961,
+      "correct_n": 1800,
+      "misidentified": 0.013395157135497167,
+      "misidentified_n": 26,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 40,
+      "buildings_queried": 1.9654817104585265,
+      "escalated": 0.19216898505924782
+     },
+     "adaptive_g5": {
+      "correct": 0.9273570324574961,
+      "correct_n": 1800,
+      "misidentified": 0.013395157135497167,
+      "misidentified_n": 26,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 40,
+      "buildings_queried": 2.4070066975785678,
+      "escalated": 0.33539412673879443
+     },
+     "query_all": {
+      "correct": 0.9278722308088614,
+      "correct_n": 1801,
+      "misidentified": 0.01287995878413189,
+      "misidentified_n": 25,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 40,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9515713549716641,
+   "central_correct_n": 1847,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9515713549716641,
+    "misidentified": 0.01287995878413189,
+    "abstained": 0.03554868624420402
+   },
+   "seed": 16
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.9605,
+   "visitor_accepted_locally": 51,
+   "routed": 1949,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.870702924576706,
+      "correct_n": 1697,
+      "misidentified": 0.03078501795792714,
+      "misidentified_n": 60,
+      "abstained_routing_n": 152,
+      "abstained_reject_n": 40,
+      "buildings_queried": 1.8219599794766548,
+      "escalated": 0.0,
+      "ranking_failures_n": 28,
+      "mis_true_shortlisted_n": 34,
+      "ranking_failures_strict_n": 28,
+      "mis_fixed_by_query_all_n": 25,
+      "mis_remaining_wrong_under_query_all_n": 35
+     },
+     "adaptive_g2": {
+      "correct": 0.8819907644946127,
+      "correct_n": 1719,
+      "misidentified": 0.019497178040020522,
+      "misidentified_n": 38,
+      "abstained_routing_n": 152,
+      "abstained_reject_n": 40,
+      "buildings_queried": 3.038481272447409,
+      "escalated": 0.47922011287839916
+     },
+     "adaptive_g5": {
+      "correct": 0.8809645972293484,
+      "correct_n": 1717,
+      "misidentified": 0.02052334530528476,
+      "misidentified_n": 40,
+      "abstained_routing_n": 152,
+      "abstained_reject_n": 40,
+      "buildings_queried": 3.8512057465366856,
+      "escalated": 0.7111339148281169
+     },
+     "query_all": {
+      "correct": 0.8804515135967163,
+      "correct_n": 1716,
+      "misidentified": 0.02103642893791688,
+      "misidentified_n": 41,
+      "abstained_routing_n": 152,
+      "abstained_reject_n": 40,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9209851205746536,
+      "correct_n": 1795,
+      "misidentified": 0.02052334530528476,
+      "misidentified_n": 40,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 39,
+      "buildings_queried": 1.4766546947152386,
+      "escalated": 0.0,
+      "ranking_failures_n": 18,
+      "mis_true_shortlisted_n": 22,
+      "ranking_failures_strict_n": 18,
+      "mis_fixed_by_query_all_n": 16,
+      "mis_remaining_wrong_under_query_all_n": 24
+     },
+     "adaptive_g2": {
+      "correct": 0.9276552077988712,
+      "correct_n": 1808,
+      "misidentified": 0.013853258081067214,
+      "misidentified_n": 27,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 39,
+      "buildings_queried": 2.0518214468958442,
+      "escalated": 0.22216521292970753
+     },
+     "adaptive_g5": {
+      "correct": 0.9291944586967675,
+      "correct_n": 1811,
+      "misidentified": 0.012314007183170857,
+      "misidentified_n": 24,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 39,
+      "buildings_queried": 2.534120061570036,
+      "escalated": 0.3740379681888148
+     },
+     "query_all": {
+      "correct": 0.9271421241662391,
+      "correct_n": 1807,
+      "misidentified": 0.014366341713699333,
+      "misidentified_n": 28,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 39,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9245767060030785,
+      "correct_n": 1802,
+      "misidentified": 0.018471010774756286,
+      "misidentified_n": 36,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.4540790148794254,
+      "escalated": 0.0,
+      "ranking_failures_n": 14,
+      "mis_true_shortlisted_n": 20,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 13,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.9281682914315034,
+      "correct_n": 1809,
+      "misidentified": 0.014879425346331451,
+      "misidentified_n": 29,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 36,
+      "buildings_queried": 1.9758850692662904,
+      "escalated": 0.1995895330938943
+     },
+     "adaptive_g5": {
+      "correct": 0.930733709594664,
+      "correct_n": 1814,
+      "misidentified": 0.012314007183170857,
+      "misidentified_n": 24,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 36,
+      "buildings_queried": 2.401231400718317,
+      "escalated": 0.3401744484350949
+     },
+     "query_all": {
+      "correct": 0.9286813750641355,
+      "correct_n": 1810,
+      "misidentified": 0.014366341713699333,
+      "misidentified_n": 28,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 36,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9261159569009748,
+      "correct_n": 1805,
+      "misidentified": 0.018984094407388404,
+      "misidentified_n": 37,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.4576706003078501,
+      "escalated": 0.0,
+      "ranking_failures_n": 14,
+      "mis_true_shortlisted_n": 20,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 13,
+      "mis_remaining_wrong_under_query_all_n": 24
+     },
+     "adaptive_g2": {
+      "correct": 0.9286813750641355,
+      "correct_n": 1810,
+      "misidentified": 0.016418676244227808,
+      "misidentified_n": 32,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.952796305797845,
+      "escalated": 0.19240636223704463
+     },
+     "adaptive_g5": {
+      "correct": 0.9312467932272961,
+      "correct_n": 1815,
+      "misidentified": 0.013853258081067214,
+      "misidentified_n": 27,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.3801949717804,
+      "escalated": 0.32786044125192404
+     },
+     "query_all": {
+      "correct": 0.9297075423293997,
+      "correct_n": 1812,
+      "misidentified": 0.01539250897896357,
+      "misidentified_n": 30,
+      "abstained_routing_n": 63,
+      "abstained_reject_n": 44,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9517701385325809,
+   "central_correct_n": 1855,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9517701385325809,
+    "misidentified": 0.012827090815802977,
+    "abstained": 0.03540277065161621
+   },
+   "seed": 17
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.960625,
+   "visitor_accepted_locally": 67,
+   "routed": 1933,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8691153647180548,
+      "correct_n": 1680,
+      "misidentified": 0.02793585100879462,
+      "misidentified_n": 54,
+      "abstained_routing_n": 151,
+      "abstained_reject_n": 48,
+      "buildings_queried": 1.8416968442834971,
+      "escalated": 0.0,
+      "ranking_failures_n": 29,
+      "mis_true_shortlisted_n": 33,
+      "ranking_failures_strict_n": 29,
+      "mis_fixed_by_query_all_n": 28,
+      "mis_remaining_wrong_under_query_all_n": 26
+     },
+     "adaptive_g2": {
+      "correct": 0.8804966373512675,
+      "correct_n": 1702,
+      "misidentified": 0.016554578375581996,
+      "misidentified_n": 32,
+      "abstained_routing_n": 151,
+      "abstained_reject_n": 48,
+      "buildings_queried": 3.0103466114847386,
+      "escalated": 0.46973616140713914
+     },
+     "adaptive_g5": {
+      "correct": 0.8820486290739783,
+      "correct_n": 1705,
+      "misidentified": 0.015002586652871184,
+      "misidentified_n": 29,
+      "abstained_routing_n": 151,
+      "abstained_reject_n": 48,
+      "buildings_queried": 3.8489394723228143,
+      "escalated": 0.7113295395757889
+     },
+     "query_all": {
+      "correct": 0.8810139679255043,
+      "correct_n": 1703,
+      "misidentified": 0.01603724780134506,
+      "misidentified_n": 31,
+      "abstained_routing_n": 151,
+      "abstained_reject_n": 48,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9161924469736161,
+      "correct_n": 1771,
+      "misidentified": 0.016554578375581996,
+      "misidentified_n": 32,
+      "abstained_routing_n": 85,
+      "abstained_reject_n": 45,
+      "buildings_queried": 1.5245732022762546,
+      "escalated": 0.0,
+      "ranking_failures_n": 13,
+      "mis_true_shortlisted_n": 16,
+      "ranking_failures_strict_n": 13,
+      "mis_fixed_by_query_all_n": 12,
+      "mis_remaining_wrong_under_query_all_n": 20
+     },
+     "adaptive_g2": {
+      "correct": 0.9203310915675117,
+      "correct_n": 1779,
+      "misidentified": 0.012415933781686497,
+      "misidentified_n": 24,
+      "abstained_routing_n": 85,
+      "abstained_reject_n": 45,
+      "buildings_queried": 2.0543197102948785,
+      "escalated": 0.21210553543714433
+     },
+     "adaptive_g5": {
+      "correct": 0.9218830832902225,
+      "correct_n": 1782,
+      "misidentified": 0.010863942058975685,
+      "misidentified_n": 21,
+      "abstained_routing_n": 85,
+      "abstained_reject_n": 45,
+      "buildings_queried": 2.5395757889291257,
+      "escalated": 0.3771339886187274
+     },
+     "query_all": {
+      "correct": 0.9203310915675117,
+      "correct_n": 1779,
+      "misidentified": 0.012415933781686497,
+      "misidentified_n": 24,
+      "abstained_routing_n": 85,
+      "abstained_reject_n": 45,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9218830832902225,
+      "correct_n": 1782,
+      "misidentified": 0.018623900672529746,
+      "misidentified_n": 36,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 43,
+      "buildings_queried": 1.4935333678220384,
+      "escalated": 0.0,
+      "ranking_failures_n": 17,
+      "mis_true_shortlisted_n": 20,
+      "ranking_failures_strict_n": 17,
+      "mis_fixed_by_query_all_n": 15,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9270563890325918,
+      "correct_n": 1792,
+      "misidentified": 0.013450594930160372,
+      "misidentified_n": 26,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.00672529746508,
+      "escalated": 0.20693222969477496
+     },
+     "adaptive_g5": {
+      "correct": 0.9275737196068288,
+      "correct_n": 1793,
+      "misidentified": 0.012933264355923435,
+      "misidentified_n": 25,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 43,
+      "buildings_queried": 2.4433523021210553,
+      "escalated": 0.3476461458872219
+     },
+     "query_all": {
+      "correct": 0.9270563890325918,
+      "correct_n": 1792,
+      "misidentified": 0.013450594930160372,
+      "misidentified_n": 26,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 43,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9218830832902225,
+      "correct_n": 1782,
+      "misidentified": 0.01758923952405587,
+      "misidentified_n": 34,
+      "abstained_routing_n": 73,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.5012933264355923,
+      "escalated": 0.0,
+      "ranking_failures_n": 14,
+      "mis_true_shortlisted_n": 18,
+      "ranking_failures_strict_n": 14,
+      "mis_fixed_by_query_all_n": 13,
+      "mis_remaining_wrong_under_query_all_n": 21
+     },
+     "adaptive_g2": {
+      "correct": 0.9244697361614072,
+      "correct_n": 1787,
+      "misidentified": 0.015002586652871184,
+      "misidentified_n": 29,
+      "abstained_routing_n": 73,
+      "abstained_reject_n": 44,
+      "buildings_queried": 1.942058975685463,
+      "escalated": 0.1826176927056389
+     },
+     "adaptive_g5": {
+      "correct": 0.925504397309881,
+      "correct_n": 1789,
+      "misidentified": 0.01396792550439731,
+      "misidentified_n": 27,
+      "abstained_routing_n": 73,
+      "abstained_reject_n": 44,
+      "buildings_queried": 2.447490946714951,
+      "escalated": 0.3445421624418003
+     },
+     "query_all": {
+      "correct": 0.925504397309881,
+      "correct_n": 1789,
+      "misidentified": 0.01396792550439731,
+      "misidentified_n": 27,
+      "abstained_routing_n": 73,
+      "abstained_reject_n": 44,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.9518882565959649,
+   "central_correct_n": 1840,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.9518882565959649,
+    "misidentified": 0.010863942058975685,
+    "abstained": 0.03724780134505949
+   },
+   "seed": 18
+  },
+  {
+   "n_events": 10000,
+   "n_visitor": 2000,
+   "local_events": 8000,
+   "local_correct": 0.95775,
+   "visitor_accepted_locally": 70,
+   "routed": 1930,
+   "by_P": {
+    "0": {
+     "sequential": {
+      "correct": 0.8818652849740932,
+      "correct_n": 1702,
+      "misidentified": 0.035233160621761656,
+      "misidentified_n": 68,
+      "abstained_routing_n": 128,
+      "abstained_reject_n": 32,
+      "buildings_queried": 1.7818652849740932,
+      "escalated": 0.0,
+      "ranking_failures_n": 35,
+      "mis_true_shortlisted_n": 38,
+      "ranking_failures_strict_n": 29,
+      "mis_fixed_by_query_all_n": 27,
+      "mis_remaining_wrong_under_query_all_n": 41
+     },
+     "adaptive_g2": {
+      "correct": 0.894300518134715,
+      "correct_n": 1726,
+      "misidentified": 0.022797927461139896,
+      "misidentified_n": 44,
+      "abstained_routing_n": 128,
+      "abstained_reject_n": 32,
+      "buildings_queried": 3.069948186528497,
+      "escalated": 0.48704663212435234
+     },
+     "adaptive_g5": {
+      "correct": 0.8948186528497409,
+      "correct_n": 1727,
+      "misidentified": 0.02227979274611399,
+      "misidentified_n": 43,
+      "abstained_routing_n": 128,
+      "abstained_reject_n": 32,
+      "buildings_queried": 3.894818652849741,
+      "escalated": 0.722279792746114
+     },
+     "query_all": {
+      "correct": 0.8948186528497409,
+      "correct_n": 1727,
+      "misidentified": 0.02227979274611399,
+      "misidentified_n": 43,
+      "abstained_routing_n": 128,
+      "abstained_reject_n": 32,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "3": {
+     "sequential": {
+      "correct": 0.9227979274611399,
+      "correct_n": 1781,
+      "misidentified": 0.023316062176165803,
+      "misidentified_n": 45,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 29,
+      "buildings_queried": 1.472020725388601,
+      "escalated": 0.0,
+      "ranking_failures_n": 24,
+      "mis_true_shortlisted_n": 29,
+      "ranking_failures_strict_n": 19,
+      "mis_fixed_by_query_all_n": 17,
+      "mis_remaining_wrong_under_query_all_n": 28
+     },
+     "adaptive_g2": {
+      "correct": 0.927461139896373,
+      "correct_n": 1790,
+      "misidentified": 0.01865284974093264,
+      "misidentified_n": 36,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 29,
+      "buildings_queried": 2.032642487046632,
+      "escalated": 0.21658031088082902
+     },
+     "adaptive_g5": {
+      "correct": 0.9310880829015544,
+      "correct_n": 1797,
+      "misidentified": 0.015025906735751295,
+      "misidentified_n": 29,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 29,
+      "buildings_queried": 2.5601036269430053,
+      "escalated": 0.37927461139896373
+     },
+     "query_all": {
+      "correct": 0.9300518134715026,
+      "correct_n": 1795,
+      "misidentified": 0.01606217616580311,
+      "misidentified_n": 31,
+      "abstained_routing_n": 75,
+      "abstained_reject_n": 29,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "5": {
+     "sequential": {
+      "correct": 0.9269430051813472,
+      "correct_n": 1789,
+      "misidentified": 0.02227979274611399,
+      "misidentified_n": 43,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 26,
+      "buildings_queried": 1.455958549222798,
+      "escalated": 0.0,
+      "ranking_failures_n": 27,
+      "mis_true_shortlisted_n": 29,
+      "ranking_failures_strict_n": 22,
+      "mis_fixed_by_query_all_n": 20,
+      "mis_remaining_wrong_under_query_all_n": 23
+     },
+     "adaptive_g2": {
+      "correct": 0.933160621761658,
+      "correct_n": 1801,
+      "misidentified": 0.01606217616580311,
+      "misidentified_n": 31,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 26,
+      "buildings_queried": 1.9124352331606218,
+      "escalated": 0.18031088082901556
+     },
+     "adaptive_g5": {
+      "correct": 0.9352331606217616,
+      "correct_n": 1805,
+      "misidentified": 0.013989637305699482,
+      "misidentified_n": 27,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 26,
+      "buildings_queried": 2.362176165803109,
+      "escalated": 0.32694300518134717
+     },
+     "query_all": {
+      "correct": 0.9357512953367876,
+      "correct_n": 1806,
+      "misidentified": 0.013471502590673576,
+      "misidentified_n": 26,
+      "abstained_routing_n": 72,
+      "abstained_reject_n": 26,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    },
+    "7": {
+     "sequential": {
+      "correct": 0.9264248704663213,
+      "correct_n": 1788,
+      "misidentified": 0.02072538860103627,
+      "misidentified_n": 40,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 28,
+      "buildings_queried": 1.4658031088082901,
+      "escalated": 0.0,
+      "ranking_failures_n": 16,
+      "mis_true_shortlisted_n": 22,
+      "ranking_failures_strict_n": 12,
+      "mis_fixed_by_query_all_n": 12,
+      "mis_remaining_wrong_under_query_all_n": 28
+     },
+     "adaptive_g2": {
+      "correct": 0.9284974093264249,
+      "correct_n": 1792,
+      "misidentified": 0.01865284974093264,
+      "misidentified_n": 36,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 28,
+      "buildings_queried": 1.899481865284974,
+      "escalated": 0.17616580310880828
+     },
+     "adaptive_g5": {
+      "correct": 0.9310880829015544,
+      "correct_n": 1797,
+      "misidentified": 0.01606217616580311,
+      "misidentified_n": 31,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 28,
+      "buildings_queried": 2.3896373056994817,
+      "escalated": 0.333160621761658
+     },
+     "query_all": {
+      "correct": 0.9295336787564766,
+      "correct_n": 1794,
+      "misidentified": 0.017616580310880828,
+      "misidentified_n": 34,
+      "abstained_routing_n": 74,
+      "abstained_reject_n": 28,
+      "buildings_queried": 5.0,
+      "escalated": 1.0
+     }
+    }
+   },
+   "central_correct": 0.960621761658031,
+   "central_correct_n": 1854,
+   "central_vis": {
+    "n_searched": 450,
+    "correct": 0.960621761658031,
+    "misidentified": 0.014507772020725389,
+    "abstained": 0.024870466321243522
+   },
+   "seed": 19
+  }
+ ]
+}

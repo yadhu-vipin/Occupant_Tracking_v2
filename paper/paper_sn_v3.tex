@@ -1,0 +1,287 @@
+\documentclass[pdflatex,sn-mathphys-num]{sn-jnl}% Math and Physical Sciences Numbered Reference Style
+
+\usepackage{graphicx}%
+\usepackage{multirow}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage[title]{appendix}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{algorithm}%
+\usepackage{algorithmicx}%
+\usepackage{algpseudocode}%
+\usepackage{listings}%
+
+\providecommand{\code}[1]{\texttt{#1}}%
+\algrenewcommand\algorithmicrequire{\textbf{Input:}}
+\algrenewcommand\algorithmicensure{\textbf{Output:}}
+
+\theoremstyle{thmstyleone}%
+\newtheorem{theorem}{Theorem}%
+\newtheorem{proposition}[theorem]{Proposition}%
+
+\theoremstyle{thmstyletwo}%
+\newtheorem{example}{Example}%
+\newtheorem{remark}{Remark}%
+
+\theoremstyle{thmstylethree}%
+\newtheorem{definition}{Definition}%
+
+\raggedbottom
+
+\begin{document}
+
+\title[Adaptive Identification and Tracking]{Adaptive Candidate Routing for Distributed Occupant Recognition Across Multiple Building IoT-enabled Smart Spaces}
+
+\author*[1,2]{\fnm{First} \sur{Author}}\email{iauthor@gmail.com}
+
+\author[2,3]{\fnm{Second} \sur{Author}}\email{iiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\author[1,2]{\fnm{Third} \sur{Author}}\email{iiiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\affil*[1]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{100190}, \state{State}, \country{Country}}}
+
+\affil[2]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{10587}, \state{State}, \country{Country}}}
+
+\affil[3]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{610101}, \state{State}, \country{Country}}}
+
+
+\abstract{Conventional approaches to occupant recognition across multiple buildings resolve identity against a central database that holds the reference face embeddings of all occupants. Such a database concentrates sensitive biometric data and requires every identification attempt to be matched against the complete reference set. This work proposes a routing strategy for decentralized face recognition across the building-level state transition systems (BSTSs) of a distributed state transition system (DSTS). Each BSTS publishes a Bloom filter constructed from locality-sensitive hashing (LSH) codes of its registered occupants' face embeddings and retains the reference embeddings locally. A captured embedding is checked against all published filters, and only the highest-ranked BSTSs verify the identity against their local reference embeddings. An adaptive policy contacts additional BSTSs only when the candidate ranking is ambiguous. On 500 CASIA-WebFace identities distributed over 10 buildings, with results averaged over 20 random building assignments, verification over a five-building shortlist achieves 92.37\% correct identification, compared with 95.47\% for centralized search using the same voting rule. The adaptive policy achieves 92.44\% while contacting 2.54 BSTSs per identification attempt on average. The effective Bloom-filter false-positive rate is 3.54\%, above the configured 1\%. Communication costs are computed analytically, and encryption and the identification of unknown individuals are not evaluated.}
+
+\keywords{Occupant identification and tracking, Distributed state transition system, Smart spaces, Locality-sensitive hashing, Bloom filter, Face recognition}
+
+
+\maketitle
+
+\section{Introduction}
+
+IoT-enabled smart spaces use camera networks to monitor occupants and support building-level services~\cite{SM2022}. These applications require reliable occupant identification and tracking to associate facial observations with the correct individuals. When such services span multiple buildings, the system must determine which building holds the reference data needed to identify an observed occupant. In a distributed state transition system (DSTS), occupant behaviour is represented through states, events, and transition functions, with each building modelled as a building-level state transition system (BSTS) that maintains its local occupant-related state~\cite{mohan2020}. Resolving an observed face to the BSTS in which the occupant is registered is therefore necessary for generating recognition events and updating the corresponding states.
+
+Conventionally, cross-building recognition relies on a central database containing the reference face embeddings of all occupants, requiring each captured embedding to be transmitted for matching. This architecture concentrates sensitive biometric data in a central repository and requires each query to be matched against the complete reference set. To address these limitations, this work proposes a decentralized face recognition strategy that uses locality-sensitive hashing (LSH) and Bloom filters to route queries to the buildings most likely to contain the matching reference. LSH converts face embeddings extracted from reference images into compact binary codes using random hyperplane projections~\cite{charikar2002}, while Bloom filters~\cite{bloom1970} support space-efficient membership queries. Each building-level state transition system (BSTS) publishes a Bloom filter constructed from the LSH codes of its registered occupants' face embeddings while retaining the reference embeddings locally. For each query embedding, the system ranks BSTSs by the number of LSH slots with positive filter checks, selects a shortlist, and verifies the query against the shortlisted BSTSs' local reference embeddings through angular-distance voting. An accepted identity generates a recognition event for processing by the transition function of the corresponding BSTS.
+
+%=====================================================================
+\section{Related Work}
+\label{sec:related}
+
+Occupant identification and tracking in IoT-enabled smart spaces rely on camera-based and radio-frequency (RF)-based sensing~\cite{mohan2020,WZSYGWLLHSC2025}, and Wi-Fi-based indoor localization has been studied using weighted trilateration~\cite{MSSAB2019}. Camera-based systems enable unobtrusive facial identification, including tracking across non-overlapping cameras~\cite{nair2021}, and optimized camera placement improves the coverage of surveillance networks~\cite{SM2022}. In multi-building deployments, however, identity verification that depends on a central store of biometric data raises computational and privacy concerns~\cite{mohan2020}.
+
+State transition models represent occupant tracking through states, recognition events, and transition functions~\cite{MJG2011}. The DSTS extends this approach to multiple buildings, each represented by a BSTS, but resolves occupants through a centralized master list~\cite{mohan2020}; related work also addresses video synopsis~\cite{NGA2022} and quantitative metrics for smart spaces~\cite{MMJ2025}. Privacy-preserving biometric methods include Bloom-filter protection of iris templates~\cite{rathgeb2014}, and Marzani et al.~\cite{marzani2026} combine face features, fuzzy extractors, and homomorphically encrypted Bloom filters to count individuals across locations. In contrast, the present work uses LSH codes and per-BSTS Bloom filters to route a captured embedding towards candidate buildings on the basis of approximate similarity, while the reference embeddings remain local.
+
+The proposed routing builds on established techniques. Random-hyperplane LSH preserves angular similarity in binary codes~\cite{charikar2002}, multi-probe lookup examines nearby codes to improve recall without additional hash tables~\cite{lv2007}, and Bloom filters~\cite{bloom1970} provide compact approximate set membership with positions derived by double hashing~\cite{kirsch2006}. In distributed search, Summary Cache~\cite{fan2000} uses Bloom filters to identify web proxies likely to hold requested objects, Gottesb{\"u}ren et al.~\cite{gottesbueren2024} study partitioning-based routing of nearest-neighbor search requests to relevant data shards, and Semord~\cite{wang2026semord} organizes similar vectors in a decentralized overlay using learned hashing and exchanged summaries. Unlike approaches that rely on vector placement or shared vector summaries, the proposed framework publishes only compact Bloom filters of LSH codes and does not distribute reference face embeddings. To the best of our knowledge, this combination has not previously been evaluated for occupant identification across multiple BSTSs.
+
+% ============================================================
+% METHODOLOGY
+% ============================================================
+
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{System Model and Assumptions}
+\label{subsec:system_model}
+
+This work builds on the DSTS framework of Mohan and Menon~\cite{mohan2020} and considers a single sub-problem within it: identifying an occupant observed in one building without matching the captured embedding against the reference embeddings of every building. The environment consists of $B$ buildings, each with a BSTS that maintains a local reference database $\mathcal{D}_b$, $b\in\{1,\ldots,B\}$, containing the reference face embeddings of its registered occupants. Each BSTS publishes a Bloom filter derived from the LSH codes of its registered occupants and keeps $\mathcal{D}_b$ local. A captured face is converted into a captured embedding, which is checked against all published filters to rank the buildings; local verification is then carried out only at the highest-ranked buildings (Fig.~\ref{fig:workflow}), and the system abstains if none accepts. A centralized system that holds all reference embeddings in a single database serves as the performance baseline.
+
+Two assumptions delimit the scope. Communication between buildings is assumed to be secured by the deployment infrastructure, and encryption is neither implemented nor evaluated. LSH codes and Bloom filters are compact routing representations and not encryption mechanisms, so no formal privacy guarantee is claimed; the objective is to support identification without consolidating all reference embeddings in a single database. The optional end-of-day caching of visitor embeddings in the DSTS design is excluded from the evaluation.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.82\textwidth]{fig1_workflow.pdf}
+\caption{Workflow of the proposed routing strategy. A captured face is encoded into LSH codes, which are checked against the Bloom filters published by all buildings. Only the shortlisted buildings verify the identity against their locally retained reference embeddings.}
+\label{fig:workflow}
+\end{figure}
+
+\subsection{Face Embedding Preprocessing and LSH Encoding}
+\label{subsec:lsh_encoding}
+
+Faces are detected and aligned with SCRFD-10GF~\cite{guo2022}, and 512-dimensional face embeddings are extracted with a pretrained ArcFace model~\cite{deng2019} (InsightFace \code{buffalo\_l}); the same procedure is applied to reference and captured images. Let $\mathbf{e} \in \mathbb{R}^{512}$ denote a raw embedding. It is normalized, centered using the reference-derived mean $\bar{\mathbf{x}}$, and normalized again:
+\begin{equation}
+    \tilde{\mathbf{e}}
+    =
+    \frac{
+        \frac{\mathbf{e}}{\|\mathbf{e}\|_2}
+        - \bar{\mathbf{x}}
+    }{
+        \left\|
+        \frac{\mathbf{e}}{\|\mathbf{e}\|_2}
+        - \bar{\mathbf{x}}
+        \right\|_2
+    }.
+    \label{eq:embedding_preprocessing}
+\end{equation}
+For each registered occupant, the preprocessed reference embeddings $\tilde{\mathbf{e}}_1,\ldots,\tilde{\mathbf{e}}_R$ are summarized by a normalized centroid
+\begin{equation}
+    \mathbf{z}
+    =
+    \frac{
+        \sum_{r=1}^{R}\tilde{\mathbf{e}}_r
+    }{
+        \left\|\sum_{r=1}^{R}\tilde{\mathbf{e}}_r\right\|_2
+    }.
+    \label{eq:identity_centroid}
+\end{equation}
+LSH codes are generated with random hyperplanes~\cite{charikar2002}. For a hyperplane $\mathbf{w}_j$, the binary component is
+\begin{equation}
+    h_j(\mathbf{e}) =
+    \begin{cases}
+        1, & \mathbf{w}_j^\top\tilde{\mathbf{e}} \geq 0,\\
+        0, & \text{otherwise}.
+    \end{cases}
+    \label{eq:lsh_bit}
+\end{equation}
+Concatenating $K$ components yields a code $c_\ell(\mathbf{e})$ for slot $\ell$, and $L$ slots give $L$ opportunities for similar embeddings to produce matching codes. Each code is tagged with its slot identifier,
+\begin{equation}
+    s_\ell(\mathbf{e})
+    =
+    \ell 2^K + c_\ell(\mathbf{e}),
+    \label{eq:tagged_code}
+\end{equation}
+so that codes from different slots are never treated as the same item.
+
+\subsection{Parameter Selection}
+\label{subsec:parameter_selection}
+
+The number of bits per slot $K$ and the number of slots $L$ are selected from genuine and impostor comparisons between reference embeddings: a larger $K$ reduces chance collisions between different identities, and a larger $L$ increases the likelihood that similar embeddings agree in at least one slot. Multi-probe routing~\cite{lv2007} additionally examines codes obtained by flipping the bits with the smallest absolute hyperplane margins, using $P$ extra probes per slot. Routing selects a shortlist of at most $S$ buildings, local verification requires at least $V$ votes, and the adaptive policy uses a score-gap threshold $g_0$. The values used (Section~\ref{sec:setup}) define the evaluated configuration and are not claimed to be optimal.
+
+\subsection{Bloom-Filter Construction and Publication}
+\label{subsec:bloom_filter}
+
+Each building inserts the tagged LSH items of its registered occupants into a Bloom filter, $L$ items per occupant, so that $n=N\cdot L$ items are inserted for $N$ registered occupants. A Bloom filter~\cite{bloom1970} provides an approximate membership test: an item reported absent is not in the filter, whereas an item reported present may be a false positive. For a target false-positive probability $f^*$, the filter size and the number of hash positions are
+\begin{equation}
+    m =
+    \left\lceil
+    -\frac{n\ln f^*}{(\ln 2)^2}
+    \right\rceil,
+    \qquad
+    \kappa =
+    \operatorname{round}
+    \left(\frac{m}{n}\ln 2\right).
+    \label{eq:bloom_size}
+\end{equation}
+The $\kappa$ bit positions of an item are derived by double hashing~\cite{kirsch2006} from two base hash values computed with a 64-bit mixing function and a shared salt. A positive response does not establish that an identity is registered in a building; it only qualifies that building as a candidate for local verification.
+
+\subsection{Candidate Routing and Local Verification}
+\label{subsec:routing_verification}
+
+For a captured embedding, the system computes its LSH codes and the configured multi-probe items and checks them against each building's Bloom filter. The routing score $A_b$ of a building is the number of slots for which at least one probed item is reported present (each slot counts at most once), and the $S$ highest-ranked buildings form the shortlist, with ties resolved by building index. The score gap $g$ is the difference between the two highest scores.
+
+At a shortlisted building, the captured embedding is compared with the local reference embeddings by angular distance. A reference contributes a vote when its angle to the captured embedding is at most the threshold $\tau$, so the vote count of a registered occupant $u$ is $v_u=|\{r:\angle(\tilde{\mathbf{e}},\tilde{\mathbf{e}}_{u,r})\leq\tau\}|$. The occupant with the most votes (ties broken by the smallest angle $\theta_u$) is the local candidate and is accepted only if its vote count reaches $V$. This procedure, $\textsc{Verify}(b,\tilde{\mathbf{e}})$, returns the local candidate, its vote count and its smallest angle. Routing thus determines which reference databases are consulted, and the local reference embeddings provide the evidence for accepting or rejecting an identification.
+
+\subsection{Verification Policies}
+\label{subsec:verification_policies}
+
+Three verification policies determine which shortlisted buildings are contacted. Under the default policy, all shortlisted buildings verify the captured embedding, and the accepting building with the most votes is selected (ties are broken by the smaller angle, then by routing rank). Under sequential verification, the shortlisted buildings are contacted in routing order and verification stops at the first building that accepts; this contacts fewer buildings but may accept an incorrect identity from a building ranked above the correct one. Under adaptive verification, the score gap $g$ between the two highest-ranked buildings is compared with $g_0$: if $g\le g_0$ the ranking is ambiguous and all shortlisted buildings verify the captured embedding, and otherwise the sequential rule is used. In all policies the system abstains if no contacted building reaches $V$ votes.
+
+% ============================================================
+% EXPERIMENTAL SETUP
+% ============================================================
+
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Dataset and Protocol}
+
+The experiments use 500 identities of CASIA-WebFace~\cite{yi2014}, divided at random into $B=10$ buildings of 50 occupants each. For every identity, 20 images are enrolled as reference images and a further 20 images are held out as test images, which gives 10,000 reference embeddings and 10,000 test embeddings. Each test image is used as a captured face and is checked against the filters of all ten buildings. The evaluation is closed-set, as every identification attempt belongs to an enrolled occupant.
+
+\subsection{Parameters, Compared Methods and Repetitions}
+
+The mean embedding $\bar{\mathbf{x}}$ is computed from the 10,000 reference embeddings. The angle threshold $\tau=80.43^{\circ}$ is estimated from reference images only, from the angle statistics of genuine pairs (two reference images of the same identity) and impostor pairs (reference images of different identities); the test images are used only as captured faces. The same statistics give $K=11$ bits per slot and $L=122$ slots. The remaining parameters are $P=3$ probes, a shortlist of $S=5$ buildings, a verification threshold of $V=12$ votes, a score-gap threshold of $g_0=5$, and a Bloom-filter target false-positive probability of $f^*=0.01$, so that each filter holds $n=50\cdot122=6100$ items. The influence of $P$ is examined by varying it from 0 to 7.
+
+The centralized baseline searches the reference embeddings of all 500 identities using the same voting rule, which without routing corresponds to contacting all $B-1=9$ other buildings. The distributed system is evaluated with the three verification policies of Section~\ref{subsec:verification_policies}. Each distributed result is the mean over 20 random seeds, where a seed changes the assignment of identities to buildings, the LSH hyperplanes, and the Bloom-filter salt, while the embeddings, the mean, and $\tau$ are fixed. Results are reported with 95\% confidence half-widths based on the Student-$t$ distribution with 19 degrees of freedom.
+
+\subsection{Evaluation Metrics}
+
+Each identification attempt is assigned to exactly one of four outcomes. It is correct if the true occupant is accepted; it is misidentified if a different occupant is accepted; it is a verification rejection if the true building was shortlisted but no building reached $V$ votes; and it is a routing abstention if the true building was not shortlisted and no building reached $V$ votes. The centralized baseline has no routing step, so its non-correct and non-misidentified attempts are reported as abstentions. For the policies, the mean number of buildings contacted per attempt and the share of attempts contacting all five shortlisted buildings are reported. Bloom-filter quality is measured by the effective false-positive rate, obtained by testing the enrolled items of the other nine buildings against the filter of each building. Communication cost is computed analytically from the measured number of buildings contacted (Section~\ref{sec:cost}); latency and traffic are not measured, since all calls are executed in a single process.
+
+% ============================================================
+% RESULTS
+% ============================================================
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Distributed versus Centralized Identification}
+
+The centralized baseline achieves 95.47\% correct identification, with 1.41\% misidentification and 3.12\% abstention. Under the default distributed policy, correct identification is 92.37\%, misidentification is 1.42\%, and the remaining attempts are divided between 1.75\% verification rejections and 4.46\% routing abstentions. Correct identification is therefore 3.10 percentage points lower than for the centralized baseline, while the misidentification rate is essentially unchanged. The difference is attributable to routing, since in 4.46\% of attempts the building holding the correct reference is not among the five shortlisted buildings.
+
+Multi-probe routing reduces these routing abstentions. Without additional probes ($P=0$), 8.07\% of attempts result in routing abstention and correct identification is 88.28\%; with $P=3$, routing abstentions decrease to 4.46\% and correct identification increases to 92.37\%. Larger values of $P$ yield smaller improvements (92.89\% at $P=7$) while the lookups per filter, $L(1+P)$, grow linearly, so $P=3$ is adopted as a trade-off.
+
+\subsection{Verification Policies}
+
+Fig.~\ref{fig:results} and Table~\ref{tab:adaptive} compare centralized search with the three policies on the same 10,000 attempts. Exhaustive search contacts all $B-1=9$ other buildings, whereas the policies contact 1.50 (sequential), 2.54 (adaptive) and 5.00 (verify all five) buildings on average, reductions of 83\%, 72\% and 44\%. The policies break ties between equal vote counts by rank order, so verifying all five buildings gives 92.34\% here and 92.37\% for the default policy above. Sequential verification is the cheapest but raises misidentification to 2.17\%, because an incorrect building ranked above the correct one sometimes accepts first. Verifying all five buildings lowers misidentification to 1.45\% at the cost of five contacts per attempt. The adaptive policy achieves 92.44\% correct identification and 1.35\% misidentification, and all five shortlisted buildings are contacted for 37.6\% of attempts. All three policies abstain on the same attempts.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.62\textwidth]{fig2_results.pdf}
+\caption{Buildings contacted per identification attempt at 10 buildings (mean over 20 seeds). Centralized (exhaustive) search without routing contacts all $B-1=9$ other buildings, whereas the distributed policies contact only the shortlisted buildings required by their verification rule; the percentages give the reduction relative to exhaustive search.}
+\label{fig:results}
+\end{figure}
+
+\begin{table}[!t]
+\caption{Comparison of centralized (exhaustive) search and the verification policies for 10 buildings and a shortlist of five: mean over 20 random building assignments with 95\% confidence half-widths ($\pm$). The adaptive policy uses a score-gap threshold of 5: all five shortlisted buildings are verified when the top two routing scores differ by at most 5, and the sequential rule is used otherwise. Payload is the captured-embedding traffic per attempt (2.048~KB per building contacted).}
+\label{tab:adaptive}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.25}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+Method & \shortstack{Correct\\identification (\%)} & \shortstack{Misidentification\\(\%)} & \shortstack{Buildings contacted\\per attempt} & \shortstack{Payload per\\attempt (KB)} \\
+\hline
+Centralized (exhaustive) & 95.47 & 1.41 & 9 & 18.4 \\
+Sequential & 91.62 $\pm$ 0.08 & 2.17 $\pm$ 0.04 & 1.50 & 3.1 \\
+Adaptive & 92.44 $\pm$ 0.09 & 1.35 $\pm$ 0.04 & 2.54 & 5.2 \\
+Verify all five & 92.34 $\pm$ 0.09 & 1.45 $\pm$ 0.04 & 5.00 & 10.2 \\
+\hline
+\end{tabular}}
+\end{table}
+
+\subsection{Bloom-Filter False-Positive Rate}
+\label{sec:fpr}
+
+The Bloom filters are configured for a false-positive probability of 1\%, whereas the effective rate, measured by testing the enrolled items of the other nine buildings against each filter, is $3.54 \pm 0.02\%$. Without a Bloom array, $2.61 \pm 0.02\%$ of the items of other buildings already equal an enrolled item in the same slot, close to the 2.41\% expected if the codes of 50 occupants were evenly distributed over $2^{11}=2048$ values, whereas the Bloom array alone yields $0.94 \pm 0.01\%$ on random integers that were never inserted. The excess over the configured target therefore originates from collisions between LSH codes of different occupants and not from the Bloom array, so a positive filter response is a candidate signal and not evidence that an occupant is registered in the building.
+
+\subsection{Communication Cost}
+\label{sec:cost}
+
+The costs are computed from message sizes and the measured number of buildings contacted, and they exclude protocol headers, replies, filter updates, computation time, and the caching of reference embeddings. A 512-dimensional float32 embedding occupies 2,048 bytes, so an attempt contacting $q$ buildings generates $2048q$ bytes. A central database of the 10,000 reference embeddings occupies 20.5~MB, whereas the distributed design publishes ten Bloom filters of 7.3~KB each (73~KB in total) and each building retains 2.05~MB of reference embeddings locally. An attempt costs 3.1~KB under sequential verification (1.50 buildings), 5.2~KB under adaptive verification (2.54 buildings), and 10.2~KB when all five shortlisted buildings are contacted, compared with 18.4~KB for exhaustive search over the other nine buildings (Table~\ref{tab:adaptive}); a central database receives the embedding once (2.0~KB) but holds all reference embeddings in one place. Each attempt also requires $B\cdot L(1+P)=4{,}880$ filter lookups, which grow linearly with the number of buildings.
+
+% ============================================================
+% DISCUSSION
+% ============================================================
+
+\section{Discussion}
+\label{sec:discussion}
+
+The results indicate a trade-off between identification accuracy and the number of buildings contacted. Restricting verification to a shortlist reduces the number of reference databases consulted, but the building holding the correct identity may be excluded from it; this accounts for the 3.10 percentage-point difference from centralized search, since the misidentification rate is unchanged. Sequential verification has the lowest cost but accepts incorrect identities more often, whereas the adaptive policy verifies all candidates only when the top scores are close. It attained the accuracy of verifying all five buildings while contacting approximately half as many, although 37.6\% of attempts still required all five, so further reductions depend on a more discriminative ranking. The additional candidates caused by the 3.54\% false-positive rate are rejected by local verification, so the effect is on routing efficiency and not on the accepted identities.
+
+From a security perspective, the published filters are derived from LSH codes of occupant embeddings, which preserve similarity. A party with access to the filters and the public hash parameters could therefore test whether a given face produces filter hits for a building and thereby infer that the person may be registered there, even though no reference embedding is published. This exposure was not measured here, and protecting the filters, for example through access control, keyed hashing, or encrypted filters, is left for future work. Within the DSTS context, this study addresses the identification component and not the complete tracking and state-transition workflow.
+
+% ============================================================
+% CONCLUSION
+% ============================================================
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+This work presented a routing strategy for decentralized face recognition across multiple buildings, in which per-building Bloom filters of LSH codes direct a captured face to the buildings that are likely to hold the matching reference, without a central database of reference embeddings. On 500 CASIA-WebFace identities distributed over 10 buildings, the default policy achieved 92.37\% correct identification against 95.47\% for centralized search, and the adaptive policy achieved 92.44\% while contacting 2.54 buildings and an estimated 5.2~KB of captured-embedding payload per attempt on average. The reduction in contacted buildings is accompanied by a loss of recall when the correct building is not shortlisted, and by a false-positive rate that LSH code collisions raise above the Bloom-filter design value. Future work includes evaluation on a larger and more varied population, more reliable candidate ranking, protection of the published filters, identification of unknown visitors with a stricter acceptance rule, and measurement of communication costs in a deployed system.
+
+% ============================================================
+% LIMITATIONS
+% ============================================================
+
+\section{Limitations}
+\label{sec:limitations}
+
+The evaluation uses 500 identities from a single public dataset and 10 buildings, and the confidence intervals reflect variation in building assignment and hash randomness rather than a different population. The values $K=11$ and $P=3$ were chosen after observing accuracy on the test images, and the overlap between the ArcFace training data and CASIA-WebFace was not checked. The evaluation is closed-set, so the acceptance rule was not assessed for unknown individuals such as visitors. Communication costs are computed from message sizes, and latency, throughput, and filter synchronization were not measured. The encrypted channel and visitor caching were not implemented, no security analysis of the published filters was carried out, and no formal privacy guarantee is established. A Bloom filter cannot delete items, so a change in enrollment requires rebuilding it.
+
+\bmhead{Acknowledgement}
+
+The authors gratefully acknowledge Sri Mata Amritanandamayi Devi (Amma), Chancellor, Amrita Vishwa Vidyapeetham, for her inspiration and for providing financial support for the Article Processing Charges (APC) of this publication.
+
+\bibliography{akd}% akd.bib
+
+\end{document}
