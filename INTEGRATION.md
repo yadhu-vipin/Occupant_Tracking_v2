@@ -218,7 +218,7 @@ Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Build
 
 ## 8. Limits and choices to be aware of
 
-* **The zip's UI is not the default front page.** `/` is still the console. Flip it with `--ui lane_d` / `DSTS_DEFAULT_UI=lane_d`, or change the default in `dsts/api/server.py::index` if the Lane D page should be primary.
+* **The Lane D dashboard is the front page.** `/` serves it (also at `/lane-d/`). The older console is kept at `/console`; `--ui console` / `DSTS_DEFAULT_UI=console` makes it the front page again.
 * **Role mapping is a demo mapping.** Officer / Analyst / Self are not the zip's old row filters any more; they are a Dean, a Teacher and a Student of the run. The zip's `dsts/security/access.py` (officer / analyst / self filters) is only used by the standalone demo.
 * **The standalone demo is not the project's security.** Its HMAC transport and role filters demonstrate behaviour on fakes; the real layers are `access_control/` and `secure_transfer/` (README §7–8).
 * **Persona login needs `DSTS_DEMO_MODE=1`**, like the console. With it off, `/lane-d/` shows the server's 403 message instead of data.

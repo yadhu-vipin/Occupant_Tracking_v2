@@ -35,7 +35,7 @@ from fastapi import (
     Depends,
     status,
 )
-from fastapi.responses import RedirectResponse, FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from prometheus_client import (
@@ -384,15 +384,16 @@ def _console_page() -> FileResponse:
 
 @app.get("/", include_in_schema=False)
 def index():
-    """The Command Center console. ``DSTS_DEFAULT_UI=lane_d`` makes the Lane D dashboard (/lane-d/) the front page."""
-    if os.environ.get("DSTS_DEFAULT_UI", "").strip().lower() in ("lane_d", "lane-d"):
-        return RedirectResponse("/lane-d/")
-    return _console_page()
+    """The front page is the Lane D dashboard. ``DSTS_DEFAULT_UI=console`` brings the older Command Center console back
+    as the front page; either UI is always reachable at /lane-d/ and /console."""
+    if os.environ.get("DSTS_DEFAULT_UI", "").strip().lower() in ("console", "command_center"):
+        return _console_page()
+    return HTMLResponse(_lane_d.render_index("integrated", "/lane-d/static"))
 
 
 @app.get("/console", include_in_schema=False)
 def console() -> FileResponse:
-    """The console, always (even when the front page is switched to Lane D)."""
+    """The older Command Center console, always (the front page is the Lane D dashboard unless switched back)."""
     return _console_page()
 
 
@@ -1183,7 +1184,7 @@ async def ws_live(websocket: WebSocket, ticket: Optional[str] = Query(None)) -> 
         _subscribers.pop(websocket, None)
 
 
-# The Lane D dashboard (dsts_final.zip) on the real data: /lane-d/ and /lane-d/api/* -- see dsts/api/lane_d.py.
+# The Lane D dashboard (dsts_final.zip) on the real data: the front page, /lane-d/ and /lane-d/api/* -- see dsts/api/lane_d.py.
 from dsts.api import lane_d as _lane_d  # noqa: E402
 _lane_d.mount(app)
 

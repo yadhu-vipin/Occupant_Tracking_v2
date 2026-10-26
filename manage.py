@@ -6,9 +6,10 @@
     python manage.py pipeline [--seed N]        the same, for one seed (default seed from config/experiment.yaml)
     python manage.py states [--seed N]          per-state TP/TN/FP/FN vs ground truth
     python manage.py demo [--seed N]            RBAC + queries end to end
-    python manage.py serve [--seed N] [--ui lane_d]
-                                                start the real system on http://127.0.0.1:8000: the console at /, the
-                                                Lane D dashboard at /lane-d/ (--ui lane_d makes it the front page)
+    python manage.py serve [--seed N] [--ui console]
+                                                start the real system on http://127.0.0.1:8000: the Lane D dashboard at /
+                                                (and /lane-d/), the older console at /console (--ui console makes the
+                                                console the front page again)
     python manage.py standalone                 the Lane D dashboard on its offline, fake-backed demo server (:8001)
     python manage.py walk                       scripted B1 -> B5 walk in the terminal (offline, needs no corpus)
     python manage.py query [--seed N] ARGS...   pipeline/query.py (e.g. --caller X --target Y --query Q6)
