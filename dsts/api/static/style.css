@@ -2115,3 +2115,77 @@ button {
   font-family: var(--mono);
   font-size: 12px;
 }
+/* "Why this answer" card: label column + value column, compact evidence rows */
+.reasoning-grid {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 6px 14px;
+  align-items: start;
+}
+
+.reasoning-label {
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.reasoning-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.reasoning-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.reasoning-list li {
+  padding: 2px 0;
+  line-height: 1.5;
+}
+
+.reasoning-role {
+  display: inline-block;
+  min-width: 108px;
+  margin-right: 8px;
+  padding: 0 6px;
+  border: 1px solid rgba(90, 169, 255, 0.45);
+  border-radius: 4px;
+  background: rgba(90, 169, 255, 0.12);
+  color: var(--blue);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.reasoning-chip {
+  display: inline-block;
+  margin: 0 6px 4px 0;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.reasoning-chip b {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.reasoning-muted {
+  color: var(--muted);
+}
+
+@media (max-width: 550px) {
+  .reasoning-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .reasoning-label {
+    margin-top: 6px;
+  }
+}

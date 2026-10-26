@@ -1529,8 +1529,36 @@ function executeCurrentQuery() {
   });
 }
 
+const flagTags = (flags) => flags.map(f => `<span class="tag-redacted">${escapeHTML(f)}</span>`).join(" ");
+
+// One "key value" chip per entry; nested objects (flag counts, checklists) become "k v, k v".
+function reasoningDetails(details) {
+  return Object.entries(details).map(([key, value]) => {
+    const shown = value !== null && typeof value === "object"
+      ? Object.entries(value).map(([k, v]) => `${k} ${v}`).join(", ") || "none"
+      : String(value);
+    return `<span class="reasoning-chip"><b>${escapeHTML(key.replace(/_/g, " "))}</b> ${escapeHTML(shown)}</span>`;
+  }).join("");
+}
+
+// A single pointer (Q6 fast path) or TRACK's visit segments, each with its own flags.
+function reasoningPointer(pointer) {
+  if (!pointer.segments) {
+    return Object.entries(pointer).map(([k, v]) =>
+      `<span class="reasoning-chip"><b>${escapeHTML(k.replace(/_/g, " "))}</b> ${escapeHTML(String(v))}</span>`).join("");
+  }
+  const rows = pointer.segments.map(s => {
+    const span = `${s.entry_time}–${s.exit_time || "open"}`;
+    const flags = (s.uncertainty || []).length ? flagTags(s.uncertainty)
+      : `<span class="reasoning-muted">${escapeHTML(String(s.sightings ?? 0))} sighting(s)</span>`;
+    return `<li>${escapeHTML(`${s.current_building} · ${span} · ${s.status}`)} ${flags}</li>`;
+  }).join("");
+  return `<ul class="reasoning-list">${rows}</ul>`;
+}
+
 // Rule / Evidence / Absence / Uncertainty / Withheld, as redacted by the server.
-function renderReasoning(expl) {
+// answerWithheld: what the server removed from the answer itself (e.g. a visitor's other buildings).
+function renderReasoning(expl, answerWithheld) {
   const card = $("#reasoning-card");
   const body = $("#reasoning-body");
   if (!card || !body) return;
@@ -1543,7 +1571,7 @@ function renderReasoning(expl) {
   if (level) level.textContent = expl.disclosure_level || "";
 
   const row = (label, html) =>
-    `<div style="margin-bottom:6px;"><span style="font-weight:700;color:var(--muted);display:inline-block;min-width:96px;">${label}</span>${html}</div>`;
+    `<div class="reasoning-label">${label}</div><div class="reasoning-value">${html}</div>`;
   const parts = [];
   if (expl.rule) parts.push(row("Rule", escapeHTML(expl.rule)));
 
@@ -1553,25 +1581,24 @@ function renderReasoning(expl) {
       const bits = [e.time, e.building, e.zone, e.occupant_id ? `occupant ${e.occupant_id}` : null,
                     e.event_id ? `(${e.event_id})` : null, e.provenance?.mode ? `via ${e.provenance.mode}` : null,
                     e.note].filter(Boolean).map(escapeHTML).join(" · ");
-      return `<li><span class="badge-level" style="margin-right:6px;">${escapeHTML(e.role)}</span>${bits}</li>`;
+      return `<li><span class="reasoning-role">${escapeHTML(e.role)}</span>${bits}</li>`;
     }).join("");
-    const more = evidence.length > 12 ? `<li>… and ${evidence.length - 12} more</li>` : "";
-    parts.push(row("Evidence", `<ul style="margin:4px 0 0 0;padding-left:18px;font-family:var(--mono);">${items}${more}</ul>`));
+    const more = evidence.length > 12 ? `<li class="reasoning-muted">… and ${evidence.length - 12} more</li>` : "";
+    parts.push(row("Evidence", `<ul class="reasoning-list">${items}${more}</ul>`));
   } else if ("evidence" in expl) {
-    parts.push(row("Evidence", "none shown"));
+    parts.push(row("Evidence", `<span class="reasoning-muted">none shown</span>`));
   }
-  if (expl.pointer_used) parts.push(row("Pointer", escapeHTML(JSON.stringify(expl.pointer_used))));
-  if (expl.details && Object.keys(expl.details).length) parts.push(row("Details", escapeHTML(JSON.stringify(expl.details))));
+  if (expl.pointer_used) parts.push(row("Pointer", reasoningPointer(expl.pointer_used)));
+  if (expl.details && Object.keys(expl.details).length) parts.push(row("Details", reasoningDetails(expl.details)));
   if (expl.absence) parts.push(row("Absence", escapeHTML(expl.absence)));
   if ("uncertainty" in expl) {
-    parts.push(row("Uncertainty", (expl.uncertainty || []).length
-      ? expl.uncertainty.map(f => `<span class="tag-redacted">${escapeHTML(f)}</span>`).join(" ")
-      : "none"));
+    parts.push(row("Uncertainty", (expl.uncertainty || []).length ? flagTags(expl.uncertainty) : "none"));
   }
   parts.push(row("Withheld", (expl.withheld || []).length
     ? expl.withheld.map(escapeHTML).join("; ")
     : "nothing"));
-  body.innerHTML = parts.join("");
+  if ((answerWithheld || []).length) parts.push(row("Answer withheld", answerWithheld.map(escapeHTML).join("; ")));
+  body.innerHTML = `<div class="reasoning-grid">${parts.join("")}</div>`;
 }
 
 async function runQuery(body) {
@@ -1654,7 +1681,7 @@ async function runQuery(body) {
     }
 
     // 2b. Answer reasoning: the server sends it already redacted for this caller.
-    renderReasoning(data.explanation);
+    renderReasoning(data.explanation, data.withheld);
 
     // 3. Update Explainability Card
     const explainCard = $("#explain-card");
