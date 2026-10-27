@@ -10,6 +10,7 @@ index the wrong rows or crash. Returning a matched pair with the index reset
 makes that impossible to get wrong -- and the result is bit-identical to running
 on the full array and selecting the building afterwards (asserted below).
 """
+import json
 from pathlib import Path
 
 import numpy as np
@@ -18,11 +19,17 @@ import pandas as pd
 BUILDING_COL = "building"
 OCCUPANT_COL = "occupant_id"
 
-from shared.paths import CORPUS_DIR, run_paths
+from shared.paths import CORPUS_DIR, REPO, run_paths
 
 
 def default_emb_path():
-    """Where the CLIs look for ``emb_arcface.npy`` (the corpus is shared by every run)."""
+    """Where the CLIs look for the embeddings: the active run's extended corpus (population.json
+    ``corpus_embeddings``, set when the masked building is part of the run), else the shared ``emb_arcface.npy``."""
+    population = run_paths().population_json
+    if population.exists():
+        extended = json.loads(population.read_text(encoding="utf-8")).get("corpus_embeddings")
+        if extended:
+            return REPO / extended
     return CORPUS_DIR / "emb_arcface.npy"
 
 

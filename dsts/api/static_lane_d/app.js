@@ -54,9 +54,9 @@ function renderCampus(){
  let s=`<svg viewBox="0 -62 680 410"><defs><filter id="gl"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><polygon points="340,20 660,170 340,320 20,170" fill="#0c1334" stroke="#3b46a8" stroke-opacity=".6"/>`;
  for(let i=1;i<8;i++){const t=i/8;s+=`<line x1="${340-320*t}" y1="${20+150*t}" x2="${340+320*(1-t)}" y2="${170+150*(1-t)}" stroke="#4452c9" stroke-opacity=".18"/><line x1="${340+320*t}" y1="${20+150*t}" x2="${340-320*(1-t)}" y2="${170+150*(1-t)}" stroke="#4452c9" stroke-opacity=".18"/>`}
  G.slice().sort((p,q)=>p.y-q.y||p.x-q.x).forEach(g=>s+=box(g.x,g.y,g.h,g.c));
- G.forEach(g=>{const n=Object.values(S.heat[g.q.id]||{}).reduce((p,q)=>p+q,0),lab=String(g.q.id).replace(/^building_/,"B");
+ G.forEach(g=>{const n=Object.values(S.heat[g.q.id]||{}).reduce((p,q)=>p+q,0),lab=String(g.q.id).replace(/^building_/,"B")+(g.q.id===S.layout?.masked_building?" \u{1F637}":"");
   s+=`<g transform="translate(${g.x-30},${g.y-g.h-44})"><rect width="60" height="28" rx="8" fill="#0b1030" stroke="${g.c}" stroke-opacity=".8"/><text x="30" y="12" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">${safe(lab)}</text><text x="30" y="23" text-anchor="middle" fill="#aab4e8" font-size="8.5">${g.q.occupants.length} occ · ${n} here</text></g>`});
- $("#campus").innerHTML=s+"</svg>";$("#campus-sub").textContent=`${bs.length} buildings`;
+ $("#campus").innerHTML=s+"</svg>";$("#campus-sub").textContent=`${bs.length} buildings`+(S.layout?.masked_building?` \u00b7 ${String(S.layout.masked_building).replace(/^building_/,"B")} \u{1F637} everyone masked`:"");
 }
 /* zones */
 const heat=(v,m)=>{if(!v)return"#2b3555";const t=Math.min(v/Math.max(m,1),1);return t<.34?"#22c55e":t<.67?"#facc15":"#f97316"};

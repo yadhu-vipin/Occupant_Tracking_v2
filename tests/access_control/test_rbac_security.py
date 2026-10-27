@@ -253,7 +253,7 @@ def test_health_is_minimal_without_token_and_detailed_with_one():
     anon = client.get("/api/health").json()
     assert anon == {"status": "healthy", "service": "dsts-command-center", "version": "2.1.0"}
     full = client.get("/api/health", headers=tok(DEAN5)).json()
-    assert full["registered_occupants"] == 500
+    assert full["registered_occupants"] == len(srv._roles)           # everyone in the active run (550 with the masked building)
 
 
 def test_cache_stats_dean_only():

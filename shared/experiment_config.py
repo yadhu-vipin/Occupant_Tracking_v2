@@ -20,6 +20,14 @@ class PopulationConfig:
 
 
 @dataclass(frozen=True)
+class MaskedBuildingConfig:
+    """An extra building whose occupants all appear masked (built from MFR2 by tools/build_masked_building.py)."""
+    enabled: bool = False
+    building: str = "building_11"
+    dir: str = "corpus/masked"           # holds emb_arcface.npy + meta.csv for that building
+
+
+@dataclass(frozen=True)
 class EventsConfig:
     n_days: int = 14
     start_date: str = "2026-01-05"
@@ -42,6 +50,7 @@ class VisitorPoolConfig:
 @dataclass(frozen=True)
 class ExperimentConfig:
     population: PopulationConfig = field(default_factory=PopulationConfig)
+    masked_building: MaskedBuildingConfig = field(default_factory=MaskedBuildingConfig)
     events: EventsConfig = field(default_factory=EventsConfig)
     visitor_pool: VisitorPoolConfig = field(default_factory=VisitorPoolConfig)
 
@@ -55,6 +64,7 @@ def load_experiment_config(path: Optional[Path] = None) -> ExperimentConfig:
                   for r in pool.get("promote_when", [])) or VisitorPoolConfig().promote_when
     return ExperimentConfig(
         population=PopulationConfig(**(raw.get("population") or {})),
+        masked_building=MaskedBuildingConfig(**(raw.get("masked_building") or {})),
         events=EventsConfig(**(raw.get("events") or {})),
         visitor_pool=VisitorPoolConfig(promote_when=rules),
     )

@@ -54,14 +54,14 @@ def test_every_data_endpoint_needs_a_token(path):
 # ---------------------------------------------------------------- data views
 def test_layout_carries_the_callers_building_and_the_demo_target():
     d = client.get("/lane-d/api/layout", headers=auth(P.dean)).json()
-    assert len(d["buildings"]) == 10 and all(len(b["occupants"]) == 50 for b in d["buildings"])
+    assert len(d["buildings"]) >= 10 and all(len(b["occupants"]) == 50 for b in d["buildings"])
     assert d["home_building"] == P.building and d["default_target"] == P.target
     assert client.get("/lane-d/api/layout", headers=auth(P.outsider)).json()["home_building"] != P.building
 
 
 def test_heatmap_is_campus_wide_but_occupancy_follows_the_role():
     heat = client.get("/lane-d/api/heatmap", headers=auth(P.student)).json()
-    assert len(heat) == 10 and sum(sum(zones.values()) for zones in heat.values()) > 0
+    assert len(heat) >= 10 and sum(sum(zones.values()) for zones in heat.values()) > 0      # 11 with the masked building
     dean = client.get("/lane-d/api/occupancy", headers=auth(P.dean)).json()
     student = client.get("/lane-d/api/occupancy", headers=auth(P.student)).json()
     dean_rows = [r for rows in dean.values() for r in rows]
@@ -151,3 +151,20 @@ def test_generator_demo_walk_and_reset_are_dean_only_and_work():
         assert walk.json()["home_building"] == "building_1" and walk.json()["events_run"] > 0
     assert client.post("/lane-d/api/reset", headers=auth(P.student)).status_code == 403
     assert client.post("/lane-d/api/reset", headers=auth(P.dean)).json()["status"] == "reset"
+
+
+def test_the_masked_building_is_part_of_the_run_and_its_captures_are_masked_faces():
+    import json
+    import pandas as pd
+    from shared.paths import run_paths
+    population = json.loads(run_paths().population_json.read_text())
+    masked = population.get("masked_building")
+    if not masked:
+        pytest.skip("this run was built without the masked building")
+    layout = client.get("/lane-d/api/layout", headers=auth(P.dean)).json()
+    assert layout["masked_building"] == masked and masked in {b["id"] for b in layout["buildings"]}
+    meta = pd.read_csv(run_paths().corpus_meta, dtype={"occupant_id": str})
+    truth = json.loads(run_paths().ground_truth.read_text())
+    mine = [t for t in truth if t["home_building"] == masked]
+    assert mine and all(int(meta.loc[t["embedding_row"], "masked"]) == 1 for t in mine)   # every capture is a masked face
+    assert all(int(meta.loc[t["embedding_row"], "masked"]) == 0 for t in truth if t["home_building"] != masked)

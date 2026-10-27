@@ -67,6 +67,13 @@ def lane_d_index() -> HTMLResponse:
 
 
 # ------------------------------------------------------------------ data views
+def _masked_building() -> Optional[str]:
+    """The building whose occupants are all seen masked in this run (None when the run has no masked building)."""
+    from shared.paths import run_paths
+    population = run_paths().population_json
+    return json.loads(population.read_text(encoding="utf-8")).get("masked_building") if population.exists() else None
+
+
 @router.get("/api/layout")
 def layout(who: str = Depends(principal)) -> dict:
     """The campus (buildings and their occupants) plus, for the form defaults, the caller's own building and the
@@ -74,7 +81,7 @@ def layout(who: str = Depends(principal)) -> dict:
     srv = _srv()
     return {**srv._load_layout(), "home_building": srv.get_occupant_building(who),
             "default_target": srv._demo_personas()["target"],
-            "default_date": srv._get_engine().default_date}
+            "default_date": srv._get_engine().default_date, "masked_building": _masked_building()}
 
 
 @router.get("/api/occupancy")

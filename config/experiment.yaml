@@ -5,6 +5,14 @@ population:
   per_building: 50         # registered occupants per building (n_buildings * per_building = identities used)
   default_seed: 42         # run used when no --seed / DSTS_SEED is given
 
+masked_building:
+  # building_11: 50 more people, every one of them seen WITH A MASK (MFR2 faces, see corpus/masked/README.md).
+  # Their galleries are unmasked, their capture embeddings are masked. Build the data once with
+  # `python tools/build_masked_building.py`; set enabled: false to run the original 10 buildings only.
+  enabled: true
+  building: building_11
+  dir: corpus/masked
+
 events:
   n_days: 14               # simulated days (events carry a date)
   start_date: "2026-01-05" # first simulated day

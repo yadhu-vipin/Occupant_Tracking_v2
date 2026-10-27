@@ -139,18 +139,44 @@ def predicted_occupant(recognition_result, attempt):
     return None
 
 
-def event_confusion(rows):
+def event_confusion(rows, masked_building=None):
     """One-vs-rest TP / FP / FN / TN over occupant identities (see ``evaluation/confusion.py``), for all events and
-    split into local and visitor events. An abstention is a FN only; a wrong identity is a FP and a FN."""
+    split into local and visitor events. An abstention is a FN only; a wrong identity is a FP and a FN.
+
+    With a masked building, the same is reported for the people of that building (every capture of them is a masked
+    face, at home and while visiting) as ``masked`` / ``masked_local`` / ``masked_visitor`` and for everybody else as
+    ``unmasked``; the label set stays the full population so the cohorts are comparable."""
     labels = len({r["occupant_id"] for r in rows})
 
     def pairs(subset):
         return [(r["occupant_id"], r.get("predicted_occupant_id")) for r in subset]
 
-    return {"n_labels": labels,
-            "all": one_vs_rest(pairs(rows), labels),
-            "local": one_vs_rest(pairs([r for r in rows if r["event_type"] == "local"]), labels),
-            "visitor": one_vs_rest(pairs([r for r in rows if r["event_type"] == "visitor"]), labels)}
+    out = {"n_labels": labels,
+           "all": one_vs_rest(pairs(rows), labels),
+           "local": one_vs_rest(pairs([r for r in rows if r["event_type"] == "local"]), labels),
+           "visitor": one_vs_rest(pairs([r for r in rows if r["event_type"] == "visitor"]), labels)}
+    if masked_building:
+        masked = [r for r in rows if r["home_building"] == masked_building]
+        out["masked"] = one_vs_rest(pairs(masked), labels)
+        out["masked_local"] = one_vs_rest(pairs([r for r in masked if r["event_type"] == "local"]), labels)
+        out["masked_visitor"] = one_vs_rest(pairs([r for r in masked if r["event_type"] == "visitor"]), labels)
+        out["unmasked"] = one_vs_rest(pairs([r for r in rows if r["home_building"] != masked_building]), labels)
+    return out
+
+
+def masked_cohort(rows, masked_building):
+    """Plain identification accuracy (the predicted identity is the true one) for masked vs unmasked people."""
+    def block(subset):
+        local = [r for r in subset if r["event_type"] == "local"]
+        visitor = [r for r in subset if r["event_type"] == "visitor"]
+        hit = lambda part: sum(r.get("predicted_occupant_id") == r["occupant_id"] for r in part)   # noqa: E731
+        rate = lambda part: hit(part) / len(part) if part else 0.0                                 # noqa: E731
+        return {"events": len(subset), "local_events": len(local), "visitor_events": len(visitor),
+                "accuracy": rate(subset), "local_accuracy": rate(local), "visitor_accuracy": rate(visitor),
+                "abstained": sum(r.get("predicted_occupant_id") is None for r in subset)}
+    return {"masked_building": masked_building,
+            "masked": block([r for r in rows if r["home_building"] == masked_building]),
+            "unmasked": block([r for r in rows if r["home_building"] != masked_building])}
 
 
 def build_event_rows(ground_truth, recognition_by_id, retrieval_by_id):
@@ -253,7 +279,7 @@ def pointer_precision(nodes_dir, ground_truth):
 # summary
 # --------------------------------------------------------------------------
 
-def summarize(rows, pointer_report):
+def summarize(rows, pointer_report, masked_building=None):
     visitor_rows = [r for r in rows if r["event_type"] == "visitor"]
     local_rows = [r for r in rows if r["event_type"] == "local"]
     attempted_rows = [r for r in visitor_rows if r["outcome"] != "LOCAL_FALSE_ACCEPT_OF_VISITOR"]
@@ -289,7 +315,8 @@ def summarize(rows, pointer_report):
         ),
         "visitor_bucket_counts": {bucket: count(visitor_rows, bucket) for bucket in VISITOR_BUCKETS},
         "pointer_precision": pointer_report,
-        "event_confusion": event_confusion(rows),
+        "event_confusion": event_confusion(rows, masked_building),
+        **({"masked_cohort": masked_cohort(rows, masked_building)} if masked_building else {}),
     }
 
 
@@ -333,7 +360,10 @@ def run_evaluation(
 
     rows = build_event_rows(ground_truth, recognition_by_id, retrieval_by_id)
     pointer_report = pointer_precision(n_dir, ground_truth)
-    summary = summarize(rows, pointer_report)
+    population = run_paths().population_json
+    masked_building = (json.loads(population.read_text(encoding="utf-8")).get("masked_building")
+                       if population.exists() else None)
+    summary = summarize(rows, pointer_report, masked_building)
 
     # Incorporate phase4_results_path when present
     p4_path = phase4_results_path or (run_paths().phase4_results)

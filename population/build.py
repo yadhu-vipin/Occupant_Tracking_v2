@@ -17,9 +17,10 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from population.corpus import BASE_META, load_corpus
 from population.roles import build_roles, by_building_from_meta, write_roles
 from shared.experiment_config import load_experiment_config
-from shared.paths import CORPUS_DIR, RunPaths, run_paths
+from shared.paths import REPO, RunPaths, run_paths
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,8 @@ class Population:
     per_building: int
     person_building: Dict[str, str]       # occupant_id -> "building_N" (1-based)
     meta: pd.DataFrame                    # corpus rows with `building` reassigned
+    corpus_emb: Optional[str] = None      # embedding file the rows index into (repo-relative), when not the base corpus
+    masked_building: Optional[str] = None # the building whose occupants are all masked, when enabled
 
     @property
     def by_building(self) -> Dict[str, List[str]]:
@@ -52,25 +55,34 @@ def build_population(seed: int, meta: Optional[pd.DataFrame] = None,
     cfg = load_experiment_config().population
     n_buildings = n_buildings or cfg.n_buildings
     per_building = per_building or cfg.per_building
+    fixed: Dict[str, str] = {}
+    corpus_emb = None
     if meta is None:
-        meta = pd.read_csv(CORPUS_DIR / "meta.csv")
+        corpus = load_corpus()
+        meta, fixed = corpus.meta, corpus.fixed_building
+        corpus_emb = corpus.emb_path.relative_to(REPO).as_posix() if corpus.masked else None
     meta = meta.assign(occupant_id=meta["occupant_id"].astype(str).str.zfill(7))
-    mapping = assign_buildings(sorted(meta["occupant_id"].unique()), seed, n_buildings, per_building)
+    dealt = [o for o in sorted(meta["occupant_id"].unique()) if o not in fixed]
+    mapping = assign_buildings(dealt, seed, n_buildings, per_building)
+    mapping.update(fixed)                                # the masked building's people are not shuffled
     kept = meta[meta["occupant_id"].isin(mapping)].copy()
     kept["building"] = kept["occupant_id"].map(mapping)
-    return Population(seed, n_buildings, per_building, mapping, kept.reset_index(drop=True))
+    masked_building = sorted(set(fixed.values()))[0] if fixed else None
+    return Population(seed, n_buildings + (1 if fixed else 0), per_building, mapping, kept.reset_index(drop=True),
+                      corpus_emb, masked_building)
 
 
 def write_population(pop: Population, paths: RunPaths) -> RunPaths:
     paths.ensure()
-    corpus_rows = len(pd.read_csv(CORPUS_DIR / "meta.csv"))
+    corpus_rows = len(load_corpus().meta) if pop.corpus_emb else len(pd.read_csv(BASE_META))
     if len(pop.meta) != corpus_rows:
         raise ValueError(f"the pipeline needs the population to cover every corpus row ({corpus_rows}), got {len(pop.meta)}; "
                          "use n_buildings * per_building equal to the number of corpus identities")
     pop.meta.to_csv(paths.corpus_meta, index=False)
     paths.population_json.write_text(json.dumps(
         {"seed": pop.seed, "n_buildings": pop.n_buildings, "per_building": pop.per_building,
-         "person_building": pop.person_building}, indent=1, sort_keys=True) + "\n")
+         "person_building": pop.person_building, "corpus_embeddings": pop.corpus_emb,
+         "masked_building": pop.masked_building}, indent=1, sort_keys=True) + "\n")
     write_roles(build_roles(pop.by_building, pop.seed), paths.roles_dir)
     return paths
 

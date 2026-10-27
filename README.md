@@ -28,7 +28,7 @@ bash paper/reproduce.sh                     # rebuild every number in the paper
 
 Every command that reads a run accepts `--seed N` (or set `DSTS_SEED` / `DSTS_RUN_DIR`). Without one it uses the default seed in `config/experiment.yaml`.
 
-The embedding corpus is not in git. Put `emb_arcface.npy` (20,000 × 512 float32 ArcFace embeddings, ~39 MB) and `meta.csv` (columns `building`, `occupant_id`, `split`, row-aligned) in `corpus/`. Every command finds them there, or takes `--emb` and `--meta`.
+The embedding corpus is not in git. Put `emb_arcface.npy` (20,000 × 512 float32 ArcFace embeddings, ~39 MB) and `meta.csv` (columns `building`, `occupant_id`, `split`, row-aligned) in `corpus/`. Every command finds them there, or takes `--emb` and `--meta`. The masked building's data (`corpus/masked/`, built from MFR2 with `python manage.py masked`) is also not in git; without it set `masked_building.enabled: false` in `config/experiment.yaml`.
 
 To use the website with the three demo personas, start the server with the demo switch on:
 
@@ -51,7 +51,7 @@ Environment variables used by the server:
 
 ## 2. What the project is
 
-A research prototype of **decentralised occupant identification and tracking across campus buildings**. There are 10 buildings with 50 registered occupants each (500 people). Each building keeps its own face embeddings and its own state. No central server holds everyone's biometrics.
+A research prototype of **decentralised occupant identification and tracking across campus buildings**. There are 10 buildings with 50 registered occupants each (500 people), plus building_11 with 50 more people who are all seen masked (550 in total). Each building keeps its own face embeddings and its own state. No central server holds everyone's biometrics.
 
 The problem: a camera in building A sees a face. If it is one of A's 50 people, A recognises it locally. If not, it may be a visitor registered elsewhere. A should find the right building without asking all nine and without anyone sharing galleries.
 
@@ -129,6 +129,17 @@ runs/summary.json                                   mean ± 95% CI over the seed
 
 `python manage.py run --seeds 0-4` runs the whole chain for each seed and then `python -m evaluation.summarize_runs`. All knobs are in `config/experiment.yaml` (identities per building, number of days, events per day, the share of visitor days, frequent visitors, visitor-pool promotion rules). Dashboard/test personas are not hardcoded: they are picked from the run's roles (`access_control/personas.py`).
 
+### The masked building (building_11)
+
+On top of the 500 corpus identities dealt into buildings 1-10, **building_11 holds 50 more people who are all seen wearing a mask**. They come from **MFR2** (53 identities, 269 aligned masked / unmasked photos; the 50 with the most photos are used), embedded with the same ArcFace network as the corpus (insightface `buffalo_l`, `w600k_r50.onnx`). Each person has 20 unmasked `reference` embeddings (their gallery) and 20 masked `test` embeddings (everything the cameras capture of them), so a masked person is recognised against an unmasked gallery, locally at building_11 and, when they visit another building, through LSH + Bloom routing.
+
+* Data: `corpus/masked/{emb_arcface.npy,meta.csv,README.md}` (2,000 rows), built once by `python manage.py masked` (= `tools/build_masked_building.py`; needs `external/mfr2_download/mfr2` and `external/arcface_model/w600k_r50.onnx`). Ids are `9000001`-`9000050`, so they never clash with the corpus. `population/corpus.py` appends them after the 20,000 base rows (`corpus/emb_arcface_with_masked.npy`); the base corpus is never touched.
+* The masked people are **not shuffled by the seed**: every seed deals the same 500 people into buildings 1-10 as before and adds building_11 as the 11th. Roles (1 Dean, 10 Teachers, 39 Students) and rosters work as in every building.
+* Switch: `masked_building.enabled` in `config/experiment.yaml` (`false` = the original 10-building setup). `population.json` records `masked_building` and the extended embedding file, which every script then follows.
+* Results: `event_metrics.json` gains `masked`, `masked_local`, `masked_visitor` and `unmasked` (same TP/FP/FN/TN), and `end_to_end_summary.json` a `masked_cohort` block with plain accuracy. The dashboard marks the building on the campus map.
+* Seed 42, one day: unmasked people are identified correctly **94.98 %** of the time; the masked building's **85.9 %** (87.3 % at home, 78.0 % as visitors elsewhere; 118 of 1,000 captures abstain).
+* **Read it with its limits.** MFR2 has only 1-2 unmasked and 1-8 masked photos per person, so the 40 embeddings per person are augmentations (flip, rotation, scale, shift, brightness, blur, noise, JPEG) of at most 10 real photos, 5 of the 20 probes per person are synthetic masks drawn on unmasked photos (those are easier: about 60 degrees from the gallery vs about 70 degrees for real masked photos), and the references are near-duplicates of 1-2 faces. building_11 tests masked recognition and routing end to end; it is not an accuracy estimate for new people.
+
 ### Data flow
 
 ```
@@ -184,7 +195,7 @@ Both use the same one-vs-rest convention (`evaluation/confusion.py`): an item ha
 
 **Reference results** (a single run each, so no confidence interval; `python manage.py run --seeds 0-4` gives the mean ± 95% CI table in `runs/summary.json`).
 
-*Seed 42, single day, 500 people, `python manage.py run --seeds 42 --days 1`* (10,000 events: 8,000 local, 2,000 visitor):
+*Seed 42, single day, the original 500 people in 10 buildings (`masked_building.enabled: false`), `python manage.py run --seeds 42 --days 1`* (10,000 events: 8,000 local, 2,000 visitor); with the masked building enabled the run has 11,000 events and the numbers move slightly (see the masked building section):
 - Events: overall identification 94.7% (local 95.6%, visitor 90.9%). Of the 2,000 visitor events 1,335 are served by the building's own visitor database (the same visitor sighted again the same day) and 585 are routed; routing recall (right building in the shortlist) 90.4%, 1.74 buildings contacted per routed attempt and 0.53 per visitor event overall. Visit-pointer precision 99.3%.
 - Event TP / FP / FN: all 9,468 / 192 / 532, local 7,651 / 82 / 349, visitor 1,817 / 110 / 183 (precision 0.98 / 0.99 / 0.94, recall 0.95 / 0.96 / 0.91).
 - States (mean over all 10,000 states): building+zone precision 0.92, recall 0.92, F1 0.92 (mean TP 438, FP 38, FN 39); building only 0.96 / 0.96; zone only 0.94 / 0.94. Accuracy is about 0.99 but is dominated by TN.
@@ -451,8 +462,8 @@ for f in sorted(Path('runs/seed_42/nodes').iterdir()):
 - Phase 4 borrows a visitor's references from the corpus (the source of truth of the home gallery) once per visitor per day, instead of keeping the ones Phase 3 received in the sealed reply; both are the same data in the simulation.
 - The CA is a simulation: its "signature" is a MAC under a secret held in the CA object, not a real PKI.
 - Wiping is best-effort; Python cannot guarantee no other copy of an array remains.
-- Only the synthetic 500-person, 10-building corpus is measured; larger scale is untested. The same 20 test photos per person are reused across days of a multi-day run.
-- The population must cover every corpus identity (500 = 10 × 50); smaller populations are not supported by the pipeline.
+- Only the 500-person, 10-building corpus plus the 50-person masked building are measured; larger scale is untested. The same 20 test photos per person are reused across days of a multi-day run.
+- The population must cover every corpus identity (500 = 10 × 50, plus the 50 masked people when enabled); smaller populations are not supported by the pipeline.
 - A visitor database hit can lock in an earlier misidentification for the rest of the day (or permanently, for a promoted visitor); such errors show up as `WRONG_IDENTITY_VIA_VISITOR_DB`.
 - Phase 3 cannot recover a local occupant rejected locally (current building is excluded by design).
 - A visitor whose departure event is not identified stays "present" until the day ends.

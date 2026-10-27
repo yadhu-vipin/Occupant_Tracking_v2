@@ -39,7 +39,7 @@ def per_run_metrics(results_dir: Path) -> Dict[str, float]:
     if pointers is not None:
         out["events.pointer_precision"] = pointers
     events = _load(results_dir / "event_metrics.json") or {}
-    for part in ("all", "local", "visitor"):
+    for part in ("all", "local", "visitor", "masked", "masked_local", "masked_visitor", "unmasked"):
         for key in ("tp", "fp", "fn", "tn", "precision", "recall", "f1"):
             if (events.get(part) or {}).get(key) is not None:
                 out[f"event_confusion.{part}.{key}"] = events[part][key]
