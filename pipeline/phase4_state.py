@@ -60,6 +60,12 @@ Two candidate-set regimes, depending on identity source:
 Either way, no Bloom/routing score, vote count, or ground truth ever feeds
 Definition 3.3 -- only biometric distance (angle) evidence.
 
+Provenance: every IDENTIFIED row also carries a ``provenance`` dict saying
+how the identity was reached (votes, routing rank, Bloom margin, whether the
+vote winner was also the nearest candidate). It is copied from the Phase 2/3
+outputs for query explanations (``pipeline/explain.py``) and never feeds
+Definition 3.3, BSTS or the identity decision.
+
 Observation location: the resulting BSTS update is always persisted against
 ``event["current_building"]`` / ``event["current_zone"]`` -- the building and
 zone where the event was actually observed -- never the visitor's home
@@ -103,6 +109,7 @@ log = logging.getLogger(__name__)
 
 EVENT_FIELDS = {"event_id", "timestamp", "current_building", "current_zone", "embedding_row"}
 TRANSITION_ZONE = "zT"
+ROUTING_PARAMS_PATH = ROOT / "shared" / "routing_params.json"
 
 
 class BuildingContext:
@@ -215,14 +222,68 @@ def _day_refs(visitors, corpus, occupant_id):
     return refs
 
 
-def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_dir, corpus=None):
+def _routing_min_votes():
+    """Phase 3's vote threshold. retrieval_attempts.json does not record it per attempt."""
+    try:
+        return int(json.loads(ROUTING_PARAMS_PATH.read_text(encoding="utf-8"))["min_votes"])
+    except (OSError, KeyError, ValueError):
+        return None
+
+
+def _nearest(distances):
+    return min(distances, key=distances.get) if distances else None
+
+
+def _local_provenance(recognition_result, occupant_id):
+    """How a locally accepted identity was reached, from recognition_results.json."""
+    evidence = recognition_result.get("candidate_evidence") or []
+    winner_votes = recognition_result.get("votes")
+    others = [c["votes"] for c in evidence if c["occupant_id"] != occupant_id and "votes" in c]
+    return {
+        "mode": "local",
+        "votes": int(winner_votes) if winner_votes is not None else None,
+        "min_votes": recognition_result.get("minimum_votes"),
+        "vote_winner_is_nearest": _nearest({c["occupant_id"]: c["min_angle_deg"] for c in evidence}) == occupant_id,
+        "runner_up_votes": int(max(others)) if others else 0,
+    }
+
+
+def _routed_provenance(retrieval_attempt, min_votes):
+    """How a routed identity was reached, from retrieval_attempts.json."""
+    shortlist = list(retrieval_attempt.get("shortlist") or [])
+    verifier = retrieval_attempt["verified_building"]
+    scores = sorted((retrieval_attempt.get("bloom_scores") or {}).values(), reverse=True)
+    gap = (scores[0] - scores[1]) if len(scores) > 1 else (scores[0] if scores else None)
+    votes = retrieval_attempt.get("verification_votes")
+    return {
+        "mode": "routed",
+        "shortlist": shortlist,
+        "verifying_building": verifier,
+        "rank_of_verifier": shortlist.index(verifier) + 1 if verifier in shortlist else None,
+        "buildings_asked": retrieval_attempt.get("candidates_queried"),
+        "bloom_score_gap": int(gap) if gap is not None else None,
+        "votes": int(votes) if votes is not None else None,
+        "min_votes": min_votes,
+        "vote_winner_is_nearest": _nearest(retrieval_attempt.get("verification_distance_evidence")
+                                           ) == retrieval_attempt["verified_occupant_id"],
+    }
+
+
+def _pool_provenance(distances, occupant_id):
+    return {"mode": "present_visitor_pool", "pool_size": len(distances),
+            "vote_winner_is_nearest": _nearest(distances) == occupant_id}
+
+
+def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_dir, corpus=None,
+                  routing_min_votes=None):
     """Apply Definition 3.3 + BSTS for one event; return its Phase 4 output row.
 
     ``contexts`` is a mutable ``{building_id: BuildingContext}`` cache shared
     across a run so each building's state database and present-visitor pool
     persist across events. ``corpus`` (a :class:`CorpusContext`) is required
     only for already-present visitor re-matching; locally accepted events and
-    a visitor's first sighting never need it.
+    a visitor's first sighting never need it. ``routing_min_votes`` is only
+    recorded in the routed rows' provenance (read from shared/ when omitted).
     """
     if set(event) != EVENT_FIELDS:
         raise ValueError("Phase 4 accepts observable Event fields only")
@@ -234,7 +295,7 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         "verified_building": None, "distance_scores": None, "sigma": None,
         "occupant_probabilities": None, "bsts_state_after_update": None,
         "state_updates": None,
-        "status": "NO_IDENTITY", "error": None,
+        "status": "NO_IDENTITY", "error": None, "provenance": None,
     }
 
     current_building = event["current_building"]
@@ -266,6 +327,7 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
             result = occupant_probabilities(distances)
             to_persist = {occupant_id: result.probabilities[occupant_id]}
             row["presence_mode"] = "local"
+            provenance = _local_provenance(recognition_result, occupant_id)
         elif visitors.is_present(occupant_id):
             if corpus is None:
                 raise RuntimeError("present-visitor re-matching requires a CorpusContext")
@@ -278,11 +340,14 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
             result = occupant_probabilities(distances)
             to_persist = result.probabilities  # every active present visitor is updated
             row["presence_mode"] = "present_visitor_pool"
+            provenance = _pool_provenance(distances, occupant_id)
         else:
             distances = home_gallery_distances
             result = occupant_probabilities(distances)
             to_persist = {occupant_id: result.probabilities[occupant_id]}
             row["presence_mode"] = "new_visitor_home_gallery"
+            provenance = _routed_provenance(
+                retrieval_attempt, routing_min_votes if routing_min_votes is not None else _routing_min_votes())
             if corpus is not None:
                 if visitors.cached_refs(occupant_id) is None:   # first time today: borrow his references once
                     visitors.cache_refs(occupant_id, home_building, corpus.occupant_refs(home_building, occupant_id))
@@ -319,6 +384,7 @@ def process_event(event, recognition_result, retrieval_attempt, contexts, nodes_
         return row
 
     row["status"] = "IDENTIFIED"
+    row["provenance"] = provenance
     return row
 
 
@@ -329,13 +395,15 @@ def run(events, recognition_results, retrieval_attempts, nodes_dir, corpus=None)
 
     contexts: dict[str, BuildingContext] = {}
     rows = []
+    min_votes = _routing_min_votes()
     try:
         for event in events:
             recognition_result = recognition_by_id.get(event["event_id"])
             if recognition_result is None:
                 raise ValueError(f"missing recognition result for {event['event_id']}")
             retrieval_attempt = retrieval_by_id.get(event["event_id"])
-            rows.append(process_event(event, recognition_result, retrieval_attempt, contexts, nodes_dir, corpus))
+            rows.append(process_event(event, recognition_result, retrieval_attempt, contexts, nodes_dir, corpus,
+                                      routing_min_votes=min_votes))
     finally:
         for context in contexts.values():
             context.close()

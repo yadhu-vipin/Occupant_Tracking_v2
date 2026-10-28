@@ -22,6 +22,7 @@ import random
 import re
 import threading
 import time
+from datetime import datetime, time as dt_time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -52,13 +53,19 @@ from pipeline.query import (
     load_real_registry,
     register_real_registry,
     QueryEngine,
-    track_answer,
     resolve_target_current_building,
-    q6_answer_for_disclosure,
     get_real_role,
     DEFAULT_AT_TIME,
     TRAJECTORY_QUERIES,
+    aggregate_decision,
+    building_scope_denial as _building_scope_denial,
+    filter_zone_answer as _filter_zone_answer,
+    investigation_rights,
+    occupant_answer,
+    zone_disclosed_ids,
+    zone_ids as _zone_ids,
 )
+from pipeline.explain import redact, refused_explanation
 from pipeline.query_cache import QueryCache
 from access_control.personas import resolve_personas
 from shared.timeutil import approx_time, is_office_hours
@@ -478,6 +485,18 @@ def _quantize_hms(ts: str) -> str:
     return approx_time(ts)[:-3]
 
 
+def determine_office_hours(query_time: Optional[str] = None) -> bool:
+    """Whether campus office hours (08:00-18:00) are active.
+
+    Replay mode (default): judged from the query's own timestamp, so a historical query gets the policy decision
+    of that moment. Live mode (``DSTS_LIVE_POLICY=1``): judged from the wall clock, so a caller cannot get daytime
+    access at night by passing a daytime timestamp.
+    """
+    if os.environ.get("DSTS_LIVE_POLICY", "").lower() in ("1", "true", "yes"):
+        return dt_time(8, 0, 0) <= datetime.now().time() <= dt_time(18, 0, 0)
+    return is_office_hours(query_time or DEFAULT_AT_TIME)
+
+
 def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
     """Run every occupant in the snapshot through the persona/building policy for ``principal``.
 
@@ -490,7 +509,7 @@ def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str
         for row in rows:
             ts = row["timestamp"]
             ctx = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP,
-                               is_office_hours=is_office_hours(ts),
+                               is_office_hours=determine_office_hours(ts),
                                authorized_investigation=False)
             d = evaluate_campus_query_policy(principal, row["occupant"], context=ctx, purpose=ctx.purpose,
                                              target_current_building=row["building_id"])
@@ -787,6 +806,7 @@ def _denied_response(q_type: str, template_fmt: str, caller_meta: dict, rule: st
         },
         "answer": None,
         "evidence": [],
+        "explanation": refused_explanation(q_type),
         "error": reason,
     }
     if target_meta is not None:
@@ -794,19 +814,27 @@ def _denied_response(q_type: str, template_fmt: str, caller_meta: dict, rule: st
     return out
 
 
-def _cached_exec(key: tuple, fn) -> tuple[dict, bool]:
+def _cached_exec(key: tuple, fn, audit_fn=None) -> tuple[dict, bool]:
     """Run `fn` (the already-authorized engine computation) through the result cache.
 
     The cache only ever sits *behind* the authorization decision: every request is
     authenticated, authorized and audited first, and `key` includes whatever the
     decision depends on, so a cached value can never be served across callers or
     disclosure levels.
+
+    ``audit_fn``, if provided, is called on *both* cache hits and misses so that
+    every query is recorded in the audit log regardless of whether it was served
+    from cache.  This prevents cache hits from silently bypassing the audit trail.
     """
     cached = _query_cache.get(key)
     if cached is not None:
+        if audit_fn is not None:
+            audit_fn(cache_hit=True)
         return cached, True
     value = fn()
     _query_cache.set(key, value)
+    if audit_fn is not None:
+        audit_fn(cache_hit=False)
     return value, False
 
 
@@ -875,8 +903,8 @@ def execute_query_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Caller role '{caller_role}' is not authorized to initiate security investigation or audit.",
         )
-    auth_inv = (caller_role == "dean" and parsed_purpose in (QueryPurpose.SECURITY_INVESTIGATION, QueryPurpose.AUDIT))
-    is_office_hours_now = is_office_hours(at_time)
+    auth_inv = investigation_rights(caller_role, parsed_purpose)
+    is_office_hours_now = determine_office_hours(at_time)
 
     # 4. Target resolution
     target_id = (body.target_id or body.occupant_id or "").strip()
@@ -906,31 +934,46 @@ def execute_query_endpoint(
                                     f"Infrastructure authorization denied: {last_reason}", metric_kind="rbac_infra")
 
         include_evidence = caller_role == "dean"  # only a Dean (building scope above keeps it to their own campus)
-        key = QueryCache.make_key(*base_key, caller_role=f"agg|evidence={include_evidence}")
+        decision = aggregate_decision(q_type, include_evidence=include_evidence, purpose=parsed_purpose,
+                                      building_id=building_id)
+        # Key includes caller_id and caller_bld so Deans from different buildings never
+        # share a cache entry, and the disclosure level so a redacted explanation is
+        # never served at another level.
+        key = QueryCache.make_key(*base_key,
+                                  caller_role=f"agg|{caller_id}|{caller_bld}|evidence={include_evidence}"
+                                              f"|{decision.level.name}")
 
         def _run_building() -> dict:
             res = engine.Q1(building_id=building_id, after_time=at_time) if q_type == "Q1" \
                 else engine.Q2(building_id=building_id, at_time=at_time)
-            return {"answer": res.answer, "evidence": res.evidence if include_evidence else []}
+            return {"answer": res.answer, "evidence": res.evidence if include_evidence else [],
+                    "explanation": redact(res.explanation, decision)}
 
-        data, hit = _cached_exec(key, _run_building)
+        def _audit_building(cache_hit: bool) -> None:
+            """Write an audit entry for every building query, including cache hits.
+            Uses the public audit() API; deque.append is thread-safe so no explicit lock needed.
+            """
+            from access_control.authorize import audit as _sec_audit
+            _sec_audit(
+                "QUERY_AUDIT",
+                principal=caller_id,
+                query_type=q_type,
+                building_id=building_id,
+                purpose=parsed_purpose.value,
+                cache_hit=cache_hit,
+            )
+
+        data, hit = _cached_exec(key, _run_building, audit_fn=_audit_building)
         m.queries_executed_total.labels(query_type=q_type, status="success").inc()
         result = {
             "success": True,
             "query_type": q_type,
             "template_query": template_fmt,
             "caller": caller_meta,
-            "decision": {
-                "permitted": True,
-                "disclosure_level": "L4_HISTORICAL_TRACK" if include_evidence else "L2_CURRENT_ZONE",
-                "policy_rule": "RULE_BUILDING_AGGREGATE",
-                "reason": "Building-level aggregate permitted; individual occupant IDs are listed for the Dean of the building only",
-                "visitor_status": "AGGREGATE",
-                "exposed_fields": ["building_id", "counts", "aggregate_metrics"],
-                "redacted_fields": ["individual_trajectories", "individual_occupant_ids", "biometric_data"],
-            },
+            "decision": decision.to_dict(),
             "answer": data["answer"],
             "evidence": data["evidence"],
+            "explanation": data["explanation"],
         }
         if hit:
             result["_cache_hit"] = True
@@ -952,6 +995,11 @@ def execute_query_endpoint(
 
         ctx = QueryContext(purpose=parsed_purpose, is_office_hours=is_office_hours_now, authorized_investigation=auth_inv)
         key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}|{is_office_hours_now}")
+        # The per-occupant disclosure levels are fixed by (caller, purpose, investigation
+        # rights, office hours); the grant is spelled out so levels never share an entry.
+        grant = "L4_INVESTIGATION" if auth_inv else "L2_COUNTS"
+        key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}"
+                                                         f"|{is_office_hours_now}|{grant}")
 
         def _run_zone() -> dict:
             if q_type == "Q10":
@@ -961,21 +1009,16 @@ def execute_query_endpoint(
             else:
                 res = engine.Q13(zone=zone, building_id=building_id)
             ids = _zone_ids(q_type, res.answer)
-            # A zone answer reveals an exact zone per occupant, i.e. L3 disclosure about each of them.
-            # Each occupant is therefore run through the same persona/building policy as a point
-            # query; only those the caller may see at L3+ are disclosed, the rest are counted.
-            keep = set()
-            for occ in ids:
-                d = evaluate_campus_query_policy(
-                    caller_id, occ, context=ctx, purpose=ctx.purpose, target_current_building=building_id)
-                if d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT:
-                    keep.add(occ)
+            keep = zone_disclosed_ids(caller_id, ids, ctx, building_id)
             filtered = _filter_zone_answer(q_type, res.answer, keep)
+            zone_decision = aggregate_decision(q_type, include_evidence=auth_inv, purpose=parsed_purpose,
+                                               building_id=building_id, disclosed=len(keep))
             return {
                 "answer": filtered,
                 "evidence": [f"  {len(keep)} of {len(ids)} occupant(s) disclosed; "
                              f"{len(ids) - len(keep)} withheld by persona/building policy"],
                 "disclosed": len(keep),
+                "explanation": redact(res.explanation, zone_decision, disclosed_occupants=keep),
             }
 
         data, hit = _cached_exec(key, _run_zone)
@@ -985,17 +1028,11 @@ def execute_query_endpoint(
             "query_type": q_type,
             "template_query": template_fmt,
             "caller": caller_meta,
-            "decision": {
-                "permitted": True,
-                "disclosure_level": "L3_PRECISE_CURRENT" if data["disclosed"] else "L2_CURRENT_ZONE",
-                "policy_rule": "RULE_ZONE_PER_OCCUPANT_FILTER",
-                "reason": f"Zone query in {building_id}: each occupant filtered through persona/building policy (L3+ required to be listed)",
-                "visitor_status": "ZONE_MONITORING",
-                "exposed_fields": ["occupants (policy-permitted only)", "counts", "zone_id", "building_id"],
-                "redacted_fields": ["occupants (policy-denied)", "biometric_raw_gallery"],
-            },
+            "decision": aggregate_decision(q_type, include_evidence=auth_inv, purpose=parsed_purpose,
+                                           building_id=building_id, disclosed=data["disclosed"]).to_dict(),
             "answer": data["answer"],
             "evidence": data["evidence"],
+            "explanation": data["explanation"],
         }
         if hit:
             result["_cache_hit"] = True
@@ -1044,32 +1081,20 @@ def execute_query_endpoint(
             "decision": decision.to_dict(),
             "answer": None,
             "evidence": [],
+            "explanation": refused_explanation(q_type),
             "error": f"{q_type} is a full trajectory query requiring L4_HISTORICAL_TRACK; caller only holds {decision.level.name}.",
         }
 
-    # Execute (cached behind the decision: the key carries the granted level and rule)
-    key = QueryCache.make_key(*base_key, caller_role=f"occ|{decision.level.name}|{decision.policy_rule}")
+    # Execute (cached behind the decision: the key carries the caller identity, granted
+    # disclosure level and the policy rule, so callers with different identities or
+    # different policy outcomes never share a cache entry even if all other parameters match).
+    key = QueryCache.make_key(*base_key,
+                              caller_role=f"occ|{caller_id}|{decision.level.name}|{decision.policy_rule}")
 
     def _run_occupant() -> dict:
-        if q_type == "Q6":
-            return {"answer": q6_answer_for_disclosure(engine, target_id, decision.level, at_time, decision), "evidence": []}
-        if q_type == "TRACK":
-            return {"answer": track_answer(engine, target_id), "evidence": []}
-        if q_type == "Q3":
-            res = engine.Q3(occupant_id=target_id, building_id=building_id, before_time=at_time)
-        elif q_type == "Q4":
-            res = engine.Q4(occupant_id=target_id, building_id=building_id, t1=t1, t2=t2)
-        elif q_type == "Q5":
-            res = engine.Q5(occupant_id=target_id, building_id=building_id)
-        elif q_type == "Q7":
-            res = engine.Q7(occupant_id=target_id, t1=t1, t2=t2)
-        elif q_type == "Q8":
-            res = engine.Q8(occupant_id=target_id, zone=zone, building_id=building_id)
-        elif q_type == "Q9":
-            res = engine.Q9(occupant_id=target_id, zone=zone, building_id=building_id)
-        else:  # Q11
-            res = engine.Q11(occupant_id=target_id, t1=t1, t2=t2)
-        return {"answer": res.answer, "evidence": res.evidence}
+        # Q3 reads its cut-off from time_t; a visitor's answer is scoped to the caller's building
+        return occupant_answer(engine, q_type, target_id, decision, caller_building=caller_bld, at_time=at_time,
+                               building_id=building_id, before_time=at_time, t1=t1, t2=t2, zone=zone)
 
     data, hit = _cached_exec(key, _run_occupant)
     m.queries_executed_total.labels(query_type=q_type, status="success").inc()
@@ -1082,6 +1107,8 @@ def execute_query_endpoint(
         "decision": decision.to_dict(),
         "answer": data["answer"],
         "evidence": data["evidence"],
+        "explanation": data["explanation"],
+        "withheld": data["withheld"],
     }
     if hit:
         result["_cache_hit"] = True
@@ -1096,15 +1123,27 @@ def execute_query_endpoint(
 def metrics(request: Request, authorization: Optional[str] = Header(None)) -> Response:
     """Prometheus scrape endpoint.
 
-    Access: a Bearer token equal to DSTS_METRICS_TOKEN, or -- only when that variable is
-    unset -- a client on the loopback interface.
+    Access policy:
+    * When DSTS_METRICS_TOKEN is set: ONLY the bearer matching that token is admitted
+      (loopback address alone is NOT sufficient).
+    * When DSTS_METRICS_TOKEN is unset: loopback clients are admitted as a convenience
+      for local development; remote clients are always rejected.
+
+    This prevents a network-adjacent attacker from reading internal metrics even if
+    they somehow reach 127.0.0.1 (e.g. via SSRF), as long as the operator sets the token.
     """
     expected = os.environ.get("DSTS_METRICS_TOKEN", "")
     supplied = _strip_bearer(authorization) or ""
-    token_ok = bool(expected) and hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
     loopback = bool(request.client) and request.client.host in ("127.0.0.1", "::1", "localhost")
-    if not (token_ok or (not expected and loopback)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Metrics access denied.")
+    if expected:
+        # Token configured: ONLY a matching bearer is accepted; loopback alone is not enough.
+        token_ok = hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+        if not token_ok:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Metrics access denied.")
+    else:
+        # No token configured: fall back to loopback-only (local dev / CI convenience).
+        if not loopback:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Metrics access denied.")
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

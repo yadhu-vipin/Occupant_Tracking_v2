@@ -367,4 +367,6 @@ def query(body: QueryIn, authorization: Optional[str] = Header(None), x_api_toke
             "redacted": bool(dec.get("redacted_fields")) or not ok,
             "answer": _describe(q, ok, dec, answer, evidence, res),
             "success": ok,
+            # the reasoning behind the answer, already redacted by the server for this caller's disclosure level
+            "explanation": res.get("explanation"), "withheld": res.get("withheld") or [],
             "decision": {k: dec.get(k) for k in ("permitted", "disclosure_level", "policy_rule", "reason", "visitor_status")}}
