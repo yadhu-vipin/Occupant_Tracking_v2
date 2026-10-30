@@ -1,4 +1,4 @@
-"""building_11: fifty masked identities (MFR2) appended to the corpus and wired into the population and evaluation."""
+"""building_11: fifty masked identities (RMFRD) appended to the corpus and wired into the population and evaluation."""
 import sys
 
 import numpy as np
@@ -86,19 +86,18 @@ def test_event_confusion_splits_the_masked_cohort_from_everyone_else():
 sys.path.insert(0, str(REPO / "tools"))
 
 
-def test_synthetic_mask_only_touches_the_lower_face_and_is_deterministic():
-    import build_masked_building as tool
-    img = np.random.default_rng(0).integers(0, 255, (160, 160, 3), dtype=np.uint8)
-    a = tool.draw_mask(img, "surgical_blue", tool.seeded("x"))
-    b = tool.draw_mask(img, "surgical_blue", tool.seeded("x"))
-    assert np.array_equal(a, b)
-    assert np.array_equal(a[:int(0.45 * 160)], img[:int(0.45 * 160)])     # forehead and eyes are untouched
-    assert not np.array_equal(a[int(0.7 * 160):], img[int(0.7 * 160):])   # the mouth and chin are covered
-
-
 def test_augmentation_is_seeded_and_changes_the_image():
     import build_masked_building as tool
     img = np.random.default_rng(1).integers(0, 255, (160, 160, 3), dtype=np.uint8)
     one, two = tool.augment(img, tool.seeded("y")), tool.augment(img, tool.seeded("y"))
     assert np.array_equal(one, two) and not np.array_equal(one, img)
     assert not np.array_equal(tool.augment(img, tool.seeded("z")), one)
+
+
+@needs_masked
+def test_masked_probes_are_real_photos_topped_up_with_augmented_copies_only():
+    meta = pd.read_csv(MASKED / "meta.csv", dtype={"occupant_id": str})
+    test = meta[meta.split == "test"]
+    assert set(test.source) <= {"real", "real_augmented"}                 # no synthetic masks
+    assert set(meta[meta.split == "reference"].source) == {"real"}         # unmasked galleries are all real photos
+    assert (test.groupby("occupant_id").source.apply(lambda s: (s == "real").sum()) >= 10).all()

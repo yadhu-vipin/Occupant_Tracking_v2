@@ -21,7 +21,7 @@ class PopulationConfig:
 
 @dataclass(frozen=True)
 class MaskedBuildingConfig:
-    """An extra building whose occupants all appear masked (built from MFR2 by tools/build_masked_building.py)."""
+    """An extra building whose occupants all appear masked (built from RMFRD by tools/build_masked_building.py)."""
     enabled: bool = False
     building: str = "building_11"
     dir: str = "corpus/masked"           # holds emb_arcface.npy + meta.csv for that building

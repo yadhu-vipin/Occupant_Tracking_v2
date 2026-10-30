@@ -1,33 +1,34 @@
-"""Build the masked building (building_11) from the MFR2 masked-face dataset.
+"""Build the masked building (building_11) from the RMFRD real-world masked-face dataset.
 
-MFR2 (53 identities, 269 aligned 160x160 photos, with / without a mask) is the only masked-identity data this
-project has. It holds 1-2 unmasked and 1-8 masked photos per person, but the pipeline works on 20 reference +
-20 probe embeddings per person, so the missing photos are produced here:
+RMFRD (Wuhan University's "Real-World Masked Face Dataset", the self-built masked face recognition set) holds
+web-crawled photos of 525 people: a few real masked photos per person and hundreds of unmasked ones. Only people
+with plenty of both are useful here, so the 50 identities with the most real masked photos are used (each has
+>= 20 unmasked photos). The pipeline works on 20 reference + 20 probe embeddings per person:
 
-  reference (20, unmasked)  the person's real unmasked photos, plus augmented copies (flip, rotation, scale,
-                            shift, brightness / contrast, blur, noise, JPEG)
-  test      (20, MASKED)    15 from the person's real masked photos (the originals, then augmented copies) and 5
-                            synthetic masks drawn onto their unmasked photos, so every probe is a masked face
+  reference (20, unmasked)  20 distinct real unmasked photos of the person (no duplication needed)
+  test      (20, MASKED)    the person's real masked photos (up to 20); when there are fewer, the rest are
+                            augmented copies of those real masked photos (flip, rotation, scale, shift,
+                            brightness / contrast, blur, noise, JPEG). No synthetic masks are drawn.
 
-Every image is embedded with the ArcFace network the corpus uses (insightface buffalo_l, ``w600k_r50.onnx``,
-112x112 RGB, (x - 127.5) / 127.5) and L2-normalised, exactly like ``corpus/emb_arcface.npy``. Nothing is
-random across runs: every choice is seeded from the identity name.
+Every photo is detected and aligned with insightface's RetinaFace-style detector (``det_10g.onnx``, 5 landmarks,
+similarity transform to the 112x112 ArcFace template), embedded with the ArcFace network the corpus uses
+(``w600k_r50.onnx``, RGB, (x - 127.5) / 127.5) and L2-normalised, exactly like ``corpus/emb_arcface.npy``. A photo
+where no face is found falls back to a plain centre crop. Nothing is random across runs: every choice is seeded
+from the identity name.
 
-    python tools/build_masked_building.py            # reads external/mfr2_download + external/arcface_model
+    python tools/build_masked_building.py            # reads external/rmfd_download + external/arcface_model
 
-writes ``corpus/masked/{emb_arcface.npy,meta.csv,README.md}`` and the generated photos under
-``external/mfr2_generated/`` (so ``image_path`` in the meta points at real files).
+writes ``corpus/masked/{emb_arcface.npy,meta.csv,README.md}`` and the aligned crops under
+``external/rmfd_generated/`` (so ``image_path`` in the meta points at real files).
 
-Honest limits (also in corpus/masked/README.md): the synthetic masks are a fixed-geometry overlay on MFR2's
-aligned crops (no landmark detector), and all 40 embeddings of a person descend from at most 10 real photos, so
-building_11 is a *test of masked recognition and routing*, not an estimate of masked accuracy on new people.
+Honest limits (also in corpus/masked/README.md): masked photos of one person are few (the 50 chosen have 11-52), so
+for most people part of the 20 probes are augmented copies of real ones, and the photos are celebrity-style web
+images, so building_11 is a *test of masked recognition and routing*, not an estimate of accuracy for new people.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
-import json
-from collections import defaultdict
 from pathlib import Path
 
 import cv2
@@ -35,29 +36,37 @@ import numpy as np
 import pandas as pd
 
 REPO = Path(__file__).resolve().parent.parent
-MFR2 = REPO / "external" / "mfr2_download" / "mfr2"
-MODEL = REPO / "external" / "arcface_model" / "w600k_r50.onnx"
+RMFRD = REPO / "external" / "rmfd_download" / "rmfd" / "self-built-masked-face-recognition-dataset"
+MASKED_DIR = RMFRD / "AFDB_masked_face_dataset"
+UNMASKED_DIR = RMFRD / "AFDB_face_dataset"
+MODEL_DIR = REPO / "external" / "arcface_model"
+MODEL = MODEL_DIR / "w600k_r50.onnx"
+DETECTOR = MODEL_DIR / "det_10g.onnx"
 OUT = REPO / "corpus" / "masked"
-IMAGES = REPO / "external" / "mfr2_generated"
+IMAGES = REPO / "external" / "rmfd_generated"
 
 BUILDING = "building_11"
 N_IDENTITIES = 50
 N_REFERENCE = 20
 N_TEST = 20
-N_SYNTHETIC = 5                       # of the 20 probes; synthetic masks are easier than real ones (see README)
+MIN_UNMASKED = 20                       # an identity needs this many real unmasked photos to be chosen
 FIRST_ID = 9_000_001                    # 7-digit ids that cannot collide with the corpus ids (0000000-0004999)
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
-# (name, BGR colour) for synthetic masks
-MASK_COLOURS = {
-    "surgical_blue": (200, 160, 90), "surgical_white": (235, 235, 235), "surgical_green": (150, 190, 120),
-    "surgical_black": (40, 40, 40), "cloth_black": (30, 30, 30), "cloth_white": (225, 225, 225),
-    "cloth_red": (50, 50, 190), "cloth_purple": (140, 60, 120), "N95": (240, 240, 240),
-}
+# the ArcFace 112x112 landmark template (left eye, right eye, nose, left mouth corner, right mouth corner)
+TEMPLATE = np.array([[38.2946, 51.6963], [73.5318, 51.5014], [56.0252, 71.7366],
+                     [41.5493, 92.3655], [70.7299, 92.2041]], np.float32)
 
 
 def seeded(*parts) -> np.random.Generator:
     digest = hashlib.sha256("|".join(map(str, parts)).encode()).digest()
     return np.random.default_rng(int.from_bytes(digest[:8], "big"))
+
+
+def read_image(path: Path):
+    """cv2.imread cannot open the dataset's non-ASCII file names on Windows; decode from bytes instead."""
+    data = np.fromfile(str(path), np.uint8)
+    return cv2.imdecode(data, cv2.IMREAD_COLOR) if data.size else None
 
 
 # ---------------------------------------------------------------------------------------------- augmentation
@@ -81,34 +90,64 @@ def augment(img: np.ndarray, rng: np.random.Generator, strength: float = 1.0) ->
     return cv2.imdecode(buf, cv2.IMREAD_COLOR) if ok else out
 
 
-def draw_mask(img: np.ndarray, kind: str, rng: np.random.Generator) -> np.ndarray:
-    """Overlay a face mask on an aligned 160x160 face (nose bridge ~y=0.55h, chin ~y=0.95h)."""
-    h, w = img.shape[:2]
-    j = lambda s=0.02: rng.uniform(-s, s)                                    # noqa: E731  geometry jitter
-    top = 0.55 + j()
-    pts = np.array([
-        (0.17 + j(), 0.62 + j()), (0.30 + j(), top + 0.03), (0.42 + j(), top), (0.58 + j(), top),
-        (0.70 + j(), top + 0.03), (0.83 + j(), 0.62 + j()), (0.86 + j(), 0.74 + j()),
-        (0.76 + j(), 0.90 + j()), (0.62 + j(), 0.99), (0.50 + j(), 1.01), (0.38 + j(), 0.99),
-        (0.24 + j(), 0.90 + j()), (0.14 + j(), 0.74 + j()),
-    ]) * (w, h)
-    colour = np.array(MASK_COLOURS.get(kind, (200, 160, 90)), np.float32)
-    layer = np.full(img.shape, colour, np.float32)
-    layer += rng.normal(0, 4, img.shape)                                      # fabric grain
-    if kind.startswith("surgical"):                                           # pleats
-        for y in np.linspace(top + 0.12, 0.92, 3):
-            cv2.line(layer, (int(0.2 * w), int(y * h)), (int(0.8 * w), int(y * h + rng.uniform(-3, 3))),
-                     tuple(float(c * 0.82) for c in colour), 1, cv2.LINE_AA)
-    shade = np.linspace(1.05, 0.88, h, dtype=np.float32)[:, None, None]       # darker towards the chin
-    layer = np.clip(layer * shade, 0, 255)
-    mask = np.zeros((h, w), np.uint8)
-    cv2.fillPoly(mask, [pts.astype(np.int32)], 255, lineType=cv2.LINE_AA)
-    soft = cv2.GaussianBlur(mask, (0, 0), 1.0).astype(np.float32)[:, :, None] / 255.0
-    out = img.astype(np.float32) * (1 - soft) + layer * soft
-    ear = tuple(float(c) for c in colour * 0.8)                               # ear loops
-    cv2.line(out, (int(0.17 * w), int(0.62 * h)), (0, int(0.52 * h)), ear, 1, cv2.LINE_AA)
-    cv2.line(out, (int(0.83 * w), int(0.62 * h)), (w - 1, int(0.52 * h)), ear, 1, cv2.LINE_AA)
-    return np.clip(out, 0, 255).astype(np.uint8)
+# ---------------------------------------------------------------------------------------- detect and align
+class FaceAligner:
+    """SCRFD (insightface ``det_10g``): the best face's 5 landmarks -> a 112x112 ArcFace-aligned crop."""
+
+    STRIDES = (8, 16, 32)
+    SIZE = 640
+
+    def __init__(self, model: Path):
+        import onnxruntime as ort
+        self.session = ort.InferenceSession(str(model), providers=["CPUExecutionProvider"])
+        self.input = self.session.get_inputs()[0].name
+        self.found = 0
+        self.fallback = 0
+
+    def _detect(self, img: np.ndarray, threshold: float):
+        h, w = img.shape[:2]
+        scale = self.SIZE / max(h, w)
+        resized = cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))))
+        canvas = np.zeros((self.SIZE, self.SIZE, 3), np.uint8)
+        canvas[:resized.shape[0], :resized.shape[1]] = resized
+        blob = cv2.dnn.blobFromImage(canvas, 1.0 / 128, (self.SIZE, self.SIZE), (127.5, 127.5, 127.5), swapRB=True)
+        outs = self.session.run(None, {self.input: blob})
+        boxes, scores, points = [], [], []
+        for i, stride in enumerate(self.STRIDES):
+            s, b, k = outs[i][:, 0], outs[i + 3] * stride, outs[i + 6] * stride
+            side = self.SIZE // stride
+            centres = np.stack(np.mgrid[:side, :side][::-1], axis=-1).astype(np.float32).reshape(-1, 2) * stride
+            centres = np.repeat(centres, 2, axis=0)                          # two anchors per cell
+            keep = np.where(s >= threshold)[0]
+            if not len(keep):
+                continue
+            c = centres[keep]
+            boxes.append(np.hstack([c - b[keep][:, :2], c + b[keep][:, 2:]]) / scale)
+            points.append((c[:, None, :] + k[keep].reshape(-1, 5, 2)) / scale)
+            scores.append(s[keep])
+        if not scores:
+            return None
+        boxes, scores, points = np.vstack(boxes), np.concatenate(scores), np.concatenate(points)
+        # the largest confident face wins (these are tight single-face crops)
+        area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+        best = int(np.argmax(scores * np.sqrt(np.maximum(area, 1))))
+        return points[best].astype(np.float32)
+
+    def __call__(self, img: np.ndarray) -> np.ndarray:
+        h, w = img.shape[:2]
+        pad = int(0.5 * max(h, w))                                           # tight crops: give the detector context
+        padded = cv2.copyMakeBorder(img, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0)
+        for threshold in (0.5, 0.3):
+            landmarks = self._detect(padded, threshold)
+            if landmarks is not None:
+                m, _ = cv2.estimateAffinePartial2D(landmarks, TEMPLATE, method=cv2.LMEDS)
+                if m is not None:
+                    self.found += 1
+                    return cv2.warpAffine(padded, m, (112, 112), borderValue=0)
+        self.fallback += 1
+        side = min(h, w)
+        top, left = (h - side) // 2, (w - side) // 2
+        return cv2.resize(img[top:top + side, left:left + side], (112, 112))
 
 
 # -------------------------------------------------------------------------------------------------- embedding
@@ -125,47 +164,54 @@ class ArcFace:
         return out / np.linalg.norm(out, axis=1, keepdims=True)
 
 
-def read_labels():
-    people = defaultdict(list)
-    for line in (MFR2 / "mfr2_labels.txt").read_text().splitlines():
-        if line.strip():
-            name, idx, kind = [p.strip() for p in line.split(",")]
-            image = cv2.imread(str(MFR2 / name / f"{name}_{int(idx):04d}.png"))
-            if image is None:
-                raise FileNotFoundError(f"{name}_{idx}")
-            people[name].append((kind, image))
-    return people
+def photos(folder: Path) -> list[Path]:
+    return sorted(p for p in folder.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES) if folder.is_dir() else []
+
+
+def choose_identities() -> list[str]:
+    """The identities with the most real masked photos that also have enough unmasked ones (ties by name)."""
+    candidates = []
+    for folder in sorted(MASKED_DIR.iterdir()):
+        masked, unmasked = len(photos(folder)), len(photos(UNMASKED_DIR / folder.name))
+        if masked and unmasked >= MIN_UNMASKED:
+            candidates.append((-masked, folder.name))
+    if len(candidates) < N_IDENTITIES:
+        raise SystemExit(f"RMFRD has {len(candidates)} usable identities, need {N_IDENTITIES}")
+    return sorted(name for _, name in sorted(candidates)[:N_IDENTITIES])
+
+
+def load_aligned(aligner: FaceAligner, paths: list[Path]):
+    out = []
+    for path in paths:
+        img = read_image(path)
+        if img is not None and min(img.shape[:2]) >= 8:
+            out.append(aligner(img))
+    return out
 
 
 def build(args):
-    people = read_labels()
-    if len(people) < N_IDENTITIES:
-        raise SystemExit(f"MFR2 has {len(people)} identities, need {N_IDENTITIES}")
-    # the 50 best-covered identities (most photos; ties by name) -- the three sparsest are left out
-    chosen = sorted(people, key=lambda n: (-len(people[n]), n))[:N_IDENTITIES]
-    chosen.sort()
-    net = ArcFace(args.model)
+    if not MASKED_DIR.is_dir():
+        raise SystemExit(f"RMFRD not found at {RMFRD} (download RMFD.zip from the dataset's GitHub page and unzip "
+                         f"it into external/rmfd_download/rmfd)")
+    chosen = choose_identities()
+    aligner, net = FaceAligner(args.detector), ArcFace(args.model)
     rows, embeddings, summary = [], [], []
     for number, name in enumerate(chosen):
         occupant = f"{FIRST_ID + number:07d}"
-        unmasked = [im for kind, im in people[name] if kind == "no-mask"]
-        masked = [(kind, im) for kind, im in people[name] if kind != "no-mask"]
-        rng = seeded("mfr2", name)
-        # ---- 20 unmasked references: the real photos first, then augmented copies of them
-        refs = [(im, "real", "no-mask") for im in unmasked]
-        while len(refs) < N_REFERENCE:
-            refs.append((augment(unmasked[len(refs) % len(unmasked)], rng), "augmented", "no-mask"))
-        # ---- 20 masked probes: real masked photos (the originals, then augmented copies) + synthetic masks
-        n_real = N_TEST - N_SYNTHETIC if masked else 0
-        tests = [(im, "real", kind) for kind, im in masked][:N_TEST]
-        for i in range(len(tests), n_real):
-            kind, im = masked[i % len(masked)]
-            tests.append((augment(im, rng), "real_augmented", kind))
-        kinds = sorted(MASK_COLOURS)
+        rng = seeded("rmfrd", name)
+        masked_paths, unmasked_paths = photos(MASKED_DIR / name), photos(UNMASKED_DIR / name)
+        # ---- 20 unmasked references: distinct real photos, chosen by a seeded shuffle
+        picked = [unmasked_paths[i] for i in rng.permutation(len(unmasked_paths))[:N_REFERENCE + 6]]
+        refs_img = load_aligned(aligner, picked)[:N_REFERENCE]
+        while len(refs_img) < N_REFERENCE:                                   # only if photos were unreadable
+            refs_img.append(augment(refs_img[len(refs_img) % len(refs_img)], rng))
+        refs = [(im, "real", "no-mask") for im in refs_img]
+        # ---- 20 masked probes: real masked photos (up to 20), then augmented copies of them
+        real_paths = [masked_paths[i] for i in rng.permutation(len(masked_paths))]
+        masked_img = load_aligned(aligner, real_paths)
+        tests = [(im, "real", "real_mask") for im in masked_img[:N_TEST]]
         while len(tests) < N_TEST:
-            kind = kinds[int(rng.integers(len(kinds)))]
-            base = augment(unmasked[len(tests) % len(unmasked)], rng, 0.8)
-            tests.append((draw_mask(base, kind, rng), "synthetic", kind))
+            tests.append((augment(masked_img[len(tests) % len(masked_img)], rng), "real_augmented", "real_mask"))
         for split, items in (("reference", refs), ("test", tests)):
             folder = IMAGES / BUILDING / occupant / split
             folder.mkdir(parents=True, exist_ok=True)
@@ -177,38 +223,47 @@ def build(args):
                              "image_path": path.relative_to(REPO).as_posix(), "masked": int(split == "test"),
                              "mask_type": kind, "source": source, "identity_name": name})
                 embeddings.append(vec)
-        summary.append((occupant, name, len(unmasked), len(masked)))
-        print(f"  {occupant} {name:<22} real unmasked {len(unmasked)}  real masked {len(masked)}", flush=True)
+        summary.append((occupant, name, len(unmasked_paths), len(masked_paths)))
+        print(f"  {occupant} {name:<22} real unmasked {len(unmasked_paths):>3}  real masked {len(masked_paths):>3}",
+              flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
     emb = np.stack(embeddings).astype(np.float32)
     np.save(OUT / "emb_arcface.npy", emb)
     meta = pd.DataFrame(rows)
     meta.to_csv(OUT / "meta.csv", index=False)
-    (OUT / "README.md").write_text(readme(meta, summary), encoding="utf-8")
-    print(f"wrote {OUT}: {emb.shape[0]} embeddings, {meta.occupant_id.nunique()} identities")
+    (OUT / "README.md").write_text(readme(meta, summary, aligner), encoding="utf-8")
+    print(f"wrote {OUT}: {emb.shape[0]} embeddings, {meta.occupant_id.nunique()} identities; "
+          f"face found in {aligner.found} photos, centre-crop fallback in {aligner.fallback}")
     return emb, meta
 
 
-def readme(meta, summary) -> str:
-    real = int((meta.source == "real").sum())
-    return f"""# building_11: masked identities from MFR2
+def readme(meta, summary, aligner) -> str:
+    test = meta[meta.split == "test"]
+    real = int((test.source == "real").sum())
+    masked_counts = sorted(m for _, _, _, m in summary)
+    return f"""# building_11: masked identities from RMFRD
 
-Built by `tools/build_masked_building.py` from the MFR2 masked-face recognition dataset (Anwar & Raychowdhury,
-"Masked Face Recognition for Secure Authentication", MaskTheFace project): 53 identities, 269 aligned photos.
+Built by `tools/build_masked_building.py` from the RMFRD real-world masked face dataset (Wuhan University, "Masked Face
+Recognition Dataset and Application", Wang et al. 2020; `self-built-masked-face-recognition-dataset`): web-crawled photos
+of 525 people with real masks and hundreds of unmasked photos each.
 
-* {meta.occupant_id.nunique()} identities (the 50 with the most photos), ids {meta.occupant_id.min()} - {meta.occupant_id.max()}.
-* {len(meta)} embeddings: 20 `reference` (unmasked) + 20 `test` (all masked) per person, 512-d, L2-normalised, from
-  insightface `buffalo_l` / `w600k_r50.onnx` (112x112 RGB, (x-127.5)/127.5).
-* Only {real} of the {len(meta)} images are original MFR2 photos; the rest are augmented copies or synthetic masks
-  drawn on unmasked photos (`source` column: real / augmented / real_augmented / synthetic; `mask_type` says which mask).
+* {meta.occupant_id.nunique()} identities (the ones with the most real masked photos, each with >= {MIN_UNMASKED} unmasked photos),
+  ids {meta.occupant_id.min()} - {meta.occupant_id.max()}. They have {masked_counts[0]} - {masked_counts[-1]} real masked photos each.
+* {len(meta)} embeddings: 20 `reference` (unmasked, all distinct real photos) + 20 `test` (all masked) per person, 512-d,
+  L2-normalised, from insightface `buffalo_l` (`det_10g` detector + landmark alignment, `w600k_r50` ArcFace, RGB,
+  (x-127.5)/127.5).
+* Probes: {real} of the {len(test)} masked probes are original masked photos; the rest are augmented copies of them
+  (flip, rotation, scale, shift, brightness, blur, noise, JPEG). No synthetic masks. `source` column: real / real_augmented.
+* Face detection found a face in {aligner.found} photos; {aligner.fallback} fell back to a centre crop.
 
-Limits: synthetic masks are a fixed-geometry overlay (no landmark detector); every person's 40 embeddings come from
-at most 10 real photos. Treat building_11 as a test of masked recognition and routing, not as an accuracy estimate for
-new people. MFR2 is for research use; see its page for terms.
+Limits: the median person has 16 real masked photos (15 people have the full 20), so the rest of their 20 probes are augmented copies; the photos are
+celebrity-style web images. Treat building_11 as a test of masked recognition and routing, not as an accuracy estimate
+for new people. RMFRD is released for research use; see its GitHub page for terms.
 """
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--model", type=Path, default=MODEL)
+    ap.add_argument("--detector", type=Path, default=DETECTOR)
     build(ap.parse_args())

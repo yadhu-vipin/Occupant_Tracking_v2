@@ -10,7 +10,7 @@
     python manage.py standalone                 the Lane D dashboard on its offline, fake-backed demo server (:8001)
     python manage.py walk                       scripted B1 -> B5 walk in the terminal (offline, needs no corpus)
     python manage.py query [--seed N] ARGS...   pipeline/query.py (e.g. --caller X --target Y --query Q6)
-    python manage.py masked                     build corpus/masked (building_11: 50 masked MFR2 identities) once
+    python manage.py masked                     build corpus/masked (building_11: 50 masked RMFRD identities) once
 
 Every seed owns one folder, ``runs/seed_XX/`` (see shared/paths.py); scripts find it through
 ``$DSTS_RUN_DIR``, which this file sets for each subprocess. See README.md for what every step reads and writes.

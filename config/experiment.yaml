@@ -6,7 +6,7 @@ population:
   default_seed: 42         # run used when no --seed / DSTS_SEED is given
 
 masked_building:
-  # building_11: 50 more people, every one of them seen WITH A MASK (MFR2 faces, see corpus/masked/README.md).
+  # building_11: 50 more people, every one of them seen WITH A MASK (RMFRD faces, see corpus/masked/README.md).
   # Their galleries are unmasked, their capture embeddings are masked. Build the data once with
   # `python tools/build_masked_building.py`; set enabled: false to run the original 10 buildings only.
   enabled: true
