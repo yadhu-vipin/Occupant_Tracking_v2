@@ -43,6 +43,7 @@ Design notes
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -153,6 +154,8 @@ def _compute_spread(angles) -> float:
 
 def detect_mask(angles, cfg: MaskConfig) -> tuple[bool, float]:
     """Return (mask_detected, spread_deg) for the given angle matrix."""
+    if os.environ.get("DSTS_MASK_HANDLER", "on").lower() == "off":     # ablation switch: never relax thresholds
+        return False, 0.0
     n_occ = angles.shape[0] if hasattr(angles, "shape") else len(angles)
     if n_occ < cfg.min_spread_samples:
         return False, 0.0

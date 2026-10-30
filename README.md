@@ -174,6 +174,8 @@ On top of the 500 corpus identities dealt into buildings 1-10, **building_11 hol
 * Seed 42, one day: unmasked people are identified correctly **95.04 %** of the time; the masked building's **59.0 %** (59.4 % at home, 56.7 % as visitors elsewhere; 340 of 1,000 captures abstain, precision 89.4 %).
 * **Read it with its limits.** RMFRD's masked photos are few per person (median 16 of the 20 probes are real, 15 people have all 20 real; the rest are augmented copies: flip, rotation, scale, shift, brightness, blur, noise, JPEG), the photos are celebrity-style web images with some mislabelled ones, and the same person looks about 67 degrees apart in the gallery (about 61 in the corpus). That makes building_11 a hard, realistic test of masked recognition and routing rather than an accuracy estimate for new people. An earlier version built from MFR2 (1-2 unmasked photos per person, so near-duplicate galleries, plus drawn-on masks) scored 85.9 % because it was easier.
 
+**What was tried to improve masked recognition (offline, seed 42, building_11 probes against the 50-person gallery):** mixing synthetic-masked templates into the gallery, matching on the upper face only, and relaxing thresholds did not raise F1 (about 0.72 in every case; they trade abstains for wrong answers), and without thresholds the nearest person is right only 65-70 % of the time for every gallery variant. Enrolling a few real masked photos per person adds about 5 points. The pre-existing mask handler (`recognition/mask_handler.py`, an angle-spread heuristic) never fires for masked people and fires on about 42 % of unmasked local events, where it costs about 22 extra false accepts; `DSTS_MASK_HANDLER=off` switches it off for an ablation (default on, unchanged).
+
 ### Data flow
 
 ```
