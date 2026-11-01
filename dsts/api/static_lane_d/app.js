@@ -7,7 +7,7 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 /* zone names of the real zone graph (dsts/state/zones.py) */
 const ZONES=[["z1","Entrance"],["z2","Mail room"],["z3","Office"],["z4","Lounge"],["z5","Conference"],["z6","Classroom"],["z7","Cafeteria"],["z8","Exit"],["zT","Transition"]];
 const QUERIES=[["Q1","Did any occupant stay in building B after time T?",["building","time"]],["Q2","Were visitors in building B more numerous than registered occupants at time T?",["building","time"]],["Q3","Did occupant O leave building B before time T?",["occupant","building","time"]],["Q4","Did occupant O enter the building between T1 and T2?",["occupant","building","start","end"]],["Q5","Did occupant O visit all zones in building B?",["occupant","building"]],["Q6","Where was occupant O at time T?",["occupant","time"]],["Q7","How many zones did occupant O visit during T1–T2?",["occupant","start","end"]],["Q8","At what time did occupant O visit zone Z for the first time?",["occupant","zone"]],["Q9","How long did occupant O spend at zone Z during the first visit?",["occupant","zone"]],["Q10","Who was in zone Z at time T?",["zone","time"]],["Q11","Where was occupant O during T1–T2?",["occupant","start","end"]],["Q12","Who was in zone Z from T1 to T2?",["zone","start","end"]],["Q13","Who all visited zone Z?",["zone"]],["TRACK","Full trajectory of occupant O",["occupant"]]];
-const COL=["#7c5cff","#4f7cff","#22c55e","#f59e0b","#ec4899"];
+const COL=["#e4d6f3","#cfe6f9","#d7e4c3","#f1dacb","#f2d3da"];
 const safe=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const hdr=role=>INTEG&&TOK[role||"officer"]?{Authorization:"Bearer "+TOK[role||"officer"]}:{};
 const fail=async r=>{let m=`${r.status} ${r.statusText}`;try{m=(await r.json()).detail||m}catch(e){}throw new Error(m)};
@@ -35,31 +35,32 @@ const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
 function renderKpis(){
  const bs=B(),conf=S.hist.map(r=>r.probability).filter(p=>p!=null),h=Math.floor(conf.length/2);
  const d=conf.length>3?(avg(conf.slice(h))-avg(conf.slice(0,h)))*100:null;
- const K=[["▦","Total Buildings",bs.length,"Active","","#7c5cff"],["▣","Total Zones",bs.length*ZONES.length,"Configured","bl","#4f7cff"],["◉","Tracked Occupants",bs.reduce((n,b)=>n+b.occupants.length,0),"Registered","","#22c55e"],["⚡","Live Events",S.hist.length,"Generated","bl","#ec4899"],["◎","Avg Confidence",conf.length?avg(conf).toFixed(2):"—",d==null?"No trend yet":(d>=0?"+":"")+d.toFixed(0)+"%",d!=null&&d<0?"dn":"","#f59e0b"]];
- $("#kpis").innerHTML=K.map(k=>`<div class="kpi"><div class="ic" style="background:${k[5]}26;color:${k[5]};box-shadow:0 0 16px ${k[5]}33">${k[0]}</div><div><small class="muted">${k[1]}</small><b>${k[2]}</b><span class="tag ${k[4]}">${k[3]}</span></div></div>`).join("");
+ const K=[["▦","Total Buildings",bs.length,"Active","","#e4d6f3"],["▣","Total Zones",bs.length*ZONES.length,"Configured","bl","#cfe6f9"],["◉","Tracked Occupants",bs.reduce((n,b)=>n+b.occupants.length,0),"Registered","","#d7e4c3"],["⚡","Live Events",S.hist.length,"Generated","bl","#f2d3da"],["◎","Avg Confidence",conf.length?avg(conf).toFixed(2):"—",d==null?"No trend yet":(d>=0?"+":"")+d.toFixed(0)+"%",d!=null&&d<0?"dn":"","#f1dacb"]];
+ $("#kpis").innerHTML=K.map(k=>`<div class="kpi"><div class="ic" style="background:${k[5]}">${k[0]}</div><div><small class="muted">${k[1]}</small><b>${k[2]}</b><span class="tag ${k[4]}">${k[3]}</span></div></div>`).join("");
 }
 function renderActivity(){
  const r=S.hist.slice(-6).reverse(),bi=id=>Math.max(0,B().findIndex(b=>b.id===id));
- $("#activity").innerHTML=r.length?r.map(e=>`<div class="act"><div class="b" style="background:${COL[bi(e.building_id)%5]}33;color:${COL[bi(e.building_id)%5]}">${safe((e.occupant||"?").slice(-4))}</div><div><b>${safe(e.occupant||"unknown")}</b><br><span>moved to ${safe(e.building_id)}-${safe(e.zone)}</span></div><span>${fmtT(e.time)}</span></div>`).join(""):'<p class="muted">No events yet. Use Event Generator or the B1 → B5 Demo.</p>';
+ $("#activity").innerHTML=r.length?r.map(e=>`<div class="act"><div class="b" style="background:${COL[bi(e.building_id)%5]}">${safe((e.occupant||"?").slice(-4))}</div><div><b>${safe(e.occupant||"unknown")}</b><br><span>moved to ${safe(e.building_id)}-${safe(e.zone)}</span></div><span>${fmtT(e.time)}</span></div>`).join(""):'<p class="muted">No events yet. Use Event Generator or the B1 → B5 Demo.</p>';
 }
 /* isometric campus: any number of buildings on a grid (the real project has 10) */
-function box(cx,cy,h,c){const a=30,b=17,P=(...p)=>p.map(x=>x.join(",")).join(" ");
- const win=(x1,y1,x2,y2)=>[1,2,3].map(i=>{const k=i*h/4;return `<line x1="${x1}" y1="${y1-k}" x2="${x2}" y2="${y2-k}" stroke="#bcd0ff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="3 5"/>`}).join("");
- return `<g filter="url(#gl)"><polygon points="${P([cx-a,cy-h],[cx,cy-h+b],[cx,cy+b],[cx-a,cy])}" fill="${c}" fill-opacity=".38"/><polygon points="${P([cx,cy-h+b],[cx+a,cy-h],[cx+a,cy],[cx,cy+b])}" fill="${c}" fill-opacity=".6"/><polygon points="${P([cx,cy-h-b],[cx+a,cy-h],[cx,cy-h+b],[cx-a,cy-h])}" fill="${c}" stroke="#fff" stroke-opacity=".5"/>${win(cx-a+5,cy-5+b/2-3,cx-5,cy+b-8)}${win(cx+5,cy+b-8,cx+a-5,cy-5)}</g>`}
+function box(cx,cy,h,c){const a=30,b=17,P=(...p)=>p.map(x=>x.join(",")).join(" "),ink="#121210";
+ const win=(x1,y1,x2,y2)=>[1,2,3].map(i=>{const k=i*h/4;return `<line x1="${x1}" y1="${y1-k}" x2="${x2}" y2="${y2-k}" stroke="${ink}" stroke-opacity=".2" stroke-width="1.5" stroke-dasharray="3 5"/>`}).join("");
+ const L=P([cx-a,cy-h],[cx,cy-h+b],[cx,cy+b],[cx-a,cy]),R=P([cx,cy-h+b],[cx+a,cy-h],[cx+a,cy],[cx,cy+b]),T=P([cx,cy-h-b],[cx+a,cy-h],[cx,cy-h+b],[cx-a,cy-h]);
+ return `<g stroke="${ink}" stroke-opacity=".45" stroke-linejoin="round"><polygon points="${L}" fill="${c}"/><polygon points="${R}" fill="${c}"/><polygon points="${R}" fill="${ink}" fill-opacity=".13" stroke="none"/><polygon points="${T}" fill="${c}"/><polygon points="${T}" fill="#fff" fill-opacity=".5" stroke="none"/>${win(cx-a+5,cy-5+b/2-3,cx-5,cy+b-8)}${win(cx+5,cy+b-8,cx+a-5,cy-5)}</g>`}
 function campusPos(n){const cols=Math.min(5,Math.max(1,n)),rows=Math.ceil(n/cols),out=[];
  for(let i=0;i<n;i++){const u=i%cols-(cols-1)/2,w=Math.floor(i/cols)-(rows-1)/2;out.push([340+(u-w)*88,172+(u+w)*44])}return out}
 function renderCampus(){
  const bs=B(),pos=campusPos(bs.length);
  const G=bs.map((q,i)=>({q,x:pos[i][0],y:pos[i][1],h:38+(q.occupants.length%4)*8,c:COL[i%COL.length]}));
- let s=`<svg viewBox="0 -62 680 410"><defs><filter id="gl"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><polygon points="340,20 660,170 340,320 20,170" fill="#0c1334" stroke="#3b46a8" stroke-opacity=".6"/>`;
- for(let i=1;i<8;i++){const t=i/8;s+=`<line x1="${340-320*t}" y1="${20+150*t}" x2="${340+320*(1-t)}" y2="${170+150*(1-t)}" stroke="#4452c9" stroke-opacity=".18"/><line x1="${340+320*t}" y1="${20+150*t}" x2="${340-320*(1-t)}" y2="${170+150*(1-t)}" stroke="#4452c9" stroke-opacity=".18"/>`}
+ let s=`<svg viewBox="0 -62 680 410"><polygon points="340,20 660,170 340,320 20,170" fill="#efece4" stroke="#d8d2c2"/>`;
+ for(let i=1;i<8;i++){const t=i/8;s+=`<line x1="${340-320*t}" y1="${20+150*t}" x2="${340+320*(1-t)}" y2="${170+150*(1-t)}" stroke="#d8d2c2" stroke-opacity=".45"/><line x1="${340+320*t}" y1="${20+150*t}" x2="${340-320*(1-t)}" y2="${170+150*(1-t)}" stroke="#d8d2c2" stroke-opacity=".45"/>`}
  G.slice().sort((p,q)=>p.y-q.y||p.x-q.x).forEach(g=>s+=box(g.x,g.y,g.h,g.c));
  G.forEach(g=>{const n=Object.values(S.heat[g.q.id]||{}).reduce((p,q)=>p+q,0),lab=String(g.q.id).replace(/^building_/,"B")+(g.q.id===S.layout?.masked_building?" \u{1F637}":"");
-  s+=`<g transform="translate(${g.x-30},${g.y-g.h-44})"><rect width="60" height="28" rx="8" fill="#0b1030" stroke="${g.c}" stroke-opacity=".8"/><text x="30" y="12" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">${safe(lab)}</text><text x="30" y="23" text-anchor="middle" fill="#aab4e8" font-size="8.5">${g.q.occupants.length} occ · ${n} here</text></g>`});
+  s+=`<g transform="translate(${g.x-30},${g.y-g.h-44})"><rect width="60" height="28" rx="8" fill="#fbfaf6" stroke="#d8d2c2"/><text x="30" y="12" text-anchor="middle" fill="#121210" font-weight="700" font-size="11">${safe(lab)}</text><text x="30" y="23" text-anchor="middle" fill="#6b6b66" font-size="8.5">${g.q.occupants.length} occ · ${n} here</text></g>`});
  $("#campus").innerHTML=s+"</svg>";$("#campus-sub").textContent=`${bs.length} buildings`+(S.layout?.masked_building?` \u00b7 ${String(S.layout.masked_building).replace(/^building_/,"B")} \u{1F637} everyone masked`:"");
 }
 /* zones */
-const heat=(v,m)=>{if(!v)return"#2b3555";const t=Math.min(v/Math.max(m,1),1);return t<.34?"#22c55e":t<.67?"#facc15":"#f97316"};
+const heat=(v,m)=>{if(!v)return"#eae6da";const t=Math.min(v/Math.max(m,1),1);return t<.34?"#d7e4c3":t<.67?"#e6d9a0":"#eab79a"};
 function counts(b){if(b!=="all")return S.heat[b]||{};const o={};Object.values(S.heat).forEach(c=>Object.entries(c||{}).forEach(([z,n])=>o[z]=(o[z]||0)+n));return o}
 function renderZones(){
  if(!S.b&&B().length)S.b=B()[0].id;
@@ -113,8 +114,8 @@ let secTab="logs",SEC=null;
 const ROLES=INTEG?[["officer","Acts as the Dean of the demo building: every movement of that building's teachers and students (L4, any purpose), and of other buildings' Deans; nobody else"],["analyst","Acts as a Teacher of the demo building: only the students assigned to them (class-teacher), in any building; nobody else"],["self","Acts as a Student of the demo building: their own data (L4), and where the teachers assigned to them are now (L3); nobody else"]]:[["officer","Full detail: time, zone, occupant, probability"],["analyst","Aggregated: pseudonymised occupant handle, no raw probability"],["self","Only rows that belong to the requesting occupant"]];
 async function refreshSecurity(){
  try{const [s,ev]=await Promise.all([api("/api/security-summary"),api("/api/security-log")]);SEC={s,ev};}catch(e){console.warn(e);return}
- const K=[["Authenticated Users",SEC.s.authenticated_users,"#22c55e","◉"],["Active Sessions",SEC.s.active_sessions,"#4f7cff","◔"],["API Requests",SEC.s.api_requests,"#7c5cff","⇄"],["Blocked Requests",SEC.s.blocked_requests,"#ef4444","⊘"]];
- $("#sec-kpis").innerHTML=K.map(k=>`<div class="kpi"><div class="ic" style="background:${k[2]}26;color:${k[2]}">${k[3]}</div><div><small class="muted">${k[0]}</small><b>${k[1]}</b></div></div>`).join("");renderSecTab();
+ const K=[["Authenticated Users",SEC.s.authenticated_users,"#d7e4c3","◉"],["Active Sessions",SEC.s.active_sessions,"#cfe6f9","◔"],["API Requests",SEC.s.api_requests,"#e4d6f3","⇄"],["Blocked Requests",SEC.s.blocked_requests,"#f2d3da","⊘"]];
+ $("#sec-kpis").innerHTML=K.map(k=>`<div class="kpi"><div class="ic" style="background:${k[2]}">${k[3]}</div><div><small class="muted">${k[0]}</small><b>${k[1]}</b></div></div>`).join("");renderSecTab();
 }
 function renderSecTab(){
  const el=$("#sec-body");if(!SEC)return;
