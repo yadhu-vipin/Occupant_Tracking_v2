@@ -44,3 +44,6 @@ nodes/
 out/
 reports/
 evaluate_pipeline/
+
+# the face photo folders (CASIA-WebFace splits), large and not versioned here
+dataset_splits/
