@@ -29,7 +29,7 @@ function renderRows(t,rows){const b=$(t);b.innerHTML=rows.length?rows.map(r=>`<t
 async function refresh(){
  const [o,h,q]=await Promise.all([api("/api/occupancy"),api("/api/heatmap"),api("/api/events").catch(()=>[])]);
  S.occ=o;S.heat=h;S.hist=Array.isArray(q)?q:(q.rows||[]);const rows=rowsFrom(o);renderRows("#occupancy-body",rows);$("#occupancy-count").textContent=`${rows.length} records`;
- renderKpis();renderCampus();renderActivity();renderZones();
+ renderKpis();renderCampus();renderActivity();renderZones();showUser();
 }
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
 function renderKpis(){
@@ -151,7 +151,8 @@ function renderReasoning(x,answerWithheld){const card=$("#reasoning-card"),body=
  body.innerHTML=`<div class="reasoning-grid">${parts.join("")}</div>`}
 async function runQuery(p=qPayload()){try{const d=await post("/api/query",p,p.role);const dec=d.decision?` Policy ${d.decision.policy_rule||"—"} · ${d.decision.disclosure_level||""}.`:"";$("#query-note").textContent=(d.redacted?`Role policy applied for ${p.role}; some details may be hidden.`:`Executed ${p.query_id||"query"} using available tracking data.`)+dec;$("#query-answer").textContent=d.answer||`${(d.rows||[]).length} matching record(s).`;renderRows("#query-body",d.rows||[]);renderReasoning(d.explanation,d.withheld);if($("#q-speak").checked)speak(d.answer||"Query completed.");}catch(e){$("#query-note").textContent="Query failed: "+e.message;$("#query-answer").textContent="The API could not execute this query: "+e.message;renderRows("#query-body",[]);renderReasoning(null)}}
 $("#btn-query").onclick=()=>runQuery();
-const showAs=()=>{const el=$("#q-as");if(!el)return;const r=$("#q-role").value;el.textContent=INTEG&&PRIN[r]?`Acting as ${r} → occupant ${PRIN[r]} (${ROLE_PERSONA[r]}). The answer and what is hidden follow that person's role.`:""};
+const ROLE_LABEL={officer:"Dean",analyst:"Teacher",self:"Student"};const showUser=()=>{const r=$("#q-role")?$("#q-role").value:"officer",n=$("#user-name");if(!n)return;n.textContent=INTEG&&PRIN[r]?`${ROLE_LABEL[r]} ${PRIN[r]}`:"Demo user";$("#user-sub").textContent="Viewing as "+ROLE_LABEL[r];$("#user-av").textContent=ROLE_LABEL[r][0]};
+const showAs=()=>{showUser();const el=$("#q-as");if(!el)return;const r=$("#q-role").value;el.textContent=INTEG&&PRIN[r]?`Acting as ${r} → occupant ${PRIN[r]} (${ROLE_PERSONA[r]}). The answer and what is hidden follow that person's role.`:""};
 $("#q-role").onchange=showAs;
 if(!INTEG&&$("#purpose-field"))$("#purpose-field").style.display="none";
 $("#btn-clear-query").onclick=()=>{$("#query-fields").querySelectorAll("input").forEach(x=>x.value="");$("#query-note").textContent="";$("#query-answer").textContent="";renderRows("#query-body",[])};

@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DSTS — Lane D Occupant Tracking</title>
+<title>DSTS · Multi-Building Occupant Tracking</title>
 <!-- __MODE__ / __STATIC__ are filled in by the server: "integrated" (real data, login, /lane-d) or "standalone" (offline demo) -->
-<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=8"></head>
+<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=9"></head>
 <body><div class="app">
 <aside class="side">
  <div class="brand"><div class="logo">▲</div><div><b>dsts</b><small>Occupant tracking</small></div></div>
@@ -15,14 +15,14 @@
   <button class="nav" data-view="metrics"><i>◔</i>Metrics</button>
   <div class="sec">SYSTEM</div>
   <button class="nav" data-view="generator"><i>✦</i>Event Generator</button>
-  <button class="nav" id="btn-walk"><i>⇄</i>B1 → B5 Demo</button>
+  <button class="nav" id="btn-walk"><i>⇄</i>Walkthrough</button>
   <button class="nav" data-view="settings"><i>⚙</i>Settings</button>
  </nav>
- <div class="user"><div class="avatar">AA</div><div><b>Ajith Ashok</b><small>Lane D Team</small></div></div>
+ <div class="user"><div class="avatar" id="user-av">D</div><div><b id="user-name">Demo user</b><small id="user-sub">Role-based access demo</small></div></div>
 </aside>
 <main>
 <header class="top">
- <div><span class="eyebrow">Observe every building · explain every answer</span><h1>DSTS — Lane D <span class="mark">Occupant Tracking</span></h1><p>Building-level coordination · Zone-level occupancy · Temporal queries</p></div>
+ <div><span class="eyebrow">Observe every building · explain every answer</span><h1>Multi-building <span class="mark">occupant tracking</span></h1><p>Building-level coordination · Zone-level occupancy · Temporal queries</p></div>
  <div class="top-r"><span class="pill online"><span class="dot" id="live-dot"></span>System Online</span><div class="clock"><span id="clk-d"></span><b id="clk-t"></b></div></div>
 </header>
 
@@ -76,5 +76,5 @@
 <div class="row"><button id="btn-simulate">Generate Events</button><button id="btn-reset" class="ghost">Reset</button></div></div></section>
 
 <section id="v-settings" class="view"><div class="card"><h3>Recognition threshold</h3><input id="theta" type="range" min="0" max="100" value="40"><div class="muted" id="theta-value">0.40</div>
-<h3 class="mt">About this lane</h3><p class="muted">Lane D connects recognition, cross-building routing, state retrieval, role-aware access and monitoring. Occupancy and query answers are based on the demo data available to this running instance.</p></div></section>
-</main></div><script src="__STATIC__/app.js?v=8"></script></body></html>
+<h3 class="mt">About this demo</h3><p class="muted">DSTS identifies and tracks occupants across buildings: local recognition, LSH and Bloom-filter routing to find a visitor's home building, probabilistic state tracking, role-based access and explained answers. Occupancy and query answers use the data of this running instance.</p></div></section>
+</main></div><script src="__STATIC__/app.js?v=9"></script></body></html>

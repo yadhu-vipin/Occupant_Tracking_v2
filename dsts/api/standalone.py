@@ -34,7 +34,7 @@ from dsts.security.transport import SecurityEvent
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR.parent.parent / "config" / "campus.yaml"
 
-app = FastAPI(title="DSTS Lane D — standalone demo")
+app = FastAPI(title="DSTS — standalone demo")
 
 _security_log: list[dict] = []
 _access_log: list[dict] = []
