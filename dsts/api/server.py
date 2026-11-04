@@ -46,6 +46,7 @@ from prometheus_client import (
 
 from shared.paths import run_paths  # noqa: E402
 from dsts.api import metrics as m
+from dsts.api.simulation import SIM
 from dsts.state.zones import ZONES, zone_label, zone_sector
 from pipeline.query import (
     IdentifiedEvent,
@@ -351,7 +352,10 @@ def _compute_real_occupancy_locked(engine: QueryEngine) -> tuple[Dict[str, List[
     for b_id in sorted(engine.registered.keys(), key=lambda x: int(x.split("_")[1])):
         heatmap[b_id] = {z: 0 for z in ZONES}
 
+    fresh_after = SIM.cutoff()                       # during a simulation only recent sightings count as "here now"
     for occupant_id, event in latest_by_occupant.items():
+        if fresh_after and event.timestamp < fresh_after:
+            continue
         row = {
             "building_id": event.building,
             "zone": event.zone,

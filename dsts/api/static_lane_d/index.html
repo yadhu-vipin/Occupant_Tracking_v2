@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DSTS · Multi-Building Occupant Tracking</title>
 <!-- __MODE__ / __STATIC__ are filled in by the server: "integrated" (real data, login, /lane-d) or "standalone" (offline demo) -->
-<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=9"></head>
+<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=10"></head>
 <body><div class="app">
 <aside class="side">
  <div class="brand"><div class="logo">▲</div><div><b>dsts</b><small>Occupant tracking</small></div></div>
@@ -14,8 +14,7 @@
   <button class="nav" data-view="security"><i>⛨</i>Security</button>
   <button class="nav" data-view="metrics"><i>◔</i>Metrics</button>
   <div class="sec">SYSTEM</div>
-  <button class="nav" data-view="generator"><i>✦</i>Event Generator</button>
-  <button class="nav" id="btn-walk"><i>⇄</i>Walkthrough</button>
+    <button class="nav" id="btn-walk"><i>⇄</i>Walkthrough</button>
   <button class="nav" data-view="settings"><i>⚙</i>Settings</button>
  </nav>
  <div class="user"><div class="avatar" id="user-av">D</div><div><b id="user-name">Demo user</b><small id="user-sub">Role-based access demo</small></div></div>
@@ -23,10 +22,17 @@
 <main>
 <header class="top">
  <div><span class="eyebrow">Observe every building · explain every answer</span><h1>Multi-building <span class="mark">occupant tracking</span></h1><p>Building-level coordination · Zone-level occupancy · Temporal queries</p></div>
- <div class="top-r"><span class="pill online"><span class="dot" id="live-dot"></span>System Online</span><div class="clock"><span id="clk-d"></span><b id="clk-t"></b></div></div>
+ <div class="top-r"><label class="field viewas">View as<select id="view-as"><option value="officer">Dean</option><option value="analyst">Teacher</option><option value="self">Student</option></select></label><span class="pill online"><span class="dot" id="live-dot"></span>System Online</span><div class="clock"><span id="clk-d"></span><b id="clk-t"></b></div></div>
 </header>
 
 <section id="v-overview" class="view active">
+ <div class="card sim" id="sim">
+  <div class="sim-head"><div><h3>Simulation</h3><p class="muted" id="sim-hint">Replays recognised events across a simulated day, week or month. Everything on this page follows the clock; what you see depends on who you are signed in as.</p></div><span class="pill" id="sim-state">Not started</span></div>
+  <div class="sim-ctl"><label class="field">Period<select id="sim-span"><option value="day">One day</option><option value="week">One week</option><option value="month">One month</option></select></label>
+   <label class="field">Speed<select id="sim-speed"><option value="slow">Slow</option><option value="normal" selected>Normal</option><option value="fast">Fast</option></select></label>
+   <button id="sim-go">▶ Start simulation</button><button id="sim-reset" class="ghost">Reset</button></div>
+  <div class="sim-clock"><b id="sim-clock">—</b><div class="bar"><i id="sim-bar"></i></div><span class="muted" id="sim-meta"></span></div>
+ </div>
  <div class="kpis" id="kpis"></div>
  <div class="grid2"><div class="card"><div class="ch"><h3>Campus Overview</h3><span class="muted" id="campus-sub"></span></div><div id="campus"></div></div>
  <div class="card"><div class="ch"><h3>Live Activity</h3><span class="pill live">● Live</span></div><div id="activity" class="activity"></div><a class="link" data-go="occupancy">View all events →</a></div></div>
@@ -71,10 +77,7 @@
 
 <section id="v-metrics" class="view"><div class="card"><h3>Prometheus &amp; Grafana</h3><p class="muted">Live counters are exposed at <code>/metrics</code>. Open Grafana at <a href="http://localhost:3000" target="_blank" rel="noopener">localhost:3000</a>.</p><div class="row"><a class="btn" href="/metrics" target="_blank" rel="noopener">Open raw metrics →</a></div></div></section>
 
-<section id="v-generator" class="view"><div class="card"><h3>Event Generator</h3><p class="muted">Generate simulated mobility events for every building.</p>
-<div class="row"><label class="field">Events <input id="sim-count" type="number" value="20" min="1" max="200"></label><label class="field">Seed <input id="sim-seed" type="number" value="42"></label></div>
-<div class="row"><button id="btn-simulate">Generate Events</button><button id="btn-reset" class="ghost">Reset</button></div></div></section>
-
 <section id="v-settings" class="view"><div class="card"><h3>Recognition threshold</h3><input id="theta" type="range" min="0" max="100" value="40"><div class="muted" id="theta-value">0.40</div>
 <h3 class="mt">About this demo</h3><p class="muted">DSTS identifies and tracks occupants across buildings: local recognition, LSH and Bloom-filter routing to find a visitor's home building, probabilistic state tracking, role-based access and explained answers. Occupancy and query answers use the data of this running instance.</p></div></section>
-</main></div><script src="__STATIC__/app.js?v=9"></script></body></html>
+</main></div>
+<div id="track" class="modal" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="Track of one person"><button class="x ghost" id="track-x" aria-label="Close">×</button><div id="track-head"></div><div id="track-body"></div></div></div><script src="__STATIC__/app.js?v=10"></script></body></html>

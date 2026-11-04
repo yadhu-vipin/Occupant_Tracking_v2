@@ -104,7 +104,7 @@ def heatmap(_: str = Depends(principal)) -> dict:
 @router.get("/api/events")
 def recent_events(limit: int = 200, who: str = Depends(principal)) -> List[dict]:
     """The newest identified events, each run through the persona/building policy for the caller (exact zone at L3+,
-    sector and hour-rounded time at L2, nothing below)."""
+    sector and hour-rounded time at L2, nothing below). ``face`` says whether the caller may also see the person's photo."""
     from access_control.campus_policy import DisclosureLevel, QueryContext, QueryPurpose, evaluate_campus_query_policy
     from dsts.state.zones import zone_sector
     from shared.timeutil import approx_time
@@ -112,7 +112,8 @@ def recent_events(limit: int = 200, who: str = Depends(principal)) -> List[dict]
     engine = srv._get_engine()
     limit = max(1, min(int(limit), 1000))
     out: List[dict] = []
-    for e in sorted(engine.events, key=lambda ev: to_seconds(ev.timestamp))[-limit * 3:][::-1]:
+    # the log is kept in time order, so the newest events are at its end; sort only that tail
+    for e in sorted(engine.events[-limit * 6:], key=lambda ev: to_seconds(ev.timestamp))[::-1]:
         ctx = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP, is_office_hours=is_office_hours(e.timestamp))
         d = evaluate_campus_query_policy(who, e.occupant_id, context=ctx, purpose=ctx.purpose,
                                          target_current_building=e.building)
@@ -123,7 +124,8 @@ def recent_events(limit: int = 200, who: str = Depends(principal)) -> List[dict]
         out.append({"building_id": e.building, "zone": e.zone if exact else zone_sector(e.zone),
                     "occupant": e.occupant_id, "probability": e.identity_probability if exact else None,
                     "time": shown.replace(" ", "T"), "time_text": shown, "timestamp": to_seconds(e.timestamp),
-                    "disclosure": d.level.name})
+                    "disclosure": d.level.name, "face": exact, "event_id": e.event_id,
+                    "visitor": e.building != e.home_building})
         if len(out) >= limit:
             break
     return out[::-1]
@@ -249,6 +251,147 @@ async def demo_walk(who: str = Depends(principal)) -> dict:
 @router.post("/api/reset")
 def reset(who: str = Depends(principal)) -> dict:
     return _srv().reset_system(who)
+
+
+# ------------------------------------------------------------------ live simulation (control: Dean only)
+class SimStartIn(BaseModel):
+    span: str = "day"                # day | week | month
+    speed: str = "normal"            # slow | normal | fast
+
+
+def _sim():
+    """The simulation, wired to the engine on first use."""
+    from dsts.api.simulation import SIM
+    srv = _srv()
+    SIM.attach(srv._get_engine(), srv._state_lock, srv._invalidate_derived_state, srv._broadcast)
+    return SIM
+
+
+@router.get("/api/sim/status")
+def sim_status(_: str = Depends(principal)) -> dict:
+    return _sim().status()
+
+
+@router.post("/api/sim/start")
+async def sim_start(body: SimStartIn, who: str = Depends(principal)) -> dict:
+    import asyncio
+    _srv().require_role(who, "dean")
+    sim = _sim()
+    try:
+        if sim.state == "running":                       # only the speed can change while it runs
+            sim.set_speed(body.speed)
+        elif sim.state == "paused":
+            sim.set_speed(body.speed)
+            sim.resume(asyncio.get_running_loop())
+        else:
+            sim.start(body.span, body.speed, asyncio.get_running_loop())
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return sim.status()
+
+
+@router.post("/api/sim/pause")
+def sim_pause(who: str = Depends(principal)) -> dict:
+    _srv().require_role(who, "dean")
+    sim = _sim()
+    sim.pause()
+    return sim.status()
+
+
+@router.post("/api/sim/reset")
+def sim_reset(who: str = Depends(principal)) -> dict:
+    _srv().require_role(who, "dean")
+    sim = _sim()
+    sim.reset()
+    return sim.status()
+
+
+# ------------------------------------------------------------------ one person's track, and their photos
+def _may_see(who: str, occupant: str, building: Optional[str], ts: str):
+    """The persona policy's verdict for ``who`` looking at ``occupant`` in ``building`` at ``ts``."""
+    from access_control.campus_policy import QueryContext, QueryPurpose, evaluate_campus_query_policy
+    ctx = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP, is_office_hours=is_office_hours(ts))
+    return evaluate_campus_query_policy(who, occupant, context=ctx, purpose=ctx.purpose, target_current_building=building)
+
+
+@router.get("/api/track")
+def track(occupant: str, day: Optional[str] = None, who: str = Depends(principal)) -> dict:
+    """Where one occupant was during one day, waypoint by waypoint, shown at the detail the caller's role allows.
+
+    Every sighting passes the persona/building policy for the caller: exact zone, time, confidence and the captured
+    photo at L3+, the functional sector and the hour at L2, nothing below. The answer is audited like a query."""
+    from access_control.authorize import audit_policy_decision
+    from access_control.campus_policy import DisclosureLevel
+    from dsts.state.zones import zone_label, zone_sector
+    from shared.timeutil import approx_time, day_of
+    srv = _srv()
+    engine = srv._get_engine()
+    mine = sorted((e for e in engine.events if e.occupant_id == occupant), key=lambda e: e.timestamp)
+    days = sorted({day_of(e.timestamp) for e in mine if day_of(e.timestamp)})
+    chosen = day or (days[-1] if days else None)
+    todays = [e for e in mine if day_of(e.timestamp) == chosen] if chosen else mine
+    role = srv.get_real_role(occupant)
+    home = srv.get_occupant_building(occupant)
+    waypoints, best, refused = [], None, None
+    for e in todays:
+        d = _may_see(who, occupant, e.building, e.timestamp)
+        if not d.permitted or d.level < DisclosureLevel.L2_CURRENT_ZONE:
+            refused = refused or d
+            continue
+        best = d if best is None or d.level > best.level else best
+        exact = d.level >= DisclosureLevel.L3_PRECISE_CURRENT
+        shown = e.timestamp if exact else approx_time(e.timestamp)
+        waypoints.append({"event_id": e.event_id, "building": e.building, "zone": e.zone if exact else zone_sector(e.zone),
+                          "zone_label": zone_label(e.zone) if exact else zone_sector(e.zone), "time": shown,
+                          "probability": e.identity_probability if exact else None, "capture": exact,
+                          "visitor": e.building != e.home_building})
+    shown_level = best.level.name if best else None
+    audit_policy_decision(who, f"occupant:{occupant}", bool(waypoints), (best or refused).policy_rule if (best or refused) else "RULE_NO_EVENTS",
+                          shown_level or "L0", f"track {chosen or 'all'}")
+    note = None
+    if todays and not waypoints:
+        note = f"Your role may not follow this person ({refused.policy_rule}: {refused.reason})." if refused else "Nothing to show."
+    elif not todays:
+        note = "No sighting of this person on that day yet."
+    return {"occupant": occupant, "role": role, "home_building": home, "day": chosen, "days": days,
+            "disclosure": shown_level, "portrait": bool(best and best.level >= DisclosureLevel.L3_PRECISE_CURRENT),
+            "waypoints": waypoints, "note": note,
+            "buildings": sorted({w["building"] for w in waypoints}), "sightings": len(todays)}
+
+
+def _image(path):
+    from fastapi.responses import FileResponse
+    if path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No photo on file.")
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+
+
+@router.get("/api/face/{occupant}")
+def face(occupant: str, who: str = Depends(principal)):
+    """A reference photo of ``occupant``, only to callers who may see this person's exact location (L3+)."""
+    from access_control.campus_policy import DisclosureLevel
+    sim, srv = _sim(), _srv()
+    last = next((e for e in reversed(srv._get_engine().events) if e.occupant_id == occupant), None)
+    d = _may_see(who, occupant, last.building if last else srv.get_occupant_building(occupant), last.timestamp if last else "12:00:00")
+    if not (d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not show this person's photo.")
+    return _image(sim.faces.portrait(occupant))
+
+
+@router.get("/api/capture/{event_id}")
+def capture(event_id: str, who: str = Depends(principal)):
+    """The photo that was captured for one event, under the same L3+ rule as the portrait."""
+    from access_control.campus_policy import DisclosureLevel
+    sim = _sim()
+    owner = sim.owner_of(event_id)
+    if owner is None:
+        owner = next(((e.occupant_id, e.building) for e in _srv()._get_engine().events if e.event_id == event_id), None)
+    if owner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown event.")
+    d = _may_see(who, owner[0], owner[1], "12:00:00")
+    if not (d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not show this person's photo.")
+    return _image(sim.faces.capture(event_id))
 
 
 # ------------------------------------------------------------------ queries
