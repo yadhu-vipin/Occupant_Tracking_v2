@@ -27,9 +27,11 @@ class Personas:
     student: str
     target: str
     outsider: str
+    masked_dean: Optional[str] = None      # Dean of the all-masked building (None for a run without one)
 
     def as_login_map(self) -> dict:
-        return {"dean": self.dean, "teacher": self.teacher, "student": self.student, "target": self.target,
+        extra = {"masked_dean": self.masked_dean} if self.masked_dean else {}
+        return {**extra, "dean": self.dean, "teacher": self.teacher, "student": self.student, "target": self.target,
                 "outsider": self.outsider}
 
 
@@ -38,7 +40,9 @@ def resolve_personas(paths: Optional[RunPaths] = None, building: str = "building
     roles = json.loads((paths.roles_dir / "occupant_roles.json").read_text())
     rosters = json.loads((paths.roles_dir / "class_rosters.json").read_text())
     deans = json.loads((paths.roles_dir / "deans_by_building.json").read_text())
-    home = json.loads(paths.population_json.read_text())["person_building"]
+    population = json.loads(paths.population_json.read_text())
+    home = population["person_building"]
+    masked = deans.get(population.get("masked_building") or "")
     if building not in deans:
         building = sorted(deans)[0]
 
@@ -47,4 +51,4 @@ def resolve_personas(paths: Optional[RunPaths] = None, building: str = "building
     on_roster = set(rosters[teacher])
     student = next(o for o in sorted(roles) if roles[o] == "student" and home[o] == building and o not in on_roster)
     outsider = next(o for o in sorted(roles) if roles[o] == "student" and home[o] != building)
-    return Personas(building, deans[building], teacher, student, target, outsider)
+    return Personas(building, deans[building], teacher, student, target, outsider, masked)

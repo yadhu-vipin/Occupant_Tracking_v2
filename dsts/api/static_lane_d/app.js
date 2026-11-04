@@ -2,7 +2,7 @@ const S={layout:null,occ:{},heat:{},hist:[],b:null,z:null};
 /* Two back ends, one page. "integrated": served by the real server under /lane-d, backed by the pipeline's data and RBAC,
    every call carries the bearer token of the selected role. "standalone": the offline demo server, open endpoints. */
 const MODE=document.querySelector('meta[name="dsts-mode"]')?.content||"standalone",INTEG=MODE==="integrated",BASE=INTEG?"/lane-d":"";
-const ROLE_PERSONA={officer:"dean",analyst:"teacher",self:"student"},TOK={},PRIN={},PH={};
+const ROLE_PERSONA={officer:"dean",analyst:"teacher",self:"student",masked:"masked_dean"},TOK={},PRIN={},PH={};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 /* zone names of the real zone graph (dsts/state/zones.py) */
 const ZONES=[["z1","Entrance"],["z2","Mail room"],["z3","Office"],["z4","Lounge"],["z5","Conference"],["z6","Classroom"],["z7","Cafeteria"],["z8","Exit"],["zT","Transition"]];
@@ -14,7 +14,7 @@ const hdr=role=>{const r=role||viewRole();return INTEG&&TOK[r]?{Authorization:"B
 const fail=async r=>{let m=`${r.status} ${r.statusText}`;try{m=(await r.json()).detail||m}catch(e){}throw new Error(m)};
 const api=async(u,o={},role)=>{const r=await fetch(BASE+u,{...o,headers:{...(o.headers||{}),...hdr(role)}});if(!r.ok)await fail(r);return r.json()};
 const post=(u,b,role)=>api(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})},role);
-async function login(){for(const[role,persona]of Object.entries(ROLE_PERSONA)){const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({persona})});if(!r.ok)await fail(r);const d=await r.json();TOK[role]=d.token;PRIN[role]=d.principal}}
+async function login(){for(const[role,persona]of Object.entries(ROLE_PERSONA)){const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({persona})});if(!r.ok){if(role==="masked"){$("#view-as option[value=masked]")?.remove();continue}await fail(r)}const d=await r.json();TOK[role]=d.token;PRIN[role]=d.principal}}
 const B=()=>S.layout?.buildings||[];
 const fmtT=t=>{if(!t)return"—";if(/^\d{2}:\d{2}(:\d{2})?$/.test(t))return t;const d=new Date(String(t).replace(" ","T"));return isNaN(d)?String(t):d.toLocaleTimeString([],{hour12:false})};
 
@@ -152,7 +152,7 @@ function renderReasoning(x,answerWithheld){const card=$("#reasoning-card"),body=
  body.innerHTML=`<div class="reasoning-grid">${parts.join("")}</div>`}
 async function runQuery(p=qPayload()){try{const d=await post("/api/query",p,p.role);const dec=d.decision?` Policy ${d.decision.policy_rule||"—"} · ${d.decision.disclosure_level||""}.`:"";$("#query-note").textContent=(d.redacted?`Role policy applied for ${p.role}; some details may be hidden.`:`Executed ${p.query_id||"query"} using available tracking data.`)+dec;$("#query-answer").textContent=d.answer||`${(d.rows||[]).length} matching record(s).`;renderRows("#query-body",d.rows||[]);renderReasoning(d.explanation,d.withheld);if($("#q-speak").checked)speak(d.answer||"Query completed.");}catch(e){$("#query-note").textContent="Query failed: "+e.message;$("#query-answer").textContent="The API could not execute this query: "+e.message;renderRows("#query-body",[]);renderReasoning(null)}}
 $("#btn-query").onclick=()=>runQuery();
-const ROLE_LABEL={officer:"Dean",analyst:"Teacher",self:"Student"};const showUser=()=>{const r=viewRole(),n=$("#user-name");if(!n)return;n.textContent=INTEG&&PRIN[r]?`${ROLE_LABEL[r]} ${PRIN[r]}`:"Demo user";$("#user-sub").textContent="Viewing as "+ROLE_LABEL[r];$("#user-av").textContent=ROLE_LABEL[r][0]};
+const ROLE_LABEL={officer:"Dean",analyst:"Teacher",self:"Student",masked:"Dean of the masked building"};const showUser=()=>{const r=viewRole(),n=$("#user-name");if(!n)return;n.textContent=INTEG&&PRIN[r]?`${ROLE_LABEL[r]} ${PRIN[r]}`:"Demo user";$("#user-sub").textContent="Viewing as "+ROLE_LABEL[r];$("#user-av").textContent=ROLE_LABEL[r][0]};
 const showAs=()=>{showUser();const el=$("#q-as");if(!el)return;const r=viewRole();el.textContent=INTEG&&PRIN[r]?`Acting as ${r} → occupant ${PRIN[r]} (${ROLE_PERSONA[r]}). The answer and what is hidden follow that person's role.`:""};
 $("#btn-clear-query").onclick=()=>{$("#query-fields").querySelectorAll("input").forEach(x=>x.value="");$("#query-note").textContent="";$("#query-answer").textContent="";renderRows("#query-body",[])};
 function speak(t){if(!("speechSynthesis"in window))return;speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(t))}
@@ -176,7 +176,7 @@ const STATE_TXT={idle:"Not started",running:"Running",paused:"Paused",finished:"
 let simDay=null;
 function renderSim(){const s=S.sim;if(!s||!$("#sim"))return;s.active=s.state!=="idle";
  if(s.date&&s.date!==simDay){simDay=s.date;if(S.layout)S.layout.default_date=s.date;$("#zf-start").value=`${s.date}T08:00`;$("#zf-end").value=`${s.date}T18:00`}
- const run=s.state==="running",pause=s.state==="paused",dean=viewRole()==="officer";
+ const run=s.state==="running",pause=s.state==="paused",dean=["officer","masked"].includes(viewRole());
  $("#sim-state").textContent=STATE_TXT[s.state]||s.state;$("#sim-state").classList.toggle("live",run);
  $("#sim-go").textContent=run?"❚❚ Pause":pause?"▶ Resume":s.state==="finished"?"▶ Run again":"▶ Start simulation";
  $("#sim-clock").textContent=s.date?`${s.weekday} ${s.date} · ${s.clock.slice(0,5)}`:"—";
