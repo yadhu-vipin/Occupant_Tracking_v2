@@ -397,6 +397,7 @@ class LoginBody(BaseModel):
     persona: Optional[str] = Field(default=None, description="Demo persona (dean|teacher|student|target); needs DSTS_DEMO_MODE=1")
     principal_id: Optional[str] = Field(default=None, description="Occupant ID to sign in as; needs `key`")
     key: Optional[str] = Field(default=None, description="The occupant's own login credential (python -m access_control.credentials <id>)")
+    demo: bool = Field(default=False, description="With principal_id: sign in as that occupant without a credential; needs DSTS_DEMO_MODE=1")
 
 
 @app.post("/api/auth/login")
@@ -417,6 +418,13 @@ def login(body: LoginBody, request: Request) -> dict:
         if pid is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail=f"Unknown persona. Valid: {sorted(personas)}.")
+    elif body.demo and body.principal_id:
+        if not _demo_mode():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Choosing who to sign in as is disabled. Set DSTS_DEMO_MODE=1 to enable it for demos.")
+        pid = body.principal_id.strip()
+        if pid not in _roles:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown occupant.")
     else:
         pid = (body.principal_id or "").strip()
         client_key = f"{request.client.host if request.client else '?'}|{pid}"
@@ -434,6 +442,21 @@ def login(body: LoginBody, request: Request) -> dict:
         _login_guard_client.record_success(client_key)
     return {"token": issue_token(pid), "principal": pid, "role": get_real_role(pid),
             "building": get_occupant_building(pid), "expires_in": DEFAULT_TTL_SECONDS}
+
+
+@app.get("/api/auth/demo-accounts")
+def demo_accounts() -> dict:
+    """Demo mode only: who can be signed in as -- the Dean, the Teachers and the Students of every building."""
+    if not _demo_mode():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Demo accounts are listed only when DSTS_DEMO_MODE=1.")
+    engine = _get_engine()
+    out: Dict[str, dict] = {}
+    for b in sorted(engine.registered, key=lambda x: int(x.split("_")[1])):
+        members = sorted(engine.registered[b])
+        out[b] = {"dean": next((o for o in members if _roles.get(o) == "dean"), None),
+                  "teachers": [{"id": o, "students": len(_rosters.get(o, []))} for o in members if _roles.get(o) == "teacher"],
+                  "students": [o for o in members if _roles.get(o) == "student"]}
+    return {"default_building": get_occupant_building(_demo_personas()["dean"]), "buildings": out}
 
 
 @app.post("/api/ws-ticket")

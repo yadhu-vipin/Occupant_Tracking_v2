@@ -2,19 +2,25 @@ const S={layout:null,occ:{},heat:{},hist:[],b:null,z:null};
 /* Two back ends, one page. "integrated": served by the real server under /lane-d, backed by the pipeline's data and RBAC,
    every call carries the bearer token of the selected role. "standalone": the offline demo server, open endpoints. */
 const MODE=document.querySelector('meta[name="dsts-mode"]')?.content||"standalone",INTEG=MODE==="integrated",BASE=INTEG?"/lane-d":"";
-const ROLE_PERSONA={officer:"dean",analyst:"teacher",self:"student",masked:"masked_dean"},TOK={},PRIN={},PH={};
+const ROLE_PERSONA={officer:"dean"},TOK={},PRIN={},PH={};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 /* zone names of the real zone graph (dsts/state/zones.py) */
 const ZONES=[["z1","Entrance"],["z2","Mail room"],["z3","Office"],["z4","Lounge"],["z5","Conference"],["z6","Classroom"],["z7","Cafeteria"],["z8","Exit"],["zT","Transition"]];
 const QUERIES=[["Q1","Did any occupant stay in building B after time T?",["building","time"]],["Q2","Were visitors in building B more numerous than registered occupants at time T?",["building","time"]],["Q3","Did occupant O leave building B before time T?",["occupant","building","time"]],["Q4","Did occupant O enter the building between T1 and T2?",["occupant","building","start","end"]],["Q5","Did occupant O visit all zones in building B?",["occupant","building"]],["Q6","Where was occupant O at time T?",["occupant","time"]],["Q7","How many zones did occupant O visit during T1–T2?",["occupant","start","end"]],["Q8","At what time did occupant O visit zone Z for the first time?",["occupant","zone"]],["Q9","How long did occupant O spend at zone Z during the first visit?",["occupant","zone"]],["Q10","Who was in zone Z at time T?",["zone","time"]],["Q11","Where was occupant O during T1–T2?",["occupant","start","end"]],["Q12","Who was in zone Z from T1 to T2?",["zone","start","end"]],["Q13","Who all visited zone Z?",["zone"]],["TRACK","Full trajectory of occupant O",["occupant"]]];
 const COL=["#e4d6f3","#cfe6f9","#d7e4c3","#f1dacb","#f2d3da"];
 const safe=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const viewRole=()=>$("#view-as")?.value||"officer";
-const hdr=role=>{const r=role||viewRole();return INTEG&&TOK[r]?{Authorization:"Bearer "+TOK[r]}:{}};
+const viewRole=()=>$("#sel-role")?.value||"officer";
+const hdr=role=>{const t=role?TOK[role]:TOK.user;return INTEG&&t?{Authorization:"Bearer "+t}:{}};
 const fail=async r=>{let m=`${r.status} ${r.statusText}`;try{m=(await r.json()).detail||m}catch(e){}throw new Error(m)};
 const api=async(u,o={},role)=>{const r=await fetch(BASE+u,{...o,headers:{...(o.headers||{}),...hdr(role)}});if(!r.ok)await fail(r);return r.json()};
 const post=(u,b,role)=>api(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})},role);
-async function login(){for(const[role,persona]of Object.entries(ROLE_PERSONA)){const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({persona})});if(!r.ok){if(role==="masked"){$("#view-as option[value=masked]")?.remove();continue}await fail(r)}const d=await r.json();TOK[role]=d.token;PRIN[role]=d.principal}}
+async function login(){const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({persona:"dean"})});if(!r.ok)await fail(r);TOK.officer=(await r.json()).token;const a=await fetch("/api/auth/demo-accounts");if(!a.ok)await fail(a);S.accounts=await a.json();buildSignIn();await signIn()}
+/* demo sign-in: choose the role, the building and the person; what they may see is then decided by the access rules alone */
+function buildSignIn(){const bs=Object.keys(S.accounts.buildings);$("#sel-building").innerHTML=bs.map(b=>`<option value="${b}">${b.replace("building_","Building ")}</option>`).join("");$("#sel-building").value=S.accounts.default_building||bs[0];fillPeople()}
+function fillPeople(){if(!S.accounts)return;const role=$("#sel-role").value,A=S.accounts.buildings[$("#sel-building").value]||{},f=$("#person-f"),sel=$("#sel-person");f.style.display=role==="officer"?"none":"";sel.innerHTML=role==="analyst"?A.teachers.map(t=>`<option value="${t.id}">${t.id} · ${t.students} students</option>`).join(""):role==="self"?A.students.map(s=>`<option value="${s}">${s}</option>`).join(""):""}
+async function signIn(){if(!INTEG)return true;const role=$("#sel-role").value,A=S.accounts.buildings[$("#sel-building").value]||{},id=role==="officer"?A.dean:$("#sel-person").value;if(!id)return false;const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({principal_id:id,demo:true})});if(!r.ok)await fail(r);const d=await r.json();TOK.user=d.token;PRIN.user=d.principal;return true}
+async function switchUser(){try{if(!await signIn())return;S.z=null;showAs();renderSim();await refresh();if(!$("#track").hidden&&S.trackOcc)openTrack(S.trackOcc,S.trackDay)}catch(e){alert("Sign-in failed: "+e.message)}}
+["#sel-role","#sel-building"].forEach(s=>$(s).onchange=()=>{fillPeople();switchUser()});$("#sel-person").onchange=switchUser;
 const B=()=>S.layout?.buildings||[];
 const fmtT=t=>{if(!t)return"—";if(/^\d{2}:\d{2}(:\d{2})?$/.test(t))return t;const d=new Date(String(t).replace(" ","T"));return isNaN(d)?String(t):d.toLocaleTimeString([],{hour12:false})};
 
@@ -150,10 +156,10 @@ function renderReasoning(x,answerWithheld){const card=$("#reasoning-card"),body=
  parts.push(row("Withheld",(x.withheld||[]).length?x.withheld.map(esc).join("; "):"nothing"));
  if((answerWithheld||[]).length)parts.push(row("Answer withheld",answerWithheld.map(esc).join("; ")));
  body.innerHTML=`<div class="reasoning-grid">${parts.join("")}</div>`}
-async function runQuery(p=qPayload()){try{const d=await post("/api/query",p,p.role);const dec=d.decision?` Policy ${d.decision.policy_rule||"—"} · ${d.decision.disclosure_level||""}.`:"";$("#query-note").textContent=(d.redacted?`Role policy applied for ${p.role}; some details may be hidden.`:`Executed ${p.query_id||"query"} using available tracking data.`)+dec;$("#query-answer").textContent=d.answer||`${(d.rows||[]).length} matching record(s).`;renderRows("#query-body",d.rows||[]);renderReasoning(d.explanation,d.withheld);if($("#q-speak").checked)speak(d.answer||"Query completed.");}catch(e){$("#query-note").textContent="Query failed: "+e.message;$("#query-answer").textContent="The API could not execute this query: "+e.message;renderRows("#query-body",[]);renderReasoning(null)}}
+async function runQuery(p=qPayload()){try{const d=await post("/api/query",p);const dec=d.decision?` Policy ${d.decision.policy_rule||"—"} · ${d.decision.disclosure_level||""}.`:"";$("#query-note").textContent=(d.redacted?`Role policy applied for ${p.role}; some details may be hidden.`:`Executed ${p.query_id||"query"} using available tracking data.`)+dec;$("#query-answer").textContent=d.answer||`${(d.rows||[]).length} matching record(s).`;renderRows("#query-body",d.rows||[]);renderReasoning(d.explanation,d.withheld);if($("#q-speak").checked)speak(d.answer||"Query completed.");}catch(e){$("#query-note").textContent="Query failed: "+e.message;$("#query-answer").textContent="The API could not execute this query: "+e.message;renderRows("#query-body",[]);renderReasoning(null)}}
 $("#btn-query").onclick=()=>runQuery();
-const ROLE_LABEL={officer:"Dean",analyst:"Teacher",self:"Student",masked:"Dean of the masked building"};const showUser=()=>{const r=viewRole(),n=$("#user-name");if(!n)return;n.textContent=INTEG&&PRIN[r]?`${ROLE_LABEL[r]} ${PRIN[r]}`:"Demo user";$("#user-sub").textContent="Viewing as "+ROLE_LABEL[r];$("#user-av").textContent=ROLE_LABEL[r][0]};
-const showAs=()=>{showUser();const el=$("#q-as");if(!el)return;const r=viewRole();el.textContent=INTEG&&PRIN[r]?`Acting as ${r} → occupant ${PRIN[r]} (${ROLE_PERSONA[r]}). The answer and what is hidden follow that person's role.`:""};
+const ROLE_LABEL={officer:"Dean",analyst:"Teacher",self:"Student",masked:"Dean of the masked building"};const showUser=()=>{const r=viewRole(),n=$("#user-name");if(!n)return;n.textContent=INTEG&&PRIN.user?`${ROLE_LABEL[r]} ${PRIN.user}`:"Demo user";$("#user-sub").textContent="Viewing as "+ROLE_LABEL[r];$("#user-av").textContent=ROLE_LABEL[r][0]};
+const showAs=()=>{showUser();const el=$("#q-as");if(!el)return;const r=viewRole();el.textContent=INTEG&&PRIN.user?`Acting as ${r} → occupant ${PRIN.user} (${ROLE_PERSONA[r]}). The answer and what is hidden follow that person's role.`:""};
 $("#btn-clear-query").onclick=()=>{$("#query-fields").querySelectorAll("input").forEach(x=>x.value="");$("#query-note").textContent="";$("#query-answer").textContent="";renderRows("#query-body",[])};
 function speak(t){if(!("speechSynthesis"in window))return;speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(t))}
 function parseTranscript(t){const s=t.toLowerCase(),o={};const q=s.match(/\bq\s*(\d{1,2})\b/);if(q)o.query_id="Q"+q[1];const oc=s.match(/\bo\s*-?\s*(\d{2,4})\b/);if(oc)o.occupant="O"+oc[1];const b=s.match(/\bb\s*-?\s*(1|2|3|4|5)\b/);if(b)o.building="B"+b[1];const z=s.match(/\bz\s*-?\s*(t|\d)\b/);if(z)o.zone=z[1]==="t"?"zT":"z"+z[1];for(const[c,l]of ZONES)if(s.includes(l.toLowerCase()))o.zone=c;if(!o.query_id){if(s.includes("who")&&s.includes("zone"))o.query_id=s.includes("between")?"Q12":"Q10";else if(s.includes("how long"))o.query_id="Q9";else if(s.includes("how many zones"))o.query_id="Q7";else if(s.includes("first time"))o.query_id="Q8";else if(s.includes("where")&&s.includes("during"))o.query_id="Q11";else if(s.includes("where"))o.query_id="Q6";else if(s.includes("all zones"))o.query_id="Q5";else if(s.includes("enter"))o.query_id="Q4";else if(s.includes("leave"))o.query_id="Q3";else if(s.includes("visitor"))o.query_id="Q2";else if(s.includes("stay")||s.includes("after"))o.query_id="Q1";else if(s.includes("visited"))o.query_id="Q13"}return o}
@@ -167,8 +173,8 @@ async function connectLive(){let q="";if(INTEG){try{const r=await fetch("/api/ws
 const occ=o=>`<a class="occ" data-occ="${safe(o)}">${safe(o)}</a>`;
 const FACE={},CAP={};
 const blobOf=(url,role)=>fetch(BASE+url,{headers:hdr(role)}).then(r=>r.ok?r.blob():null).then(b=>b?URL.createObjectURL(b):null).catch(()=>null);
-const faceURL=(o,role)=>FACE[(role||viewRole())+o]??(FACE[(role||viewRole())+o]=blobOf("/api/face/"+encodeURIComponent(o),role));
-const capURL=(id,role)=>CAP[(role||viewRole())+id]??(CAP[(role||viewRole())+id]=blobOf("/api/capture/"+encodeURIComponent(id),role));
+const faceURL=(o,role)=>FACE[(role||PRIN.user||viewRole())+o]??(FACE[(role||PRIN.user||viewRole())+o]=blobOf("/api/face/"+encodeURIComponent(o),role));
+const capURL=(id,role)=>CAP[(role||PRIN.user||viewRole())+id]??(CAP[(role||PRIN.user||viewRole())+id]=blobOf("/api/capture/"+encodeURIComponent(id),role));
 function hydrateFaces(){$$("img[data-face]:not([data-done])").forEach(im=>{im.dataset.done=1;faceURL(im.dataset.face).then(u=>{if(u){im.src=u;im.parentElement.classList.add("has-face")}})})}
 document.addEventListener("click",e=>{const t=e.target.closest("[data-occ]");if(t){openTrack(t.dataset.occ)}});
 /* simulation */
@@ -192,7 +198,6 @@ $("#sim-reset").onclick=async()=>{try{await simCall("reset");S.z=null;await refr
 $("#sim-speed").onchange=()=>{if(S.sim?.state==="running")simCall("start",{span:S.sim.span,speed:$("#sim-speed").value}).catch(()=>{})};
 let rT=0,rBusy=false;async function liveRefresh(){if(rBusy||Date.now()-rT<900)return;rBusy=true;try{await refresh()}catch(e){console.warn(e)}finally{rBusy=false;rT=Date.now()}}
 /* role switch */
-$("#view-as").onchange=async()=>{const r=viewRole();showAs();renderSim();await refresh();if(!$("#track").hidden&&S.trackOcc)openTrack(S.trackOcc,S.trackDay)};
 /* the track of one person (cf. occupant track across buildings: faces at each building/zone, dashed lines between sightings) */
 const bNum=b=>String(b).replace(/^building_/,"B"),hm=t=>String(t).replace("T"," ").split(" ").pop().slice(0,5);
 function closeTrack(){$("#track").hidden=true;S.trackOcc=null}
@@ -227,6 +232,7 @@ function trackSVG(w,urls){
  return s+"</svg>";
 }
 (async function boot(){
+ if(!INTEG)["#sel-building","#person-f"].forEach(s=>{const e=$(s);(e.closest("label")||e).style.display="none"});
  try{
   if(INTEG)await login();
   S.layout=await api("/api/layout");

@@ -198,3 +198,6 @@ a.occ,.chip[data-occ]{cursor:pointer}a.occ{color:var(--ink);text-decoration:unde
 .legend2{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:12px;align-items:center}
 .ln{display:inline-block;width:26px;border-top:2px dashed;vertical-align:middle;margin-right:6px}.ln.in{border-color:#3b5bdb}.ln.out{border-color:#c2483f}
 @media(max-width:760px){main{padding:18px 14px}.sim-clock b{min-width:0}}
+
+.signin{display:flex;gap:8px;align-items:flex-end}.signin select{padding:6px 8px;max-width:150px}
+@media(max-width:900px){.signin{flex-wrap:wrap}}
