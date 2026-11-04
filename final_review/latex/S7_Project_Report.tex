@@ -212,7 +212,7 @@ A second gap concerns the people who ask questions of the tracking data. The sam
 
 This project therefore combines three things in one system: (i) decentralised identification and tracking in which only a one-way Bloom filter leaves a building until a match is confirmed; (ii) role-based, privacy-aware querying with a two-layer policy; and (iii) explanations that justify both the access decision and the tracking evidence behind each answer. A first, narrower study of the routing step alone has been written up as a conference-style manuscript \cite{ref28}; this report covers the complete system, including state tracking, access control, security, explanations and a masked-face building.
 
-\textbf{Relevant Sustainable Development Goals.} The work maps to three goals of the 2030 Agenda \cite{ref27}. \emph{SDG~9 (Industry, Innovation and Infrastructure)}, target 9.1 on quality, reliable and resilient infrastructure: the system is a resilient, decentralised infrastructure for smart buildings with no central biometric store to lose. \emph{SDG~11 (Sustainable Cities and Communities)}, target 11.7 on safe and inclusive spaces: occupants of a campus can be located for safety and service while the data is protected from misuse such as stalking. \emph{SDG~16 (Peace, Justice and Strong Institutions)}, target 16.6 on effective, accountable and transparent institutions: every access decision is audited and every answer is explained. The intended beneficiaries are campus administrators, who get reliable tracking, and the occupants, whose biometric data stays in their own building and whose location is visible only to people with a legitimate relationship to them.
+\textbf{Relevant Sustainable Development Goals.} The work maps to three goals of the 2030 Agenda \cite{ref27}: \emph{SDG~9} (target 9.1, resilient infrastructure), because there is no central biometric store to lose; \emph{SDG~11} (target 11.7, safe and inclusive spaces), because occupants can be located for safety while their data is protected from misuse such as stalking; and \emph{SDG~16} (target 16.6, accountable and transparent institutions), because every access decision is audited and every answer is explained.
 
 \section{Objectives}
 The objectives, each linked to how it is evaluated and to its deliverable, are given in Table~\ref{tab:objectives}.
@@ -235,51 +235,28 @@ The objectives, each linked to how it is evaluated and to its deliverable, are g
 \section{Scope and constraints}
 \textbf{Intended users.} Campus administrators (Deans), faculty (Teachers) and students; each sees tracking data only as their role and relationship allow. \textbf{Included functions.} Face-embedding based identification of registered occupants and of visitors across buildings; probabilistic zone-level tracking; thirteen query templates (Q1--Q13) and a full-trajectory query; role-based disclosure; explanations; secure inter-building exchange; a web dashboard; and a centralised baseline for comparison.
 
-\textbf{Exclusions and assumptions.} The system works on face embeddings that are produced by a pretrained model; it does not train a face model and does not process live video. Cameras, the network between buildings and the certificate authority are simulated in one process. The occupant population is synthetic in its movements: 20 reference and 20 test photos per person come from public datasets, and the test photos are replayed as camera events. Zones are a fixed nine-zone layout per building. Every visitor is a person registered in some other building; people who are registered nowhere (unknown visitors) are outside the scope and are listed as future work. \textbf{Constraints.} All experiments run on a laptop CPU; every result is reproducible from a population seed.
+\textbf{Exclusions and assumptions.} The system works on face embeddings produced by a pretrained model; it does not train a face model or process live video. Cameras, the network between buildings and the certificate authority are simulated in one process, and the test photos are replayed as camera events. Zones are a fixed nine-zone layout per building. Every visitor is registered in some other building; people registered nowhere (unknown visitors) are future work. \textbf{Constraints.} All experiments run on a laptop CPU and are reproducible from a population seed.
 
 \section{Project report organization}
-Chapter~2 states the problem and the limits of existing systems. Chapter~3 reviews fourteen related works and compares them. Chapter~4 lists the functional, non-functional, hardware and software requirements. Chapter~5 presents the design and the step-by-step approach, including the algorithms, the mask-handling logic and the parameters. Chapter~6 describes the evaluation, reports the results with tables and figures, covers the explanation measurements and the Bloom-filter finding, compares the system with a centralised baseline and with the earlier routing study, and discusses limitations. Chapter~7 concludes and lists future work. The references and an appendix on source code and reproducibility follow.
+Chapter~2 states the problem, Chapter~3 reviews fourteen related works, and Chapter~4 lists the requirements. Chapter~5 presents the design and its parameters, Chapter~6 the evaluation, results, comparison and limitations, and Chapter~7 the conclusion and future work. The references and an appendix on reproducibility follow.
 
 \clearpage
 \chapter{Problem Definition}
 \section{Problem statement}
 \textbf{Problem.} Identify and track occupants across a wide-area, multi-building indoor environment while giving secure, role-based and explainable access to where they are and have been, and justify both the access decisions and the tracking evidence behind each answer.
 
-\textbf{Stakeholders and consequences.} Table~\ref{tab:stakeholders} lists who is affected and what goes wrong if the problem is left unsolved. If identification is centralised, one breach exposes everyone's biometric data. If it is distributed without routing, every unrecognised face costs a request to every building. If access is not controlled, tracking becomes a stalking tool. If answers are not explained, they cannot be trusted or audited.
+\textbf{Stakeholders and consequences.} Occupants, Deans, Teachers, Students and auditors are affected. Centralised identification means one breach exposes everyone's biometric data; distribution without routing costs a request to every building per unrecognised face; uncontrolled access turns tracking into a stalking tool; and unexplained answers cannot be audited.
 
-\begin{table}[htbp]
-\centering
-\caption{Stakeholders and what they need from the system}\label{tab:stakeholders}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{3.0cm}|p{6.0cm}|p{5.8cm}|}\hline
-\textbf{Stakeholder} & \textbf{Need} & \textbf{Risk if unmet}\\\hline
-Occupants & Biometric data stays in their own building; location visible only to people with a legitimate relationship & Breach of a central store; being followed by a peer\\\hline
-Deans (administrators) & Find a visitor or a lost person; follow own campus; audit access & Slow, costly or unreliable searches\\\hline
-Teachers & Follow only the students on their class roster, in any building & Over-sharing of student movements\\\hline
-Students & See where their assigned teachers are; see themselves in full & Peer surveillance\\\hline
-Auditors & Know who asked what, and why an answer was given & Answers that cannot be justified\\\hline
-\end{tabular}}
-\end{table}
 
-\textbf{Inputs and outputs.} The identification input is a face embedding captured at a building, zone and time; the output is an identity (or an abstention) and an updated probability of the person being in each of the nine zones. The query input is a request from a logged-in user (role, target, time or interval, purpose); the output is the permitted answer together with its explanation, or a refusal with a reason code.
+
+
 
 \section{Existing system and limitations}
-Existing indoor tracking systems use cameras, radio signals or both \cite{ref1,ref2,ref9}. Edge-camera frameworks localise and track people accurately inside one site \cite{ref1,ref2,ref5}, and distributed trackers associate targets across cameras with consensus filtering or shared target tables \cite{ref3,ref4}. These systems stay within one site. They do not address how the identity of a person who is registered elsewhere is discovered, and they do not define who may query the resulting locations.
+Existing indoor tracking systems use cameras, radio signals or both \cite{ref1,ref2,ref9}. Edge-camera frameworks localise and track people accurately inside one site \cite{ref1,ref2,ref5}, and distributed trackers associate targets across cameras with consensus filtering or shared target tables \cite{ref3,ref4}. These systems stay within one site. They do not say how a person registered elsewhere is identified or who may query the locations.
 
-The DSTS framework \cite{ref6} models a multi-building environment as states, events and transition functions and resolves visitors through a centralised master list. Bloom filters have been used to protect biometric templates \cite{ref10}, and a recent privacy-preserving crowd-counting system combines face features, fuzzy extractors and encrypted Bloom filters \cite{ref11}. Summary Cache \cite{ref13} uses Bloom filters to find the web proxy likely to hold an object. None of them combines approximate, similarity-based routing of a face to a building with role-based access control and explanations. Table~\ref{tab:alternatives} contrasts the design alternatives.
+The DSTS framework \cite{ref6} models a multi-building environment as states, events and transition functions and resolves visitors through a centralised master list. Bloom filters have protected biometric templates \cite{ref10,ref11} and found web proxies \cite{ref13}, but none of the reviewed work combines approximate, similarity-based routing of a face to a building with role-based access control and explanations.
 
-\begin{table}[htbp]
-\centering
-\caption{Design alternatives for finding a visitor's home building}\label{tab:alternatives}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{3.4cm}|p{3.8cm}|p{3.8cm}|p{3.6cm}|}\hline
-\textbf{Design} & \textbf{How a visitor is found} & \textbf{Biometric data} & \textbf{Cost per unknown face}\\\hline
-Centralised store & One global search over all galleries & All galleries pooled in one place & One request, one large search\\\hline
-Distributed, no routing & Ask every other building & Stays local, but the face goes to every building & $B-1$ requests (10 here)\\\hline
-Master list \cite{ref6} & Look the visitor up in a central list of visitor embeddings & Visitor embeddings pooled centrally & One request to the list\\\hline
-LSH + Bloom routing (this work) & Rank buildings by Bloom score, verify the top five & Only a one-way Bloom filter is shared; references move after a confirmed match & About two requests per routed lookup\\\hline
-\end{tabular}}
-\end{table}
+
 
 \textbf{Gap.} Four gaps remain: (i) identity discovery across separate buildings without sharing galleries; (ii) evidence that LSH with Bloom filters can route biometric visitors accurately; (iii) role-based control over tracking queries; and (iv) explanations for access decisions and tracking answers. This project addresses all four.
 
@@ -364,7 +341,7 @@ Work 12 \cite{ref14,ref15} Charikar, 2002; Lv et al., 2007 & Similarity-preservi
 \clearpage
 \chapter{Requirements}
 \section{Functional requirements}
-Table~\ref{tab:fr} lists the functional requirements with their actors, inputs and outputs, and the acceptance criterion used to check each one. Table~\ref{tab:usecases} then shows how the requirements combine into the main use cases.
+Table~\ref{tab:fr} lists the functional requirements with their actors, inputs and outputs, and the acceptance criterion used to check each one.
 
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
 \begin{longtable}{|p{1.0cm}|p{4.0cm}|p{2.0cm}|p{3.4cm}|p{4.2cm}|}
@@ -388,18 +365,7 @@ FR14 & Sign users in as a demo role or with a per-person credential & Users & Cr
 \end{longtable}}
 
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{longtable}{|p{1.0cm}|p{3.6cm}|p{5.0cm}|p{4.9cm}|}
-\caption{Use cases}\label{tab:usecases}\\\hline
-\textbf{ID} & \textbf{Use case} & \textbf{Main flow} & \textbf{Requirements}\\\hline\endfirsthead
-\hline\textbf{ID} & \textbf{Use case} & \textbf{Main flow} & \textbf{Requirements}\\\hline\endhead
-UC1 & Identify a registered occupant & Capture at the home building; local gallery accepts; state updated & FR1, FR3, FR12\\\hline
-UC2 & Identify a visitor for the first time today & Local check fails; Bloom routing ranks buildings; shortlisted buildings verify over sealed channel; pointer opened; references cached for the day & FR1, FR2, FR3, FR4, FR5, FR9\\\hline
-UC3 & Recognise a returning visitor & Day cache or permanent pool matches locally; no request leaves the building & FR3, FR4\\\hline
-UC4 & A Dean asks where a student of the campus was & Authenticated; Layer 1 and Layer 2 permit at L4; answer and explanation returned & FR6, FR7, FR8, FR13, FR14\\\hline
-UC5 & A student asks about a peer & Layer 2 denies at L0; refusal with reason code; nothing disclosed & FR7, FR13\\\hline
-UC6 & An administrator reviews the evidence behind an answer & ``Why this answer'' card shows rule, evidence, uncertainty and what was withheld & FR8, FR10\\\hline
-UC7 & An evaluator compares the system with a centralised search & Run files scored per cohort and state level; five seeds averaged & FR11\\\hline
-\end{longtable}}
+}
 
 \section{Non-functional requirements}
 Table~\ref{tab:nfr} states the quality requirements with the measure used. The result that satisfies each one is given in Chapter~\ref{ch:results}.
@@ -465,27 +431,9 @@ The environment is a set of buildings. Each \emph{building node} owns its regist
 \caption{Inter-building tracking workflow and querying and access workflow}\label{fig:flow}
 \end{figure}
 
-Table~\ref{tab:components} lists the main components and the module of the implementation that realises each. Table~\ref{tab:stores} lists what each building keeps and what leaves it.
+Table~\ref{tab:stores} lists what each building keeps and what leaves it.
 
-\begin{table}[htbp]
-\centering
-\caption{Components and their responsibilities}\label{tab:components}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{3.2cm}|p{7.6cm}|p{3.8cm}|}\hline
-\textbf{Component} & \textbf{Responsibility} & \textbf{Module}\\\hline
-Enrolment & Turn a building's 20 reference photos per occupant into centroids, LSH codes and a Bloom filter & buildinglib.enroll\\\hline
-Local recogniser & Vote over the building's own gallery; mask handling & pipeline.recognize, recognition\\\hline
-Router and verifier & Rank peer buildings by Bloom score; verify the capture in the shortlisted buildings & buildinglib.route, verify\\\hline
-State store (BSTS) & Per-occupant probability over the nine zones; registered and visitor databases & dsts.state\\\hline
-Visitor manager & Presence, day cache, entry history, permanent pool, visit pointers & buildinglib.visitor\_\allowbreak pool\\\hline
-Secure transfer & Sealed, signed, replay-protected messages; certificates & secure\_\allowbreak transfer\\\hline
-Access control & Tokens, credentials, lockout, two-layer policy, audit log & access\_\allowbreak control\\\hline
-Query engine & Thirteen query templates and the trajectory query over the identified events & pipeline.query\\\hline
-Explanation layer & Rule, evidence, uncertainty flags, redaction & pipeline.explain\\\hline
-API and dashboard & FastAPI server and static web page & dsts.api\\\hline
-Evaluation & Event and state confusion metrics, centralised baseline, explanation and Bloom measurements & evaluation, centralized, tools\\\hline
-\end{tabular}}
-\end{table}
+
 
 \begin{table}[htbp]
 \centering
@@ -502,7 +450,6 @@ Day cache & A visitor's 20 references, in memory for one simulated day & No; zer
 \end{tabular}}
 \end{table}
 
-\textbf{Novelty.} On the technical side, (a) each building publishes only a Bloom filter of LSH codes, so a capture can rank buildings without any gallery leaving them, and (b) only the shortlisted buildings verify the face. On the application side, (c) a two-layer, class-teacher access policy with graded disclosure, (d) an explanation that is built from the same events as the answer and redacted to the caller's level, and (e) sealed inter-building transfers with certificate-bound keys.
 
 \section{Proposed approach and procedure}
 \subsection{Embedding preprocessing and enrolment}
@@ -545,22 +492,9 @@ identify(capture q, building b):
 \subsection{Mask-occlusion handling}\label{sec:mask-handler}
 The local recogniser contains a mask handler (module \texttt{recognition.mask\_\allowbreak handler}) that was part of the pipeline before this evaluation and is \emph{on by default}, so every result in Chapter~\ref{ch:results} includes its effect. After the first vote pass it measures the standard deviation of the per-occupant minimum reference angles over the building's gallery. If this spread exceeds 6.5$^{\circ}$ it treats the capture as suspected to be masked, loosens the acceptance angle by 4$^{\circ}$ (from 80.43$^{\circ}$ to 84.43$^{\circ}$), reduces the required votes by 25\% (from 12 to 9), repeats the vote and records a mask flag on the result.
 
-Two properties matter for the interpretation of the masked results. First, the handler acts only on the \emph{local} check of the capturing building; the Bloom routing and the remote verification always use the plain thresholds, so a masked visitor is never helped by it. Second, the detector is a statistical heuristic on the angle matrix, not an image classifier: a large spread means that one person stands out clearly from the others in the gallery, which is the signature of a confident match rather than of a mask. Section~\ref{sec:res-mask} measures what it actually flags and what happens when it is switched off with the environment variable \texttt{DSTS\_\allowbreak MASK\_\allowbreak HANDLER=off}, which was added for that ablation and leaves the default unchanged.
+The handler acts only on the \emph{local} check of the capturing building; the Bloom routing and the remote verification always use the plain thresholds. It is a statistical heuristic on the angle matrix, not an image classifier: a large spread means that one person stands out, which is the signature of a confident match rather than of a mask. Section~\ref{sec:res-mask} measures what it flags and what happens when it is switched off with \texttt{DSTS\_\allowbreak MASK\_\allowbreak HANDLER=off}.
 
-\begin{table}[htbp]
-\centering
-\caption{Mask handler parameters (defaults)}\label{tab:maskparams}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{6.4cm}|p{2.6cm}|p{5.6cm}|}\hline
-\textbf{Parameter} & \textbf{Value} & \textbf{Effect}\\\hline
-Angle-spread threshold & 6.5$^{\circ}$ & Above it, a mask is suspected\\\hline
-Acceptance-angle relaxation & +4$^{\circ}$ & 80.43$^{\circ}$ becomes 84.43$^{\circ}$\\\hline
-Vote relaxation & 25\% fewer & 12 votes become 9\\\hline
-Minimum gallery size for detection & 3 occupants & Below it the handler never fires\\\hline
-Where it is applied & Local check only & Not in routing or remote verification\\\hline
-Switch & \texttt{DSTS\_\allowbreak MASK\_\allowbreak HANDLER} & ``off'' disables it; default on\\\hline
-\end{tabular}}
-\end{table}
+
 
 \subsection{Tracking: probabilities and state}
 For an identified event with candidate distances $d_i$ to each candidate occupant $i$, the occupant probabilities follow Definition 3.3 of the DSTS framework \cite{ref6}: with $\sigma$ the population standard deviation of the distances,
@@ -615,28 +549,10 @@ Student (39 per building) & Themselves in full; the teachers assigned to them & 
 \end{tabular}}
 \end{table}
 
-Building-level queries (Q1, Q2) return aggregates to everyone in their own building and the list of people only to a Dean; zone queries (Q10, Q12, Q13) filter each listed occupant through the same policy; students cannot run zone queries. The templates are listed in Table~\ref{tab:queries}.
+Building-level queries (Q1, Q2) return aggregates to everyone in their own building and the list of people only to a Dean; zone queries (Q10, Q12, Q13) filter each listed occupant through the same policy; students cannot run zone queries. There are fourteen query templates (Q1--Q14), covering occupancy, location, history, tracking and zone queries.
 
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{longtable}{|p{1.4cm}|p{13.2cm}|}
-\caption{Query templates}\label{tab:queries}\\\hline
-\textbf{Query} & \textbf{Question}\\\hline\endfirsthead
-\hline\textbf{Query} & \textbf{Question}\\\hline\endhead
-Q1 & Did any occupant stay in building $b$ after time $t$?\\\hline
-Q2 & Was the number of visitors in building $b$ more than the number of registered occupants at time $t$?\\\hline
-Q3 & Did occupant $o$ leave building $b$ before time $t$?\\\hline
-Q4 & Did occupant $o$ enter the building between times $t_1$ and $t_2$?\\\hline
-Q5 & Did occupant $o$ visit all the zones in building $b$?\\\hline
-Q6 & Where was occupant $o$ at time $t$?\\\hline
-Q7 & How many zones did occupant $o$ visit during the interval $t_1$ to $t_2$?\\\hline
-Q8 & At what time did occupant $o$ visit zone $z$ for the first time?\\\hline
-Q9 & How long did occupant $o$ spend at zone $z$ during the first visit?\\\hline
-Q10 & Who was in zone $z$ at time $t$?\\\hline
-Q11 & Where was occupant $o$ during the interval $t_1$ to $t_2$?\\\hline
-Q12 & Who was in zone $z$ from time $t_1$ to $t_2$?\\\hline
-Q13 & Who all visited zone $z$?\\\hline
-TRACK & Full historical trajectory of occupant $o$\\\hline
-\end{longtable}}
+}
 
 \subsection{Explainable responses}
 Each query builds an explanation from the same filtered event list that it used to compute the answer, never by recomputing afterwards. The explanation holds the decision rule in one sentence, the evidence events with their roles (decisive, last before $t$, carry-in state, zone visit), what was looked for and not found, uncertainty flags, what redaction withheld, and the visit pointer if one answered the query. Flags come from the identification provenance stored with every identified event (votes, routing rank, Bloom margin, whether the vote winner was also the nearest candidate) and are listed in Table~\ref{tab:flags}. The identity probability of Equation~\ref{eq:prob} is not used as a confidence signal because it is close to 1 for most misidentifications too. Before leaving the service the explanation is redacted to the caller's disclosure level, so it never shows more than the answer does.
@@ -657,29 +573,12 @@ pointer\_\allowbreak based & A value comes from a visit pointer with no identifi
 \end{table}
 
 \subsection{Secure inter-building exchange}
-Every message between buildings is sealed (Table~\ref{tab:security}). The sender generates an ephemeral X25519 key \cite{ref23}, derives a symmetric key with HKDF-SHA256 \cite{ref22}, encrypts with AES-GCM \cite{ref25} using the whole header as associated data, and signs the header, nonce and ciphertext with Ed25519 \cite{ref24}. Replies are bound to their request. A campus certificate authority issues node certificates that bind both the signing key and the key-agreement key; expiry, revocation, subject and pinning are checked. A replay guard accepts a message only within a 300-second window and once per nonce, and runs after the signature check so the timestamp is authenticated. Any failed step yields no reply and nothing is admitted (fail closed).
+Every message between buildings is sealed . The sender generates an ephemeral X25519 key \cite{ref23}, derives a symmetric key with HKDF-SHA256 \cite{ref22}, encrypts with AES-GCM \cite{ref25} using the whole header as associated data, and signs the header, nonce and ciphertext with Ed25519 \cite{ref24}. Replies are bound to their request. A campus certificate authority issues node certificates that bind both the signing key and the key-agreement key; expiry, revocation, subject and pinning are checked. A replay guard accepts a message only within a 300-second window and once per nonce, and runs after the signature check so the timestamp is authenticated. Any failed step yields no reply and nothing is admitted (fail closed).
 
-\begin{table}[htbp]
-\centering
-\caption{Security mechanisms}\label{tab:security}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{3.4cm}|p{7.4cm}|p{3.8cm}|}\hline
-\textbf{Mechanism} & \textbf{What it does} & \textbf{Module}\\\hline
-Sealed payloads & Ephemeral X25519, HKDF-SHA256, AES-GCM with the header as associated data; Ed25519 signature; reply bound to request & secure\_\allowbreak transfer.payload\\\hline
-Certificates & CA-signed, binding both public keys; expiry, revocation, subject and pinning checked & secure\_\allowbreak transfer.transport\\\hline
-Replay guard & 300~s window plus unique nonces, after signature verification & secure\_\allowbreak transfer.replay\_\allowbreak guard\\\hline
-Fail closed & Any failed step: no reply, nothing admitted & secure\_\allowbreak transfer.handler\\\hline
-Signed tokens & HMAC-SHA256, one-hour expiry, mintable only by the server & access\_\allowbreak control.tokens\\\hline
-Per-person credentials & Credential is HMAC of the occupant id under a master secret; one never opens another account & access\_\allowbreak control.credentials\\\hline
-Login lockout & 5 failures in 60 s per client and occupant, or 20 in 5 min per occupant, then HTTP 429 & access\_\allowbreak control.rate\_\allowbreak limit\\\hline
-WebSocket tickets & Single-use ticket valid 30 s; the token is never put in a URL & access\_\allowbreak control.tickets\\\hline
-Audit log & Every decision with its layer and code & access\_\allowbreak control.authorize\\\hline
-Visitor data hygiene & Private copies; day cache zeroed at rollover & buildinglib.visitor\_\allowbreak pool\\\hline
-\end{tabular}}
-\end{table}
+
 
 \subsection{The masked building}
-To study masked faces, 50 more people from RMFRD \cite{ref20} form an 11th building. The 50 people with the most real masked photos are used. Each has 20 distinct real unmasked photos as the gallery and 20 masked probes: all their real masked photos up to 20 (800 of the 1,000 probes), topped up with augmented copies (flip, rotation, scale, shift, brightness, blur, noise, JPEG compression) for the 200 remaining. Photos are detected and aligned with SCRFD and embedded with the same ArcFace model. Routing and verification are unchanged: a masked probe is matched against an unmasked gallery. The masked people are not shuffled by the seed. An earlier version built from the MFR2 dataset gave misleadingly high masked accuracy because each person had only one or two unmasked photos and the masks were partly synthetic; it was replaced by RMFRD.
+To study masked faces, 50 more people from RMFRD \cite{ref20} form an 11th building; each has 20 unmasked photos as the gallery and 20 masked probes (real photos topped up with augmented copies), embedded as for the other buildings and not shuffled by the seed (Appendix~\ref{app:setup}).
 
 \subsection{Parameters}
 Table~\ref{tab:params} lists the parameters used. The Bloom filter was configured for a 1\% false-positive rate, but Section~\ref{sec:res-bloom} shows that the effective rate that routing sees is about 3.5\% because LSH codes of different people collide.
@@ -696,55 +595,24 @@ Bloom effective false-positive rate (measured, Section~\ref{sec:res-bloom}) & ab
 References per occupant $R$ & 20\\\hline
 Accept angle / minimum votes & 80.43$^{\circ}$ / 12\\\hline
 Shortlist size / extra probes & 5 / 3\\\hline
-Embedding dimension & 512\\\hline
 Mask handler (default on) & spread 6.5$^{\circ}$; +4$^{\circ}$; 25\% fewer votes\\\hline
 Visitor promotion rule & 3 entries in 7 days or 8 entries in 30 days\\\hline
-Replay window / token lifetime & 300 s / 1 h\\\hline
-Login lockout & 5 failures in 60 s per client and occupant, or 20 in 5 min per occupant\\\hline
 Uncertainty-flag thresholds & low votes below 16; narrow margin below 5; stale after 60 min\\\hline
-Contract seed & 42\\\hline
 \end{tabular}}
 \end{table}
 
 \subsection{API and dashboard}
-The FastAPI server exposes the endpoints in Table~\ref{tab:api}; every data endpoint runs the same authentication, building scope and two-layer policy before it returns anything, and the dashboard is a static page that calls them.
+The FastAPI server exposes login, query, tracking, occupancy and explanation endpoints; every data endpoint runs the same authentication, building scope and two-layer policy before it returns anything, and the dashboard is a static page that calls them.
 
-\begin{table}[htbp]
-\centering
-\caption{Main API endpoints}\label{tab:api}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{4.2cm}|p{10.4cm}|}\hline
-\textbf{Endpoint} & \textbf{Purpose}\\\hline
-POST /api/auth/login & Demo persona (when enabled) or occupant id with that occupant's own credential; lockout after repeated failures\\\hline
-POST /api/ws-ticket & Single-use ticket for the live WebSocket\\\hline
-GET /api/layout, /api/occupancy, /api/heatmap & Buildings, who is where, and zone counts, each filtered by the caller's role\\\hline
-POST /api/query & Run one of the query templates under the two-layer policy; returns answer, decision and explanation\\\hline
-GET /api/security-log & The caller's own authorization decisions\\\hline
-POST /api/simulate, /api/demo-walk, /api/reset & Demo helpers: generate events, walk a person between buildings, reset\\\hline
-GET /metrics & Prometheus counters; needs a token or a loopback client\\\hline
-\end{tabular}}
-\end{table}
+
 
 \clearpage
 \chapter{Results and Analysis}
 \label{ch:results}
 \section{Evaluation setup}
-The evaluation uses 550 occupants in 11 buildings: the 500 CASIA-WebFace people dealt into 10 buildings of 50 by a seeded permutation, and the 50 masked people in building 11. One simulated day has 11,000 events, one for each of the 11,000 test photos; 8,800 are local (the person is in their home building) and 2,200 are visitor events. Every headline number in this chapter is the \emph{average over five random populations} (seeds 0 to 4); each seed places the same people in different buildings and draws a different event day. Where a single run is needed to show detail (the visitor outcome buckets, the mask-handler ablation and the screenshots), seed 42 is used and is named as such. Table~\ref{tab:protocol} summarises the protocol.
+The evaluation uses 550 occupants in 11 buildings: the 500 CASIA-WebFace people dealt into 10 buildings of 50 by a seeded permutation, and the 50 masked people in building 11. One simulated day has 11,000 events, one for each of the 11,000 test photos; 8,800 are local (the person is in their home building) and 2,200 are visitor events. Every headline number in this chapter is the \emph{average over five random populations} (seeds 0 to 4); each seed places the same people in different buildings and draws a different event day. Where a single run is needed to show detail (the visitor outcome buckets, the mask-handler ablation and the screenshots), seed 42 is used and is named as such.
 
-\begin{table}[htbp]
-\centering
-\caption{Evaluation protocol}\label{tab:protocol}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{4.0cm}|p{10.6cm}|}\hline
-\textbf{Item} & \textbf{Setting}\\\hline
-Population & 550 occupants: 500 (CASIA-WebFace) in 10 buildings of 50, plus 50 masked people (RMFRD) in building 11\\\hline
-Events per run & 11,000 (8,800 local, 2,200 visitor); the 20 test photos of every person, one simulated day\\\hline
-Seeds & 0, 1, 2, 3, 4 for all averages; 42 for the detailed run\\\hline
-Baseline & Hypothetical centralised server holding every gallery, same preprocessing and vote rule, no LSH or Bloom filters\\\hline
-Ground truth & True occupant and place of every event; a full true snapshot of the campus after every event\\\hline
-Hardware & Laptop CPU, no GPU\\\hline
-\end{tabular}}
-\end{table}
+
 
 \textbf{Safeguards against bias.} Reference photos enrol people and are never events; test photos are events and are never enrolled. The mean face and the Bloom filters use reference photos only. The centralised baseline uses exactly the same preprocessing, thresholds and vote rule as the building nodes, so any difference is caused by routing and not by a stronger matcher. Ground truth is read only by the evaluation scripts; recognition, routing and tracking receive observable event fields only.
 
@@ -761,7 +629,7 @@ Recall equals the share of events identified correctly, so it is also called ide
 
 \section{Result}
 \subsection{Identification: decentralised against centralised}\label{sec:res-events}
-Table~\ref{tab:central} compares the decentralised pipeline with the centralised search, and Table~\ref{tab:events} gives the confusion counts and scores, all averaged over the five seeds. Figure~\ref{fig:events} shows the accuracy by cohort.
+Table~\ref{tab:central} compares the decentralised pipeline with the centralised search, and Table~\ref{tab:events} gives the confusion counts and scores, all averaged over the five seeds.
 
 \begin{table}[htbp]
 \centering
@@ -777,11 +645,7 @@ Masked people & 1,000 & 59.80\% & 59.06\% & 0.74 & 12.6\%\\\hline
 \end{tabular}}
 \end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/fig_events.png}
-\caption{Identification accuracy, centralised search against the decentralised pipeline (average of five seeds)}\label{fig:events}
-\end{figure}
+
 
 \begin{table}[htbp]
 \centering
@@ -800,7 +664,7 @@ Masked & 591 & 72 & 409 & 0.892 & 0.591 & 0.711\\\hline
 Over all events the decentralised pipeline identifies 91.54\% against 92.24\% for the central search, a difference of 0.70 points, while each lookup touches 10.3\% of the galleries. Local events are marginally better with the pipeline (92.02\% against 91.98\%) because a person is matched only among the 50 people of their own building, so there are fewer look-alikes to confuse them with; the central search must discriminate among 550. The visitor events lose 3.7 points (89.61\% against 93.27\%), which is the cost of routing. The standard deviation over the five seeds is only 0.16 points (Section~\ref{sec:res-seeds}).
 
 \subsection{Routing and the visitor database}\label{sec:res-visitors}
-Table~\ref{tab:visitors} summarises how visitors are identified and Figure~\ref{fig:buckets} breaks one run (seed 42) down by outcome. In that run, of the 2,200 visitor events, 1,447 (about two thirds) are served from the building's visitor database (the same visitor sighted again the same day), 708 are routed, and the remaining 45 are visitors that an occupant of the capturing building wrongly accepted as a local person (a cross-population collision). The three groups add up to 2,200. Errors among the routed events are mostly routing misses that end in an abstention, and a smaller number of cases in which the right building is reached but the face still does not pass verification.
+Table~\ref{tab:visitors} summarises how visitors are identified and the text below breaks one run (seed 42) down by outcome. In that run, of the 2,200 visitor events, 1,447 (about two thirds) are served from the building's visitor database (the same visitor sighted again the same day), 708 are routed, and the remaining 45 are visitors that an occupant of the capturing building wrongly accepted as a local person (a cross-population collision). The three groups add up to 2,200. Errors among the routed events are mostly routing misses that end in an abstention, and a smaller number of cases in which the right building is reached but the face still does not pass verification.
 
 \begin{table}[htbp]
 \centering
@@ -819,11 +683,7 @@ Visitor recall in the tracked state: building / zone / building and zone & 0.945
 \end{tabular}}
 \end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.82\textwidth]{figures/fig_buckets.png}
-\caption{Outcome of the 2,200 visitor events in the detailed run (seed 42)}\label{fig:buckets}
-\end{figure}
+
 
 The detailed run also shows how the headline gap should be read. The centralised search identified 92.24\% of its 11,000 events and the pipeline 91.76\%. The exact difference is 52 events out of 11,000, that is 0.47 points; the two rounded percentages differ by 0.48 only because of rounding. The five-seed gap in Table~\ref{tab:central} is 0.70 points.
 
@@ -861,79 +721,32 @@ Building and zone & 99 & 0.901 & 0.890 & 0.896 & 0.891\\\hline
 \end{tabular}}
 \end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/fig_state.png}
-\caption{Precision, recall and F1 of the tracked state at three levels (average of five seeds)}\label{fig:state}
-\end{figure}
+
 
 Building-level state, that is knowing which building each person is in after every event, reaches an F1 of 0.950; the zone within a building and the combination are harder because the nine-zone belief is updated from one event at a time. The standard deviation of the building-level F1 over the five seeds is 0.0040.
 
 \subsection{Masked people}\label{sec:res-masked}
-Table~\ref{tab:masked} compares the 50 masked people of building 11 (1,000 events per run) with everyone else (10,000 events) and Figure~\ref{fig:masked} shows the recall. Masked people are identified 59.1\% of the time against 94.8\% for unmasked people. When the system does answer for a masked person it is right 89.2\% of the time, so the loss is mostly missed identifications rather than wrong ones. A masked probe is about 72$^{\circ}$ from its own unmasked gallery on average, close to its nearest other person (about 74$^{\circ}$), so the gallery gives little margin. Routing is also weaker for masked visitors: the right building is found less often and ranked lower.
+Table~\ref{tab:events} (rows Masked and Unmasked) compares the 50 masked people of building 11 (1,000 events per run) with everyone else (10,000 events). Masked people are identified 59.1\% of the time against 94.8\% for unmasked people. When the system does answer for a masked person it is right 89.2\% of the time, so the loss is mostly missed identifications rather than wrong ones. A masked probe is about 72$^{\circ}$ from its own unmasked gallery on average, close to its nearest other person (about 74$^{\circ}$), so the gallery gives little margin. Routing is also weaker for masked visitors: the right building is found less often and ranked lower.
 
-\begin{table}[htbp]
-\centering
-\caption{Masked against unmasked people (average of five seeds)}\label{tab:masked}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{4.6cm}|p{2.4cm}|p{2.4cm}|p{2.4cm}|p{2.4cm}|}\hline
-\textbf{Group} & \textbf{TP} & \textbf{Precision} & \textbf{Recall} & \textbf{F1}\\\hline
-Unmasked people & 9,478 & 0.982 & 0.948 & 0.965\\\hline
-Masked people & 591 & 0.892 & 0.591 & 0.711\\\hline
-Masked, in their building & 507 & 0.890 & 0.597 & 0.714\\\hline
-Masked, visiting & 83 & 0.903 & 0.556 & 0.688\\\hline
-\end{tabular}}
-\end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/fig_masked.png}
-\caption{Share of events identified correctly, masked against unmasked people (average of five seeds)}\label{fig:masked}
-\end{figure}
+
+
 
 \subsection{What was tried for masked faces, and the mask handler}\label{sec:res-mask}
-Three ideas for improving masked recognition were tested offline on the 1,000 masked probes against the 50-person gallery, using the real thresholds (80.43$^{\circ}$ and 12 votes): adding ten synthetic-masked templates per person to the gallery; matching on the upper face only, by blanking the lower part of both gallery and probe; and relaxing the accept angle and votes when a mask is suspected. Table~\ref{tab:ablation} and Figure~\ref{fig:ablation} show that each mostly traded abstentions for wrong answers. Relaxing the thresholds alone raised wrong identities from 7.0\% to 28.4\% and let strangers (people of other buildings) be accepted 31\% of the time. F1 stayed at 0.72 or fell. Without any threshold, the nearest person is the right one only 65--70\% of the time whatever the gallery (Table~\ref{tab:rank1}), so the limit is the face model, which was not trained for masks, and the noisy web labels. Enrolling five to eight \emph{real} masked photos per person, held out from the probes, gave about five points more in rank-1 accuracy.
+Three ideas for improving masked recognition were tested offline on the 1,000 masked probes against the 50-person gallery, using the real thresholds (80.43$^{\circ}$ and 12 votes): adding ten synthetic-masked templates per person to the gallery; matching on the upper face only, by blanking the lower part of both gallery and probe; and relaxing the accept angle and votes when a mask is suspected. Each mostly traded abstentions for wrong answers (best case: 66.1\% correct but 16.9\% wrong, against 59.8\% correct and 7.0\% wrong now). Relaxing the thresholds alone raised wrong identities from 7.0\% to 28.4\% and let strangers (people of other buildings) be accepted 31\% of the time. F1 stayed at 0.72 or fell. Without any threshold, the nearest person is the right one only 65--70\% of the time whatever the gallery, so the limit is the face model, which was not trained for masks, and the noisy web labels. Enrolling five to eight \emph{real} masked photos per person, held out from the probes, gave about five points more in rank-1 accuracy.
 
-\begin{table}[htbp]
-\centering
-\caption{Masked probes against the 50-person gallery: fractions of the 1,000 probes (offline, building 11)}\label{tab:ablation}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{6.4cm}|p{1.8cm}|p{1.6cm}|p{1.8cm}|p{3.0cm}|}\hline
-\textbf{Variant} & \textbf{Correct} & \textbf{Wrong} & \textbf{Abstain} & \textbf{Strangers accepted}\\\hline
-Current: 20 unmasked references, plain thresholds & 0.598 & 0.070 & 0.332 & 0.03\%\\\hline
-Relaxed thresholds (+4$^{\circ}$, 9 votes) & 0.647 & 0.284 & 0.069 & 31.2\%\\\hline
-Relaxed more (+8$^{\circ}$, 9 votes) & 0.556 & 0.444 & 0.000 & 100\%\\\hline
-10 unmasked + 10 synthetic-masked references & 0.627 & 0.118 & 0.255 & 0.00\%\\\hline
-Same, with 9 votes & 0.661 & 0.169 & 0.170 & 0.00\%\\\hline
-Upper face only (gallery and probe) & 0.572 & 0.297 & 0.131 & 0.00\%\\\hline
-Upper face only, with 9 votes & 0.595 & 0.349 & 0.056 & 0.07\%\\\hline
-\end{tabular}}
-\end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/fig_ablation.png}
-\caption{F1 of masked probes for the tested variants (offline, building 11)}\label{fig:ablation}
-\end{figure}
 
-\begin{table}[htbp]
-\centering
-\caption{Rank-1 accuracy of masked probes without thresholds (50-way)}\label{tab:rank1}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{5.6cm}|p{2.2cm}|p{2.2cm}|p{2.2cm}|p{2.2cm}|}\hline
-\textbf{Gallery} & \textbf{Best single reference} & \textbf{Mean of top 3} & \textbf{Mean of all} & \textbf{Centroid}\\\hline
-20 unmasked references & 0.647 & 0.694 & 0.694 & 0.700\\\hline
-10 unmasked + 10 synthetic-masked & 0.612 & 0.668 & 0.698 & 0.699\\\hline
-Upper face only & 0.613 & 0.652 & 0.642 & 0.659\\\hline
-\end{tabular}}
-\end{table}
+
+
+
 
 \textbf{The existing mask handler.} The handler described in Section~\ref{sec:mask-handler} flags a probe as masked when the spread of per-person minimum angles is large. Measured on the detailed run it flags none of the 850 masked local events and 3,355 of the 7,950 unmasked local events (42\%), because a large spread means that one person stands out, not that a mask is present. With the handler switched off (\texttt{DSTS\_\allowbreak MASK\_\allowbreak HANDLER=off}) on the same events, masked results are unchanged (590 TP, 70 FP) and unmasked people gain 21 correct identifications (9,525 against 9,504) and lose 22 false accepts (125 against 147). The default is left on, so all other results include this small effect, and the finding is reported as a limitation.
 
 \subsection{Explanation quality}\label{sec:res-expl}
 Explanation quality was measured in three ways: whether explanations are faithful to the answers, whether the uncertainty flags catch real errors, and what the explanations cost. All numbers below are averages over the five seeds and were produced on the current system (11 buildings, the masked building included) by \texttt{evaluation.evaluate\_\allowbreak explanations}.
 
-\textbf{Faithfulness and leakage.} Because every explanation is built from the events that produced the answer, faithfulness is checked by tests: for each query class there are cases with a yes answer, a no answer and an empty answer (40 cases in all), and each case is checked twice, once that every evidence item is one of the engine's own events and once that the answer recomputed from the evidence equals the engine's answer. Further tests check that no explanation reveals more than its answer at any disclosure level, that routing details are hidden below L4, and that cached explanations are never shared across levels. All pass (Section~\ref{sec:res-security}).
+\textbf{Faithfulness and leakage.} Every explanation is built from the events that produced the answer. For each query class, tests with a yes, a no and an empty answer (40 cases) check that every evidence item is one of the engine's own events and that the answer recomputed from the evidence equals the engine's answer. Further tests check that no explanation reveals more than its answer at any disclosure level, that routing details are hidden below L4, and that cached explanations are never shared across levels. All pass (Section~\ref{sec:res-security}).
 
 \textbf{Do the flags catch errors?} Table~\ref{tab:expl-id} scores the identification flags against the ground truth. On average 10,314 events per run are identified, of which 245 are wrong. 74.2\% of the wrong identifications carry at least one flag, and 3.8\% of the correct ones do (the false-alarm rate); of all flagged events 32.3\% are wrong. The flags work best on routed visitors (87\% of wrong ones flagged) and on local identifications (74\%). They almost never flag a wrong identification that comes from the visitor database (3\%), because that path re-matches against cached references and carries little provenance; these are the errors that persist for the rest of a day, and are the main weakness of the explanation layer. The strongest single flag is \texttt{vote\_\allowbreak winner\_\allowbreak not\_\allowbreak nearest}: 66\% of the identifications carrying it are wrong.
 
@@ -950,89 +763,26 @@ Visitor database & 1,442 & 12 & 2.8\% & 0.01\% & 67\%\\\hline
 \end{tabular}}
 \end{table}
 
-\begin{table}[htbp]
-\centering
-\caption{Individual flags on identifications (average of five seeds)}\label{tab:expl-flag}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{5.6cm}|p{2.6cm}|p{2.6cm}|p{3.0cm}|}\hline
-\textbf{Flag} & \textbf{Events carrying it} & \textbf{Of which wrong} & \textbf{Share wrong}\\\hline
-vote\_\allowbreak winner\_\allowbreak not\_\allowbreak nearest & 99 & 66 & 66.1\%\\\hline
-low\_\allowbreak votes & 306 & 115 & 37.4\%\\\hline
-verified\_\allowbreak by\_\allowbreak lower\_\allowbreak ranked\_\allowbreak building & 129 & 38 & 29.7\%\\\hline
-narrow\_\allowbreak routing\_\allowbreak margin & 227 & 50 & 22.1\%\\\hline
-\end{tabular}}
-\end{table}
 
-At the level of answers, the flags are scored over a grid of real queries (Q6 at every hour, Q7 over four two-hour windows and TRACK, for every identified occupant). On average 7,589 answers per run were scored; 24.6\% carry a flag; 912 are wrong, of which 80.2\% are flagged (recall) and 39.2\% of the flagged answers are wrong (precision). Table~\ref{tab:expl-ans} gives the figures per query type. A flag is therefore a good reason to look twice, not a verdict: most flagged answers are still right, but four of every five wrong answers are flagged.
 
-\begin{table}[htbp]
-\centering
-\caption{Uncertainty flags on answers, per query type (average of five seeds)}\label{tab:expl-ans}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{3.4cm}|p{2.4cm}|p{2.8cm}|p{2.6cm}|p{2.6cm}|}\hline
-\textbf{Query} & \textbf{Answers scored} & \textbf{Share flagged} & \textbf{Flag precision} & \textbf{Flag recall}\\\hline
-Q6 (where at time $t$) & 4,858 & 22.5\% & 43.8\% & 89.2\%\\\hline
-Q7 (zones in interval) & 2,183 & 22.0\% & 14.8\% & 59.8\%\\\hline
-TRACK (trajectory) & 548 & 53.2\% & 62.1\% & 70.8\%\\\hline
-All scored answers & 7,589 & 24.6\% & 39.2\% & 80.2\%\\\hline
-\end{tabular}}
-\end{table}
+At the level of answers, the flags are scored over a grid of real queries (Q6 at every hour, Q7 over four two-hour windows and TRACK, for every identified occupant). On average 7,589 answers per run were scored; 24.6\% carry a flag; 912 are wrong, of which 80.2\% are flagged (recall) and 39.2\% of the flagged answers are wrong (precision). A flag is therefore a good reason to look twice, not a verdict: most flagged answers are still right, but four of every five wrong answers are flagged.
 
-\textbf{What do explanations cost?} Each query type was run 100 times per seed with explanations off and on (Table~\ref{tab:expl-cost}, Figure~\ref{fig:expl}). Summed over all fourteen queries the latency rises from 16.3~ms to 17.4~ms, an increase of 8.0\%. The aggregate queries (Q1, Q13) cost most because they gather one evidence item per person; the point queries cost almost nothing. The response grows more than the latency: with the full L4 explanation, the sum of the response sizes rises from about 15,820 to 117,290 bytes, because the evidence is listed. Lower disclosure levels receive much less.
 
-\begin{table}[htbp]
-\centering
-\caption{Cost of explanations per query (average of five seeds; 100 runs each)}\label{tab:expl-cost}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{2.0cm}|p{2.4cm}|p{2.4cm}|p{2.2cm}|p{2.6cm}|p{2.6cm}|}\hline
-\textbf{Query} & \textbf{Latency without (ms)} & \textbf{Latency with (ms)} & \textbf{Overhead} & \textbf{Bytes without} & \textbf{Bytes with (L4)}\\\hline
-Q1 & 0.48 & 0.65 & 38\% & 4,735 & 21,185\\\hline
-Q2 & 1.75 & 1.97 & 14\% & 235 & 11,483\\\hline
-Q3 & 0.62 & 0.63 & 3\% & 128 & 969\\\hline
-Q4 & 0.36 & 0.37 & 2\% & 241 & 1,086\\\hline
-Q5 & 0.37 & 0.39 & 6\% & 193 & 1,802\\\hline
-Q6 & 1.93 & 1.95 & 1\% & 531 & 1,071\\\hline
-Q7 & 0.34 & 0.39 & 15\% & 146 & 3,495\\\hline
-Q8 & 0.39 & 0.39 & 0\% & 195 & 776\\\hline
-Q9 & 0.40 & 0.41 & 2\% & 354 & 1,374\\\hline
-Q10 & 2.65 & 2.78 & 6\% & 1,225 & 6,142\\\hline
-Q11 & 0.41 & 0.44 & 7\% & 1,913 & 5,168\\\hline
-Q12 & 3.18 & 3.37 & 8\% & 1,326 & 25,014\\\hline
-Q13 & 1.16 & 1.33 & 25\% & 1,863 & 28,769\\\hline
-TRACK & 2.24 & 2.32 & 4\% & 2,734 & 8,956\\\hline
-\end{tabular}}
-\end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/fig_expl.png}
-\caption{Left: share of wrong and of correct identifications carrying a flag. Right: extra latency of building the explanation, per query type (average of five seeds)}\label{fig:expl}
-\end{figure}
+\textbf{What do explanations cost?} Each query type was run 100 times per seed with explanations off and on. Summed over all fourteen queries the latency rises from 16.3~ms to 17.4~ms, an increase of 8.0\%. The aggregate queries (Q1, Q13) cost most because they gather one evidence item per person; the point queries cost almost nothing. The response grows more than the latency: with the full L4 explanation, the sum of the response sizes rises from about 15,820 to 117,290 bytes, because the evidence is listed. Lower disclosure levels receive much less.
 
-An earlier measurement of the same quantities on the 10-building system, taken before the masked building was added, found a higher flag recall (84\% of wrong identifications flagged against 74\% here) and a lower false-alarm rate (2.3\% against 3.8\%). Splitting the present measurement by cohort explains the difference. For unmasked people 80.6\% of the wrong identifications are flagged and 2.3\% of the correct ones, close to the earlier figures. For the masked people only 58.7\% of the wrong identifications are flagged, while 27.5\% of their correct identifications are flagged as well: masked captures have low votes and narrow margins, so the flags fire on many right answers and miss many wrong ones, and they are far less discriminating there.
+
+
+
+
+An earlier measurement on the 10-building system, before the masked building existed, found a higher flag recall (84\% against 74\% here). The difference is the cohort: for unmasked people 80.6\% of wrong identifications are flagged and 2.3\% of correct ones, close to the earlier figures, but for masked people only 58.7\% of wrong identifications are flagged while 27.5\% of correct ones are flagged too, because masked captures have low votes and narrow margins.
 
 \subsection{The Bloom filters' real false-positive rate}\label{sec:res-bloom}
-Each filter is sized for a 1\% false-positive rate on the assumption that its items behave like independent random keys. LSH codes of different people are not independent: two occupants whose embeddings fall on the same side of the same hyperplanes receive the same code in that slot. The effective rate was therefore measured directly, by testing the enrolled items of the ten other buildings against each building's filter and averaging over the buildings and the five seeds. Table~\ref{tab:bloom} and Figure~\ref{fig:bloom} give the result.
+Each filter is sized for a 1\% false-positive rate on the assumption that its items behave like independent random keys. LSH codes of different people are not independent: two occupants whose embeddings fall on the same side of the same hyperplanes receive the same code in that slot. The effective rate was therefore measured directly, by testing the enrolled items of the ten other buildings against each building's filter and averaging over the buildings and the five seeds.
 
-\begin{table}[htbp]
-\centering
-\caption{False-positive rates of the building filters (average of five seeds)}\label{tab:bloom}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{7.6cm}|p{2.2cm}|p{4.8cm}|}\hline
-\textbf{Quantity} & \textbf{Rate} & \textbf{Meaning}\\\hline
-Configured target & 1.00\% & Design value used to size the filter\\\hline
-Random integers never inserted (Bloom array alone) & 0.95\% & The array behaves as designed\\\hline
-Slot collisions expected if codes were uniform over 2048 values & 2.44\% & 50 occupants over $2^{11}$ codes\\\hline
-Slot collisions measured (other buildings' items equal to an enrolled item in the same slot) & 2.63\% & LSH codes of different people collide\\\hline
-\textbf{Effective rate seen by routing} & \textbf{3.55\%} & Items of other buildings reported as present\\\hline
-\end{tabular}}
-\end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/fig_bloom.png}
-\caption{Configured and measured false-positive rates of the building filters}\label{fig:bloom}
-\end{figure}
+
+
 
 The effective rate is about 3.5 times the configured one. The Bloom array itself is not at fault: random integers that were never inserted are reported at 0.95\%, essentially the 1\% target. The excess comes from the codes: 2.63\% of the items of other buildings already equal an enrolled item in the same slot, close to the 2.44\% expected if the codes of 50 occupants were spread evenly over 2048 values. This is the same finding as in the earlier routing study \cite{ref28}, which measured $3.54\pm0.02\%$ on 10 buildings; the five-seed value here, measured on 11 buildings, is 3.55\%.
 
@@ -1058,48 +808,26 @@ shared utilities & 5 & Dated timestamps, time-window arithmetic\\\hline
 \end{tabular}}
 \end{table}
 
-A persona matrix tool replays 64 requests (Dean, Teacher, Student and an outsider against each query type and target type) and checks the decision, the rule code and the disclosure level of each. Table~\ref{tab:matrix} shows representative rows. A request for a person in another building is denied unless a relationship allows it: a Teacher may follow a rostered student wherever the student is, and a Dean may follow the Deans of other buildings; every other cross-building request is refused with a rule code such as \texttt{RULE\_\allowbreak C\_\allowbreak CROSS\_\allowbreak BUILDING\_\allowbreak DENIED} or \texttt{RULE\_\allowbreak A\_\allowbreak CROSS\_\allowbreak BUILDING\_\allowbreak B\_\allowbreak C\_\allowbreak DENIED}.
+A persona matrix tool replays 64 requests (Dean, Teacher, Student and an outsider against each query type and target type) and checks the decision, the rule code and the disclosure level of each. A request for a person in another building is denied unless a relationship allows it: a Teacher may follow a rostered student wherever the student is, and a Dean may follow the Deans of other buildings; every other cross-building request is refused with a rule code such as \texttt{RULE\_\allowbreak C\_\allowbreak CROSS\_\allowbreak BUILDING\_\allowbreak DENIED} or \texttt{RULE\_\allowbreak A\_\allowbreak CROSS\_\allowbreak BUILDING\_\allowbreak B\_\allowbreak C\_\allowbreak DENIED}.
 
-\begin{table}[htbp]
-\centering
-\caption{Representative decisions from the persona matrix}\label{tab:matrix}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{3.0cm}|p{3.4cm}|p{6.4cm}|p{1.6cm}|}\hline
-\textbf{Caller} & \textbf{Target} & \textbf{Rule} & \textbf{Level}\\\hline
-Dean & Student of own campus & RULE\_\allowbreak A\_\allowbreak OWN\_\allowbreak CAMPUS\_\allowbreak FULL & L4\\\hline
-Dean & Dean of another building & RULE\_\allowbreak A\_\allowbreak PEER\_\allowbreak DEAN\_\allowbreak TRACK & L4\\\hline
-Dean & Student of another campus & RULE\_\allowbreak A\_\allowbreak CROSS\_\allowbreak BUILDING\_\allowbreak B\_\allowbreak C\_\allowbreak DENIED & L0\\\hline
-Teacher & Student on the roster & RULE\_\allowbreak B\_\allowbreak ROSTER\_\allowbreak STUDENT & L4\\\hline
-Teacher & Student not on the roster, or the Dean & RULE\_\allowbreak B\_\allowbreak UNASSIGNED\_\allowbreak DENIED & L0\\\hline
-Student & Assigned teacher & RULE\_\allowbreak C\_\allowbreak ASSIGNED\_\allowbreak TEACHER & L3\\\hline
-Student & Peer student & RULE\_\allowbreak C\_\allowbreak PEER\_\allowbreak STALKING\_\allowbreak DENIED & L0\\\hline
-Student & Zone listing & RULE\_\allowbreak C\_\allowbreak PEER\_\allowbreak ZONE\_\allowbreak SURVEILLANCE\_\allowbreak DENIED & L0\\\hline
-Student of another building & Dean & RULE\_\allowbreak C\_\allowbreak CROSS\_\allowbreak BUILDING\_\allowbreak DENIED & L0\\\hline
-Any person & Themselves & RULE\_\allowbreak SELF\_\allowbreak LOOKUP & L4\\\hline
-Anyone in the building & Building aggregate (Q1, Q2) & RULE\_\allowbreak BUILDING\_\allowbreak AGGREGATE & L2\\\hline
-\end{tabular}}
-\end{table}
+
 
 \subsection{The dashboard}\label{sec:res-ui}
-Figures~\ref{fig:ui-overview}, \ref{fig:ui-dean} and \ref{fig:ui-teacher} show the dashboard on the detailed run. The campus overview marks building 11 as the all-masked building. A Dean's query returns the answer with its ``Why this answer'' card; the same page for a Teacher returns a reduced answer, and the card states what was withheld and why.
+Figures~\ref{fig:ui-overview} and \ref{fig:ui-dean} show the dashboard on the detailed run. The campus overview marks building 11 as the all-masked building. A Dean's query returns the answer with its ``Why this answer'' card; the same page for a Teacher returns a reduced answer, and the card states what was withheld and why.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.92\textwidth]{figures/ui_overview.png}
+\includegraphics[width=0.62\textwidth]{figures/ui_overview.png}
 \caption{Campus overview: 11 buildings and 550 occupants, with building 11 marked as the all-masked building}\label{fig:ui-overview}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.92\textwidth]{figures/ui_query_dean.png}
+\includegraphics[width=0.62\textwidth]{figures/ui_query_dean.png}
 \caption{A Dean's query with its ``Why this answer'' card (rule, evidence, uncertainty, withheld)}\label{fig:ui-dean}
 \end{figure}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.92\textwidth]{figures/ui_query_teacher.png}
-\caption{The same page for a Teacher: the answer is reduced and the card states what was withheld}\label{fig:ui-teacher}
-\end{figure}
+
 
 \section{Comparative Analysis}
 Table~\ref{tab:comparison} compares the approaches. The fair comparison for this project is the same pipeline with a central search; other published systems \cite{ref1,ref2,ref3,ref4,ref5} use different data and tasks and cannot be compared number for number.
@@ -1119,12 +847,12 @@ Edge-camera tracking \cite{ref1,ref2,ref3,ref4,ref5} & Within one site & Not app
 
 Routing costs 0.70 points overall and 3.7 points on visitors, in exchange for touching about a tenth of the gallery and never pooling it.
 
-\textbf{Relation to the earlier routing study.} The manuscript on routing alone \cite{ref28} reports 92.81\% correct identification for the decentralised policy that verifies all five shortlisted buildings against 95.50\% for the centralised search. Those numbers and the ones in this chapter measure different things and should not be compared directly. The earlier study counts \emph{routed visitor events only} (visitors that no occupant of the capturing building accepts), uses 10 buildings and 20 seeds, and compares against a central search over the 450 identities outside the capturing building. This report counts \emph{all} 11,000 events (local, visitor and masked), uses 11 buildings including the masked building, counts the visitors served from the visitor database as identified, and averages five seeds. The accuracy of the decentralised pipeline on visitors alone (89.6\%) is lower than 92.81\% mainly because the masked visitors are included and because visitors accepted as locals are counted as errors, and the central search (92.2\%) is lower than 95.50\% because it has to separate 550 identities, including the masked ones, instead of 450.
+\textbf{Relation to the earlier routing study.} The manuscript on routing alone \cite{ref28} reports 92.81\% correct identification for the decentralised policy that verifies all five shortlisted buildings against 95.50\% for the centralised search. Those numbers measure something different and should not be compared directly: the earlier study counts \emph{routed visitor events only}, uses 10 buildings and 20 seeds, and compares against a central search over the 450 identities outside the capturing building. This report counts \emph{all} 11,000 events, uses 11 buildings including the masked building, counts visitors served from the visitor database as identified, and averages five seeds. The visitor accuracy here (89.6\%) is lower mainly because masked visitors are included, and the central search (92.2\%) is lower because it separates 550 identities instead of 450.
 
 \section{Discussion and Interpretation}
 The results meet the objectives that can be measured. Decentralised identification is within 0.7 points of a central search overall while touching about 10\% of the galleries, so the privacy and locality gain costs little accuracy (objectives 1 and 4). Most visitor events are cheap because repeat sightings the same day come from the day cache, which is why the number of buildings contacted per visitor event is well below one. Tracking is reliable at building level and good at zone level (objective 1).
 
-The access model and the explanations are verified by tests, flag scores and a persona matrix rather than by accuracy figures (objectives 2, 3 and 5): every policy cell and every query class is exercised, explanations are checked to be faithful to their answers and to reveal no more than the answer does, and the flags catch about three quarters of the wrong identifications and four in five wrong answers for about eight per cent of extra latency (objective 3). The weak spot of the explanation layer is the visitor database, whose errors are rarely flagged.
+The access model and the explanations are verified by tests, flag scores and a persona matrix (objectives 2, 3 and 5). The flags catch about three quarters of the wrong identifications for about eight per cent of extra latency, but the visitor database, whose errors are rarely flagged, is the weak spot.
 
 Two findings change how the system should be described. First, the Bloom filters' real false-positive rate is about 3.5\%, not the 1\% configured, because LSH codes collide; routing remains useful because verification is exact, but the privacy argument must not rely on the small configured rate. Second, masked identification is limited by the face model and not by the routing design, and the mask handler that was meant to help does not do so: it never fires for masked people and slightly harms unmasked ones.
 
@@ -1164,7 +892,7 @@ This project built and evaluated a system that identifies and tracks occupants a
 \section{Future work}
 Two directions follow directly from the results.
 
-\textbf{Better masked recognition.} Masked people are identified only 59\% of the time. The next steps are a face model trained with masks instead of one trained on unmasked faces; a real mask detector, because the existing angle-spread heuristic flags the wrong people; enrolling a few real masked photos per person, which gave about five points of rank-1 accuracy in the offline tests; and using tracking context, such as who is already inside the building, to reduce masked errors. Each can be validated on the same seeds and the same masked building, with the masked F1 of Table~\ref{tab:masked} as the target and the unmasked F1 as a check that nothing else gets worse.
+\textbf{Better masked recognition.} Masked people are identified only 59\% of the time. The next steps are a face model trained with masks instead of one trained on unmasked faces; a real mask detector, because the existing angle-spread heuristic flags the wrong people; enrolling a few real masked photos per person, which gave about five points of rank-1 accuracy in the offline tests; and using tracking context, such as who is already inside the building, to reduce masked errors. Each can be validated on the same seeds and the same masked building, with the masked F1 of Table~\ref{tab:events} as the target and the unmasked F1 as a check that nothing else gets worse.
 
 \textbf{Unknown visitor re-identification.} Today a visitor must be registered in some building, and a face that nobody knows is left unidentified. A future version should re-identify unknown visitors across buildings and days: keep one-way codes of the unknown faces (LSH with Bloom filters) under a temporary identifier, link their sightings into a track, and let an administrator later name or purge them. This needs retention and privacy rules, and a check that two different strangers are not merged, which can be measured with the same precision and recall used here once unregistered people are added to the simulated population.
 
@@ -1354,7 +1082,7 @@ manuscript in preparation, Amrita School of Computing, 2026.
 \end{thebibliography}
 \clearpage
 \appendix\chapter{Source Code and Reproducibility}
-The complete source code, configuration and test suite of the project are in one Git repository: \texttt{github.com/yadhu-vipin/Occupant\_\allowbreak Tracking\_\allowbreak v2}, branch \texttt{test\_\allowbreak 7}, commit \texttt{a7bde2e4}. No passwords, tokens or personal data are stored in the repository; the datasets and model files are public and are downloaded separately (see below), and the login master secret is supplied through an environment variable.
+The complete source code, configuration and test suite of the project are in one Git repository: \texttt{github.com/yadhu-vipin/Occupant\_\allowbreak Tracking\_\allowbreak v2}, branch \texttt{test\_\allowbreak 7}, commit \texttt{b2db57fd}. No passwords, tokens or personal data are stored in the repository; the datasets and model files are public and are downloaded separately (see below), and the login master secret is supplied through an environment variable.
 
 \section{Setup and execution}\label{app:setup}
 \textbf{Dependencies.} Python 3.12; the packages in \texttt{requirements.txt} (NumPy, pandas, cryptography, FastAPI, uvicorn, pydantic, prometheus\_\allowbreak client, PyYAML, httpx, pytest). The face models are needed only to build the masked building and are not needed to run the pipeline on the stored embeddings.
@@ -1364,112 +1092,27 @@ The complete source code, configuration and test suite of the project are in one
 \item Clone the repository, create a virtual environment and run \texttt{pip install -r requirements.txt}.
 \item Place the embedding corpus files \texttt{emb\_\allowbreak arcface.npy} (20,000 $\times$ 512) and \texttt{meta.csv} in \texttt{corpus/}. They are not in Git because of their size.
 \item Optional, for the 11th (masked) building: download the RMFRD archive \cite{ref20} into \texttt{external/rmfd\_\allowbreak download/} and the InsightFace buffalo\_\allowbreak l model files (\texttt{det\_\allowbreak 10g.onnx}, \texttt{w600k\_\allowbreak r50.onnx}) into \texttt{external/arcface\_\allowbreak model/}, then run \texttt{python manage.py masked}. Without it, set \texttt{masked\_\allowbreak building.enabled: false} in \texttt{config/experiment.yaml} to run the original ten buildings.
-\item Run the experiment (Table~\ref{tab:commands}); every seed writes into its own folder \texttt{runs/seed\_\allowbreak XX/}.
+\item Run the experiment with the commands below; every seed writes into its own folder \texttt{runs/seed\_\allowbreak XX/}.
 \end{enumerate}
+\begin{verbatim}
+python manage.py test                        # the automated tests
+python manage.py masked                      # build the masked building from RMFRD
+python manage.py run --seeds 0-4 --days 1    # five populations and runs/summary.json
+python -m centralized.compare_all            # centralised search against the pipeline
+python -m evaluation.evaluate_explanations   # explanation flags and overhead
+python tools/measure_bloom_fpr.py            # effective Bloom false-positive rate
+DSTS_DEMO_MODE=1 python manage.py serve --seed 42   # API and dashboard on port 8000
+\end{verbatim}
 
-\begin{table}[htbp]
-\centering
-\caption{Main commands}\label{tab:commands}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{7.6cm}|p{7.0cm}|}\hline
-\textbf{Command} & \textbf{What it does}\\\hline
-python manage.py test & Runs the 571 automated tests\\\hline
-python manage.py masked & Builds the masked building (corpus/masked) from RMFRD\\\hline
-python manage.py pipeline --seed 42 --days 1 & One population: enrol, events, recognition, routing, state, evaluation\\\hline
-python manage.py run --seeds 0-4 --days 1 & Five populations and the cross-seed summary (runs/summary.json)\\\hline
-python -m centralized.compare\_\allowbreak all & Centralised search against the pipeline over every event of a run\\\hline
-python -m evaluation.evaluate\_\allowbreak explanations & Explanation flags against ground truth and explanation overhead\\\hline
-python tools/measure\_\allowbreak bloom\_\allowbreak fpr.py & Effective false-positive rate of the Bloom filters\\\hline
-python tools/rbac\_\allowbreak matrix.py & Persona matrix: 64 requests with expected decisions\\\hline
-DSTS\_\allowbreak DEMO\_\allowbreak MODE=1 python manage.py serve --seed 42 & Starts the API and the dashboard on port 8000\\\hline
-\end{tabular}}
-\end{table}
+
 
 \textbf{Configuration.} All settings of an experiment are in \texttt{config/experiment.yaml}: the population (10 buildings of 50, default seed 42), the masked building switch, the event model (default 14 simulated days; the results in this report use one day, \texttt{--days 1}, with 8 events per occupant and a visitor share of 20\%) and the visitor promotion rule. The federation contract (hash functions, Bloom size, thresholds) is in \texttt{shared/params.json} and \texttt{shared/routing\_\allowbreak params.json}; every artifact carries a hash of it, and a mismatch is rejected.
 
-\textbf{Time and outputs.} A one-day run of 11,000 events takes about eight minutes on a laptop CPU. Table~\ref{tab:outputs} lists what each run writes.
+\textbf{Time and outputs.} A one-day run of 11,000 events takes about eight minutes on a laptop CPU. Each run writes its own folder under runs/seed\_\allowbreak XX/ (population, node data, events, results).
 
 \section{Supporting material}
-\subsection{Repository layout}
-\begin{table}[htbp]
-\centering
-\caption{Repository layout}\label{tab:layout}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{4.2cm}|p{10.4cm}|}\hline
-\textbf{Folder} & \textbf{Content}\\\hline
-population/ & Seeded population, roles, rosters, corpus assembly\\\hline
-buildinglib/ & Enrolment, Bloom filter, routing, verification, visitor pool\\\hline
-pipeline/ & Event generation, recognition, routing and recognition, state, query engine, explanations\\\hline
-recognition/ & Local recognition contract and the mask handler\\\hline
-dsts/ & State library, FastAPI server, dashboard\\\hline
-access\_\allowbreak control/ & Tokens, credentials, lockout, tickets, two-layer policy, audit log\\\hline
-secure\_\allowbreak transfer/ & Sealed payloads, certificates, replay guard, handler\\\hline
-evaluation/ & Event, state and explanation metrics; cross-seed summary\\\hline
-centralized/ & Centralised baseline and the all-event comparison\\\hline
-tools/ & Masked-building builder, Bloom measurement, persona matrix\\\hline
-tests/ & The automated tests, grouped by area\\\hline
-runs/seed\_\allowbreak XX/ & Generated per seed; not in Git\\\hline
-\end{tabular}}
-\end{table}
-
-\subsection{Files written by one run}
-\begin{table}[htbp]
-\centering
-\caption{Outputs of one run (runs/seed\_\allowbreak XX/)}\label{tab:outputs}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{5.8cm}|p{8.8cm}|}\hline
-\textbf{File} & \textbf{Content}\\\hline
-population.json, corpus\_\allowbreak meta.csv, roles/ & Who is in which building; roles and class rosters\\\hline
-filters/building\_\allowbreak N.npz & The published Bloom filters and their manifests\\\hline
-events/generated\_\allowbreak events.json, ground\_\allowbreak truth.json & Observable events and their true labels\\\hline
-events/state\_\allowbreak ground\_\allowbreak truth.json & The true campus state after every event\\\hline
-recognition/, retrieval/ & Local recognition results and routing attempts\\\hline
-state/phase4\_\allowbreak results.json & Identified events with their provenance\\\hline
-nodes/building\_\allowbreak N/ & Per-building databases: registered, visitor, pointers, permanent visitors\\\hline
-results/event\_\allowbreak metrics.json, state\_\allowbreak metrics.json & Event and state confusion metrics\\\hline
-results/end\_\allowbreak to\_\allowbreak end\_\allowbreak summary.json & Accuracy, routing recall, visitor outcome buckets, masked cohort\\\hline
-results/centralized\_\allowbreak vs\_\allowbreak decentralized.json & Central comparison per cohort\\\hline
-results/explanation\_\allowbreak flags.json, explanation\_\allowbreak overhead.json & Explanation measurements\\\hline
-results/bloom\_\allowbreak fpr.json & Bloom false-positive measurement\\\hline
-\end{tabular}}
-\end{table}
-
-\subsection{Where each number in this report comes from}
-\begin{table}[htbp]
-\centering
-\caption{Source of the reported results}\label{tab:sources}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{5.2cm}|p{9.4cm}|}\hline
-\textbf{Result} & \textbf{Produced by}\\\hline
-Tables~\ref{tab:central}, \ref{tab:events}, \ref{tab:visitors}, \ref{tab:seeds}, \ref{tab:masked} & evaluation.evaluate\_\allowbreak events and centralized.compare\_\allowbreak all, averaged by evaluation.summarize\_\allowbreak runs (five seeds)\\\hline
-Table~\ref{tab:state} & evaluation.evaluate\_\allowbreak states against events/state\_\allowbreak ground\_\allowbreak truth.json\\\hline
-Tables~\ref{tab:expl-id}--\ref{tab:expl-cost} & evaluation.evaluate\_\allowbreak explanations\\\hline
-Table~\ref{tab:bloom} & tools/measure\_\allowbreak bloom\_\allowbreak fpr.py\\\hline
-Tables~\ref{tab:ablation}, \ref{tab:rank1} & Offline masked-probe experiment on building 11 (one-off script; numbers recorded in this report)\\\hline
-Table~\ref{tab:tests} and Table~\ref{tab:matrix} & pytest and tools/rbac\_\allowbreak matrix.py\\\hline
-\end{tabular}}
-\end{table}
-
-\subsection{Visitor outcomes in the detailed run}
-Table~\ref{tab:buckets} gives the counts behind Figure~\ref{fig:buckets} (seed 42, 2,200 visitor events).
-
-\begin{table}[htbp]
-\centering
-\caption{Visitor outcome buckets, seed 42}\label{tab:buckets}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{9.4cm}|p{2.4cm}|}\hline
-\textbf{Outcome} & \textbf{Events}\\\hline
-Correct, served from the visitor database & 1,431\\\hline
-Correct, routed & 540\\\hline
-Right building reached, still wrong & 56\\\hline
-Routing miss, abstained & 90\\\hline
-Visitor accepted as a local occupant & 45\\\hline
-Wrong identity, served from the visitor database & 16\\\hline
-Routing miss, wrong identity & 8\\\hline
-Verification failure at the true building & 8\\\hline
-Ranking failure, wrong identity & 6\\\hline
-\end{tabular}}
-\end{table}
+\subsection{Repository layout and sources of the numbers}
+The repository is grouped by role: \texttt{population}, \texttt{events}, \texttt{buildinglib} and \texttt{recognition} (the building node and the pipeline), \texttt{access\_\allowbreak control} and \texttt{secure\_\allowbreak transfer} (the two security layers), \texttt{evaluation}, \texttt{centralized} and \texttt{tools} (metrics, baseline and measurements), \texttt{dsts/api} (the server and dashboard) and \texttt{tests}. Every number in this report is read from the files a run writes under \texttt{runs/seed\_\allowbreak XX/results/}, and the five-seed averages from \texttt{runs/summary.json}; the commands in Section~\ref{app:setup} regenerate all of them.
 
 \subsection{Dataset documentation}
 \textbf{CASIA-WebFace subset.} 500 identities with 40 embeddings each, split into 20 reference and 20 test embeddings; embeddings were extracted once with the InsightFace buffalo\_\allowbreak l models and are stored as 512-dimensional unit vectors. \textbf{RMFRD subset.} The 50 identities with the most real masked photos that also have at least 20 unmasked photos. Each has 20 distinct real unmasked photos as references and 20 masked probes: the real masked photos (10 to 20 per person, median 16; 15 people have 20) topped up with augmented copies of them. Photos are detected and aligned with SCRFD; the augmentation is seeded from the identity name, so the build is reproducible. The masked data are not in Git (a \texttt{.gitignore} rule covers \texttt{corpus/masked/} data and \texttt{external/}).
