@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DSTS · Multi-Building Occupant Tracking</title>
 <!-- __MODE__ / __STATIC__ are filled in by the server: "integrated" (real data, login, /lane-d) or "standalone" (offline demo) -->
-<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=10"></head>
+<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=11"></head>
 <body><div class="app">
 <aside class="side">
  <div class="brand"><div class="logo">▲</div><div><b>dsts</b><small>Occupant tracking</small></div></div>
@@ -22,7 +22,7 @@
 <main>
 <header class="top">
  <div><span class="eyebrow">Observe every building · explain every answer</span><h1>Multi-building <span class="mark">occupant tracking</span></h1><p>Building-level coordination · Zone-level occupancy · Temporal queries</p></div>
- <div class="top-r"><label class="field viewas">View as<select id="view-as"><option value="officer">Dean</option><option value="analyst">Teacher</option><option value="self">Student</option></select></label><span class="pill online"><span class="dot" id="live-dot"></span>System Online</span><div class="clock"><span id="clk-d"></span><b id="clk-t"></b></div></div>
+ <div class="top-r"><label class="field viewas">Signed in as<select id="view-as"><option value="officer">Dean</option><option value="analyst">Teacher</option><option value="self">Student</option></select></label><span class="pill online"><span class="dot" id="live-dot"></span>System Online</span><div class="clock"><span id="clk-d"></span><b id="clk-t"></b></div></div>
 </header>
 
 <section id="v-overview" class="view active">
@@ -43,11 +43,8 @@
 
 <section id="v-zones" class="view">
  <div class="ch pad"><div><h2>Building &amp; Zone Map</h2><p class="muted">Every configured zone is shown for every building with real-time occupancy.</p></div><label class="field">Building<select id="heatmap-building"></select></label></div>
- <div class="card pad" id="zone-filter"><div class="ch"><div><h3>Time frame</h3><p class="muted">Pick a building below, set a window and see who was in each of its zones. Clear it to return to the live view.</p></div></div>
- <div class="row"><label class="field">From<input type="datetime-local" id="zf-start"></label><label class="field">To<input type="datetime-local" id="zf-end"></label>
- <label class="field">View as<select id="zf-role"><option value="officer">Officer</option><option value="analyst">Analyst</option><option value="self">Self</option></select></label>
- <label class="field" id="zf-purpose-field">Purpose<select id="zf-purpose"><option value="general_lookup">General lookup</option><option value="security_investigation">Security investigation</option><option value="audit">Audit</option></select></label>
- <button id="zf-apply">Show who was there</button><button id="zf-clear" class="ghost">Live view</button></div>
+ <div class="card pad" id="zone-filter"><div class="ch"><div><h3>Who was where</h3><p class="muted">Pick a building, then a zone: you see who was there in the time frame below, as far as your role allows.</p></div></div>
+ <div class="row"><label class="field">From<input type="datetime-local" id="zf-start"></label><label class="field">To<input type="datetime-local" id="zf-end"></label></div>
  <p class="small muted" id="zf-note" aria-live="polite"></p></div>
 <div class="bcards" id="bcards"></div>
  <div class="grid2 z"><div class="card"><div class="ch"><h3 id="zmap-title">Zones</h3></div><div class="stage"><div class="plane" id="plane"></div></div>
@@ -58,8 +55,6 @@
 
 <section id="v-query" class="view"><div class="card"><div class="ch"><div><h3>Research-paper query templates</h3><p class="muted">Choose one of the 13 query types, enter its parameters, and execute it against available tracking records.</p></div></div>
 <div class="query-toolbar"><label class="field grow">Query template<select id="query-kind"></select></label>
-<label class="field">Role<select id="q-role"><option value="officer">Officer</option><option value="analyst">Analyst</option><option value="self">Self</option></select></label>
-<label class="field" id="purpose-field">Purpose<select id="q-purpose"><option value="general_lookup">General lookup</option><option value="security_investigation">Security investigation</option><option value="audit">Audit</option></select></label>
 <button id="btn-voice" class="ghost">🎙 Voice query</button><label class="check"><input type="checkbox" id="q-speak"> Speak result</label></div>
 <div id="query-description" class="qdesc"></div><div id="query-fields" class="query-fields"></div>
 <div class="row"><button id="btn-query">Run query</button><button id="btn-clear-query" class="ghost">Clear</button></div>
@@ -80,4 +75,4 @@
 <section id="v-settings" class="view"><div class="card"><h3>Recognition threshold</h3><input id="theta" type="range" min="0" max="100" value="40"><div class="muted" id="theta-value">0.40</div>
 <h3 class="mt">About this demo</h3><p class="muted">DSTS identifies and tracks occupants across buildings: local recognition, LSH and Bloom-filter routing to find a visitor's home building, probabilistic state tracking, role-based access and explained answers. Occupancy and query answers use the data of this running instance.</p></div></section>
 </main></div>
-<div id="track" class="modal" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="Track of one person"><button class="x ghost" id="track-x" aria-label="Close">×</button><div id="track-head"></div><div id="track-body"></div></div></div><script src="__STATIC__/app.js?v=10"></script></body></html>
+<div id="track" class="modal" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="Track of one person"><button class="x ghost" id="track-x" aria-label="Close">×</button><div id="track-head"></div><div id="track-body"></div></div></div><script src="__STATIC__/app.js?v=11"></script></body></html>

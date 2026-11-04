@@ -20,7 +20,7 @@ const fmtT=t=>{if(!t)return"—";if(/^\d{2}:\d{2}(:\d{2})?$/.test(t))return t;co
 
 const fmtDT=t=>{if(!t)return"—";const s=String(t).replace("T"," "),m=s.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/);if(!m)return fmtT(t);return S.sim?.days>1?new Date(m[1]+"T00:00").toLocaleDateString([],{weekday:"short"})+" "+m[2]:m[2]};
 /* navigation */
-function go(v){$$(".nav[data-view]").forEach(n=>n.classList.toggle("active",n.dataset.view===v));$$(".view").forEach(p=>p.classList.toggle("active",p.id==="v-"+v));if(v==="security")refreshSecurity();}
+function go(v){$$(".nav[data-view]").forEach(n=>n.classList.toggle("active",n.dataset.view===v));$$(".view").forEach(p=>p.classList.toggle("active",p.id==="v-"+v));if(v==="security")refreshSecurity();if(v==="zones")applyWindow();}
 $$(".nav[data-view]").forEach(n=>n.onclick=()=>go(n.dataset.view));$$("[data-go]").forEach(a=>a.onclick=()=>go(a.dataset.go));
 $("#theta").oninput=e=>$("#theta-value").textContent=(e.target.value/100).toFixed(2);
 setInterval(()=>{const d=new Date();$("#clk-d").textContent=d.toLocaleDateString([],{weekday:"short",day:"2-digit",month:"short",year:"numeric"});$("#clk-t").textContent=d.toLocaleTimeString([],{hour12:false})},1000);
@@ -32,6 +32,7 @@ async function refresh(){
  const [o,h,q]=await Promise.all([api("/api/occupancy"),api("/api/heatmap"),api("/api/events?limit=80").catch(()=>[])]);
  S.occ=o;S.heat=h;S.hist=Array.isArray(q)?q:(q.rows||[]);const rows=rowsFrom(o);renderRows("#occupancy-body",rows);$("#occupancy-count").textContent=`${rows.length} records`;
  renderKpis();renderCampus();renderActivity();renderZones();showUser();
+ if($("#v-zones").classList.contains("active"))applyWindow();
 }
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
 function renderKpis(){
@@ -66,10 +67,10 @@ function renderCampus(){
 const heat=(v,m)=>{if(!v)return"#eae6da";const t=Math.min(v/Math.max(m,1),1);return t<.34?"#d7e4c3":t<.67?"#e6d9a0":"#eab79a"};
 function counts(b){if(b!=="all")return S.heat[b]||{};const o={};Object.values(S.heat).forEach(c=>Object.entries(c||{}).forEach(([z,n])=>o[z]=(o[z]||0)+n));return o}
 function renderZones(){
- if(!S.b&&B().length)S.b=B()[0].id;
- const sel=$("#heatmap-building");if(!sel.options.length)sel.innerHTML='<option value="all">All Buildings</option>'+B().map(b=>`<option>${b.id}</option>`).join("");sel.value=S.b;
+ if((!S.b||S.b==="all")&&B().length)S.b=B()[0].id;
+ const sel=$("#heatmap-building");if(!sel.options.length)sel.innerHTML=B().map(b=>`<option>${b.id}</option>`).join("");sel.value=S.b;
  $("#bcards").innerHTML=B().map(b=>`<button class="bc ${S.b===b.id?"on":""}" data-b="${b.id}"><b>${b.id}</b><span>${b.occupants.length} occupants</span></button>`).join("");
- $$(".bc").forEach(x=>x.onclick=()=>{S.b=x.dataset.b;S.z=null;S.win?applyWindow():renderZones()});
+ $$(".bc").forEach(x=>x.onclick=()=>{S.b=x.dataset.b;S.z=null;applyWindow()});
  const win=S.win&&S.win.building===S.b,c=win?winCounts():counts(S.b),m=Math.max(1,...Object.values(c));
  $("#zmap-title").textContent=S.b==="all"?"All buildings · zones":`${S.b} Zones`;
  $("#plane").innerHTML=ZONES.map(([z,l])=>{const n=c[z]||0,h=8+Math.round(n/m*26),col=heat(n,m);return `<button class="tile ${S.z===z?"sel":""}" data-z="${z}" style="--c:${col};--h:${h}px" title="${l}: ${n} ${win?"in the time frame":"tracked"}"><span class="f1"></span><span class="f2"></span><span class="t"><em>${z}<br><small>${n}</small></em></span></button>`}).join("");
@@ -83,21 +84,19 @@ function zoneDetail(c,m){if(S.win&&S.win.building===S.b)return windowDetail(S.z|
  const cf=rows.map(r=>r.probability).filter(p=>p!=null);
  $("#zone-detail").innerHTML=`<div class="ch"><h3>Zone Details</h3></div><div class="ch"><div><h2>${safe(S.b==="all"?"All":S.b)} · ${z}</h2><span class="muted">${safe(lab)}</span></div><span class="badge ${lvl[0]}">${lvl[1]}</span></div><div class="stat2"><div><small>Tracked Occupants</small><b>${n}</b></div><div><small>Avg Confidence</small><b>${cf.length?avg(cf).toFixed(2):"—"}</b></div></div><h3>Recent Activity</h3><div class="bars">${bk.map(v=>`<i style="height:${v/mx*100}%" title="${v} events"></i>`).join("")}</div><div class="chips">${rows.length?rows.map(r=>`<span class="chip" data-occ="${safe(r.occupant)}">${safe(r.occupant)}</span>`).join(""):'<span class="muted">No current occupant records for this zone.</span>'}</div>`;
 }
-$("#heatmap-building").onchange=e=>{S.b=e.target.value;S.z=null;if(S.win&&S.b==="all")clearWindow();else S.win?applyWindow():renderZones()};
+$("#heatmap-building").onchange=e=>{S.b=e.target.value;S.z=null;applyWindow()};
 /* time-frame filter: who was in each zone of the selected building between two moments */
 const winCounts=()=>Object.fromEntries(ZONES.map(([z])=>[z,S.win?.zones?.[z]?.count||0]));
 const fmtW=t=>t?String(t).replace("T"," "):"—";
 async function applyWindow(){
- if(S.b==="all"||!S.b)S.b=B()[0]?.id;
- const role=$("#zf-role").value,q=new URLSearchParams({building:S.b});
- if($("#zf-start").value)q.set(INTEG?"start":"start",$("#zf-start").value);if($("#zf-end").value)q.set("end",$("#zf-end").value);
- if(INTEG)q.set("purpose",$("#zf-purpose").value);else q.set("role",role);
- try{S.win=await api("/api/zone-presence?"+q.toString(),{},role);
-  $("#zf-note").textContent=`${S.win.building}: ${S.win.total} different people between ${fmtW(S.win.start)} and ${fmtW(S.win.end)}`+(S.win.withheld?` — ${S.win.withheld} not named for this role.`:".")}
- catch(e){S.win=null;$("#zf-note").textContent="Time frame failed: "+e.message}
+ if(S.b==="all"||!S.b)S.b=B()[0]?.id;if(!S.b)return;
+ const q=new URLSearchParams({building:S.b});if($("#zf-start").value)q.set("start",$("#zf-start").value);if($("#zf-end").value)q.set("end",$("#zf-end").value);
+ if(!INTEG)q.set("role",viewRole());
+ try{S.win=await api("/api/zone-presence?"+q.toString());
+  $("#zf-note").textContent=`${S.win.building}: ${S.win.total} different people between ${fmtW(S.win.start)} and ${fmtW(S.win.end)}`+(S.win.withheld?` \u2014 ${S.win.withheld} not named for your role.`:".")}
+ catch(e){S.win=null;$("#zf-note").textContent="Could not load the time frame: "+e.message}
  renderZones();
 }
-function clearWindow(){S.win=null;$("#zf-note").textContent="";renderZones()}
 function windowDetail(z){
  const w=S.win.zones[z]||{count:0,disclosed:0,occupants:[]},lab=(ZONES.find(x=>x[0]===z)||[])[1];
  $("#zone-detail").innerHTML=`<div class="ch"><h3>Zone Details</h3></div><div class="ch"><div><h2>${safe(S.b)} · ${z}</h2><span class="muted">${safe(lab)}</span></div><span class="badge ${w.count?"md":"lo"}">${w.count} in time frame</span></div><div class="stat2"><div><small>People in window</small><b>${w.count}</b></div><div><small>Named for you</small><b>${w.disclosed}</b></div></div><h3>${fmtW(S.win.start)} → ${fmtW(S.win.end)}</h3><div class="chips">${w.occupants.length?w.occupants.map(o=>`<span class="chip" data-occ="${safe(o.occupant)}" title="first ${safe(o.first_seen)} · last ${safe(o.last_seen)}${o.visitor?" · visitor from "+safe(o.home_building):""}">${safe(o.occupant)}${o.visitor?" ↗":""}</span>`).join(""):`<span class="muted">${w.count?"Present, but your role may not see who.":"Nobody was in this zone in the time frame."}</span>`}</div>`;
@@ -110,8 +109,7 @@ function renderZoneTable(){
   return `<tr><td>${z} · ${safe(l)}</td><td>${w.count}</td><td><div class="chips">${who}</div></td></tr>`}).join("");
  box.innerHTML=`<div class="ch"><h3>${safe(S.b)} — who was where, ${fmtW(S.win.start)} → ${fmtW(S.win.end)}</h3><span class="pill">${S.win.total} people</span></div><div class="table-wrap"><table><thead><tr><th>Zone</th><th>People</th><th>Who (↗ = visitor; hover for first / last seen)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
-$("#zf-apply").onclick=applyWindow;$("#zf-clear").onclick=clearWindow;
-if(!INTEG&&$("#zf-purpose-field"))$("#zf-purpose-field").style.display="none";
+$("#zf-start").onchange=$("#zf-end").onchange=applyWindow;
 /* security */
 let secTab="logs",SEC=null;
 const ROLES=INTEG?[["officer","Acts as the Dean of the demo building: every movement of that building's teachers and students (L4, any purpose), and of other buildings' Deans; nobody else"],["analyst","Acts as a Teacher of the demo building: only the students assigned to them (class-teacher), in any building; nobody else"],["self","Acts as a Student of the demo building: their own data (L4), and where the teachers assigned to them are now (L3); nobody else"]]:[["officer","Full detail: time, zone, occupant, probability"],["analyst","Aggregated: pseudonymised occupant handle, no raw probability"],["self","Only rows that belong to the requesting occupant"]];
@@ -136,7 +134,7 @@ const dayD=()=>S.layout?.default_date||new Date().toISOString().slice(0,10),defT
 function fieldMarkup(k){const d={building:["Building ID","text",PH.building||"B1"],occupant:["Occupant ID","text",PH.occupant||"O217"],zone:["Zone ID","select"],time:["Time T","datetime-local"],start:["Start time T1","datetime-local"],end:["End time T2","datetime-local"]}[k];
  return d[1]==="select"?`<label class="field">${d[0]}<select name="${k}">${ZONES.map(z=>`<option value="${z[0]}">${z[0]} — ${z[1]}</option>`).join("")}</select></label>`:`<label class="field">${d[0]}<input name="${k}" type="${d[1]}" value="${d[1]==="datetime-local"?defTime(k):""}" placeholder="${d[2]||""}"></label>`}
 function renderQF(){const q=QUERIES.find(q=>q[0]===$("#query-kind").value)||QUERIES[0];$("#query-description").textContent=q[1];$("#query-fields").innerHTML=q[2].map(fieldMarkup).join("")}
-function qPayload(){const p={};$("#query-fields").querySelectorAll("[name]").forEach(e=>{if(e.value)p[e.name]=e.value});return{query_id:$("#query-kind").value,role:$("#q-role").value,purpose:$("#q-purpose")?$("#q-purpose").value:"general_lookup",...p}}
+function qPayload(){const p={};$("#query-fields").querySelectorAll("[name]").forEach(e=>{if(e.value)p[e.name]=e.value});return{query_id:$("#query-kind").value,role:viewRole(),purpose:"general_lookup",...p}}
 const esc=v=>String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const flagTags=f=>f.map(x=>`<span class="tag-redacted">${esc(x)}</span>`).join(" ");
 const chips=o=>Object.entries(o).map(([k,v])=>`<span class="reasoning-chip"><b>${esc(k.replace(/_/g," "))}</b> ${esc(v!==null&&typeof v==="object"?(Object.entries(v).map(([a,b])=>`${a} ${b}`).join(", ")||"none"):v)}</span>`).join("");
@@ -154,10 +152,8 @@ function renderReasoning(x,answerWithheld){const card=$("#reasoning-card"),body=
  body.innerHTML=`<div class="reasoning-grid">${parts.join("")}</div>`}
 async function runQuery(p=qPayload()){try{const d=await post("/api/query",p,p.role);const dec=d.decision?` Policy ${d.decision.policy_rule||"—"} · ${d.decision.disclosure_level||""}.`:"";$("#query-note").textContent=(d.redacted?`Role policy applied for ${p.role}; some details may be hidden.`:`Executed ${p.query_id||"query"} using available tracking data.`)+dec;$("#query-answer").textContent=d.answer||`${(d.rows||[]).length} matching record(s).`;renderRows("#query-body",d.rows||[]);renderReasoning(d.explanation,d.withheld);if($("#q-speak").checked)speak(d.answer||"Query completed.");}catch(e){$("#query-note").textContent="Query failed: "+e.message;$("#query-answer").textContent="The API could not execute this query: "+e.message;renderRows("#query-body",[]);renderReasoning(null)}}
 $("#btn-query").onclick=()=>runQuery();
-const ROLE_LABEL={officer:"Dean",analyst:"Teacher",self:"Student"};const showUser=()=>{const r=$("#q-role")?$("#q-role").value:"officer",n=$("#user-name");if(!n)return;n.textContent=INTEG&&PRIN[r]?`${ROLE_LABEL[r]} ${PRIN[r]}`:"Demo user";$("#user-sub").textContent="Viewing as "+ROLE_LABEL[r];$("#user-av").textContent=ROLE_LABEL[r][0]};
-const showAs=()=>{showUser();const el=$("#q-as");if(!el)return;const r=$("#q-role").value;el.textContent=INTEG&&PRIN[r]?`Acting as ${r} → occupant ${PRIN[r]} (${ROLE_PERSONA[r]}). The answer and what is hidden follow that person's role.`:""};
-$("#q-role").onchange=showAs;
-if(!INTEG&&$("#purpose-field"))$("#purpose-field").style.display="none";
+const ROLE_LABEL={officer:"Dean",analyst:"Teacher",self:"Student"};const showUser=()=>{const r=viewRole(),n=$("#user-name");if(!n)return;n.textContent=INTEG&&PRIN[r]?`${ROLE_LABEL[r]} ${PRIN[r]}`:"Demo user";$("#user-sub").textContent="Viewing as "+ROLE_LABEL[r];$("#user-av").textContent=ROLE_LABEL[r][0]};
+const showAs=()=>{showUser();const el=$("#q-as");if(!el)return;const r=viewRole();el.textContent=INTEG&&PRIN[r]?`Acting as ${r} → occupant ${PRIN[r]} (${ROLE_PERSONA[r]}). The answer and what is hidden follow that person's role.`:""};
 $("#btn-clear-query").onclick=()=>{$("#query-fields").querySelectorAll("input").forEach(x=>x.value="");$("#query-note").textContent="";$("#query-answer").textContent="";renderRows("#query-body",[])};
 function speak(t){if(!("speechSynthesis"in window))return;speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(t))}
 function parseTranscript(t){const s=t.toLowerCase(),o={};const q=s.match(/\bq\s*(\d{1,2})\b/);if(q)o.query_id="Q"+q[1];const oc=s.match(/\bo\s*-?\s*(\d{2,4})\b/);if(oc)o.occupant="O"+oc[1];const b=s.match(/\bb\s*-?\s*(1|2|3|4|5)\b/);if(b)o.building="B"+b[1];const z=s.match(/\bz\s*-?\s*(t|\d)\b/);if(z)o.zone=z[1]==="t"?"zT":"z"+z[1];for(const[c,l]of ZONES)if(s.includes(l.toLowerCase()))o.zone=c;if(!o.query_id){if(s.includes("who")&&s.includes("zone"))o.query_id=s.includes("between")?"Q12":"Q10";else if(s.includes("how long"))o.query_id="Q9";else if(s.includes("how many zones"))o.query_id="Q7";else if(s.includes("first time"))o.query_id="Q8";else if(s.includes("where")&&s.includes("during"))o.query_id="Q11";else if(s.includes("where"))o.query_id="Q6";else if(s.includes("all zones"))o.query_id="Q5";else if(s.includes("enter"))o.query_id="Q4";else if(s.includes("leave"))o.query_id="Q3";else if(s.includes("visitor"))o.query_id="Q2";else if(s.includes("stay")||s.includes("after"))o.query_id="Q1";else if(s.includes("visited"))o.query_id="Q13"}return o}
@@ -177,7 +173,9 @@ function hydrateFaces(){$$("img[data-face]:not([data-done])").forEach(im=>{im.da
 document.addEventListener("click",e=>{const t=e.target.closest("[data-occ]");if(t){openTrack(t.dataset.occ)}});
 /* simulation */
 const STATE_TXT={idle:"Not started",running:"Running",paused:"Paused",finished:"Finished"};
+let simDay=null;
 function renderSim(){const s=S.sim;if(!s||!$("#sim"))return;s.active=s.state!=="idle";
+ if(s.date&&s.date!==simDay){simDay=s.date;if(S.layout)S.layout.default_date=s.date;$("#zf-start").value=`${s.date}T08:00`;$("#zf-end").value=`${s.date}T18:00`}
  const run=s.state==="running",pause=s.state==="paused",dean=viewRole()==="officer";
  $("#sim-state").textContent=STATE_TXT[s.state]||s.state;$("#sim-state").classList.toggle("live",run);
  $("#sim-go").textContent=run?"❚❚ Pause":pause?"▶ Resume":s.state==="finished"?"▶ Run again":"▶ Start simulation";
@@ -194,8 +192,7 @@ $("#sim-reset").onclick=async()=>{try{await simCall("reset");S.z=null;await refr
 $("#sim-speed").onchange=()=>{if(S.sim?.state==="running")simCall("start",{span:S.sim.span,speed:$("#sim-speed").value}).catch(()=>{})};
 let rT=0,rBusy=false;async function liveRefresh(){if(rBusy||Date.now()-rT<900)return;rBusy=true;try{await refresh()}catch(e){console.warn(e)}finally{rBusy=false;rT=Date.now()}}
 /* role switch */
-$("#view-as").onchange=async()=>{const r=viewRole();$("#q-role").value=r;if($("#zf-role"))$("#zf-role").value=r;showAs();renderSim();await refresh();if(S.win)applyWindow();if(!$("#track").hidden&&S.trackOcc)openTrack(S.trackOcc,S.trackDay)};
-$("#q-role").addEventListener("change",()=>{$("#view-as").value=$("#q-role").value;renderSim();refresh()});
+$("#view-as").onchange=async()=>{const r=viewRole();showAs();renderSim();await refresh();if(!$("#track").hidden&&S.trackOcc)openTrack(S.trackOcc,S.trackDay)};
 /* the track of one person (cf. occupant track across buildings: faces at each building/zone, dashed lines between sightings) */
 const bNum=b=>String(b).replace(/^building_/,"B"),hm=t=>String(t).replace("T"," ").split(" ").pop().slice(0,5);
 function closeTrack(){$("#track").hidden=true;S.trackOcc=null}

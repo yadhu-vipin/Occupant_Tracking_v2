@@ -192,10 +192,10 @@ class Simulation:
             engine.events[:] = []
             engine.nodes_dir = None                # the recorded visit pointers describe the recorded day, not this clock
             self.span, self.speed, self.emitted = span, speed, 0
+            self.state = "running"                 # date_text() is only defined for an active simulation
             self._enter_day(0)
             engine.default_date = self.date_text()
         self._after_change()
-        self.state = "running"
         self._task = loop.create_task(self._run())
 
     def pause(self) -> None:
