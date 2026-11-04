@@ -183,7 +183,7 @@ Finally, we thank our team members for the shared effort across the parts of the
 \phantomsection
 \addcontentsline{toc}{chapter}{Abstract}
 {\centering \Large\bfseries ABSTRACT\par}
-Multi-building campuses need to recognise and follow people across buildings, but keeping every face template in one central store concentrates sensitive biometric data, while keeping the templates apart makes it hard to find the building that knows a visitor. This project extends the Distributed State Transition System (DSTS) framework to decentralised multi-building occupant identification and tracking, with secure, role-based and explainable access to the results. Each building keeps its own gallery and publishes only a Bloom filter built from locality-sensitive-hash (LSH) codes of its occupants' face embeddings. A capture that is not recognised locally is routed to a short list of likely buildings, which verify it by angular-distance voting. A dynamic visitor database, per-state probabilistic tracking, two-layer role-based access control with a class-teacher model, sealed inter-building transfers and explanations redacted to the caller's disclosure level complete the system. It is evaluated on 550 simulated occupants in 11 buildings (500 from CASIA-WebFace and 50 masked people from the real-world RMFRD dataset) over 11,000 events per simulated day, against a centralised search, and averaged over five random populations. The decentralised pipeline identifies 91.5\% of events against 92.2\% for the central search while touching 10.3\% of the galleries; building-level state F1 is 0.950. Unmasked people are identified 94.8\% of the time and masked people 59.1\%. The uncertainty flags attached to answers catch 74\% of wrong identifications at a cost of about 8\% extra latency, and 571 automated tests cover the policy, secure-transfer and explanation layers. The network, cameras and certificate authority are simulated, so the work demonstrates the design and its accuracy rather than a hardened deployment.
+Multi-building campuses need to recognise and follow people across buildings, but keeping every face template in one central store concentrates sensitive biometric data, while keeping the templates apart makes it hard to find the building that knows a visitor. This project extends the Distributed State Transition System (DSTS) framework to decentralised multi-building occupant identification and tracking, with secure, role-based and explainable access to the results. Each building keeps its own gallery and publishes only a Bloom filter built from locality-sensitive-hash (LSH) codes of its occupants' face embeddings. A capture that is not recognised locally is routed to a short list of likely buildings, which verify it by angular-distance voting. A dynamic visitor database, per-state probabilistic tracking, two-layer role-based access control with a class-teacher model, sealed inter-building transfers and explanations redacted to the caller's disclosure level complete the system. It is evaluated on 550 simulated occupants in 11 buildings (500 from CASIA-WebFace and 50 masked people from the real-world RMFRD dataset) over 11,000 events per simulated day, against a centralised search, and averaged over five random populations. The decentralised pipeline identifies 91.5\% of events against 92.2\% for the central search while touching 10.3\% of the galleries; building-level state F1 is 0.950. Unmasked people are identified 94.8\% of the time and masked people 59.1\%. The uncertainty flags attached to answers catch 74\% of wrong identifications at a cost of about 8\% extra latency, and 575 automated tests cover the policy, secure-transfer and explanation layers. The network, cameras and certificate authority are simulated, so the work demonstrates the design and its accuracy rather than a hardened deployment.
 
 Keywords: Occupant identification and tracking; Distributed state transition system; Locality-sensitive hashing; Bloom filter; Role-based access control; Explainable queries; Masked face recognition
 
@@ -405,7 +405,7 @@ Face models & InsightFace buffalo\_\allowbreak l: SCRFD detector (det\_\allowbre
 Routing and state & Random-hyperplane LSH \cite{ref14}, Bloom filter \cite{ref12}, vote-based verifier, SQLite state stores (written from scratch)\\\hline
 Security and API & cryptography library (X25519, HKDF, AES-GCM, Ed25519), HMAC tokens, FastAPI and uvicorn, Prometheus client\\\hline
 Front end & Static HTML and JavaScript dashboard served by the API (no build step)\\\hline
-Testing & pytest with 571 automated tests\\\hline
+Testing & pytest with 575 automated tests\\\hline
 Main dataset & CASIA-WebFace \cite{ref19}: 500 identities, 20 reference and 20 test photos each (20,000 embeddings), in 10 buildings of 50 people\\\hline
 Masked dataset & RMFRD \cite{ref20}: 50 identities as an 11th building; 20 unmasked references and 20 masked probes each\\\hline
 Access conditions & Both datasets are public research datasets; the RMFRD page states no licence beyond a request to cite it\\\hline
@@ -602,7 +602,7 @@ Uncertainty-flag thresholds & low votes below 16; narrow margin below 5; stale a
 \end{table}
 
 \subsection{API and dashboard}
-The FastAPI server exposes login, query, tracking, occupancy and explanation endpoints; every data endpoint runs the same authentication, building scope and two-layer policy before it returns anything, and the dashboard is a static page that calls them.
+The FastAPI server exposes login, query, tracking, occupancy and explanation endpoints; every data endpoint runs the same authentication, building scope and two-layer policy before it returns anything, and the dashboard is a static page that calls them. A simulation endpoint, open to Deans only, replays the run's recognised events against a simulated clock; a track endpoint returns one person's day, and a photo endpoint serves the captured or reference photo, both under the same policy.
 
 
 
@@ -789,7 +789,7 @@ The effective rate is about 3.5 times the configured one. The Bloom array itself
 \textbf{Privacy consequence.} The filter is one-way, but membership in it can be tested, and a positive does not prove that a particular face is enrolled in the building: with an effective rate of about 3.5\% on top of genuine matches, a positive is ambiguous. That ambiguity is useful, and it is why routing only ranks buildings and never identifies anyone; identification needs the exact vote on the real references in the shortlisted buildings. The same finding also means that the configured 1\% must not be quoted as the system's false-positive rate, and that the privacy argument should rest on the one-way encoding and on the verification step, not on a small false-positive rate. No formal privacy guarantee is claimed.
 
 \subsection{Verification of the security and policy layers}\label{sec:res-security}
-The security, policy and explanation layers are verified by 571 automated tests (Table~\ref{tab:tests}). They include attack cases written for this project: tampering with every header field of a sealed message, replay, wrong sender or recipient, a revoked certificate, brute-force login, a token used as another person, and cache sharing across roles.
+The security, policy and explanation layers are verified by 575 automated tests (Table~\ref{tab:tests}). They include attack cases written for this project: tampering with every header field of a sealed message, replay, wrong sender or recipient, a revoked certificate, brute-force login, a token used as another person, and cache sharing across roles.
 
 \begin{table}[htbp]
 \centering
@@ -799,12 +799,12 @@ The security, policy and explanation layers are verified by 571 automated tests 
 \textbf{Area} & \textbf{Tests} & \textbf{What is checked}\\\hline
 access\_\allowbreak control & 112 & Every policy cell, structured Layer-1 decisions, building scope, lockout, credentials, tickets, API-level RBAC attacks\\\hline
 secure\_\allowbreak transfer & 61 & Sealed payloads: tampering, replay, wrong sender or recipient, revoked certificate, fail closed, strict decoding\\\hline
-api & 92 & Login, queries per role, caching, zone and time-frame views, dashboard adapter\\\hline
+api & 96 & Login and demo sign-in, queries per role, caching, zone and time-frame views, simulation control, person track and photos, dashboard adapter\\\hline
 queries & 184 & Query engine, multi-day normalisation, explanation faithfulness, leakage and uncertainty, CLI access rules\\\hline
 pipeline, population, events, evaluation & 98 & Phase 2, 3 and 4, visitor database, seeded populations, event generation, ground truth, confusion metrics\\\hline
 standalone, centralised, state library & 19 & Standalone demo, centralised baseline, state library\\\hline
 shared utilities & 5 & Dated timestamps, time-window arithmetic\\\hline
-\textbf{Total} & \textbf{571} & All passing on the final commit\\\hline
+\textbf{Total} & \textbf{575} & All passing on the final commit\\\hline
 \end{tabular}}
 \end{table}
 
@@ -813,21 +813,27 @@ A persona matrix tool replays 64 requests (Dean, Teacher, Student and an outside
 
 
 \subsection{The dashboard}\label{sec:res-ui}
-Figures~\ref{fig:ui-overview} and \ref{fig:ui-dean} show the dashboard on the detailed run. The campus overview marks building 11 as the all-masked building. A Dean's query returns the answer with its ``Why this answer'' card; the same page for a Teacher returns a reduced answer, and the card states what was withheld and why.
+The dashboard is a demonstration of the access model as much as of the tracking. A Dean starts a simulation of one day, one week or one month: the recognised events of the run are replayed against a simulated clock, and the campus map, the occupancy, the live feed and every query follow it (Figure~\ref{fig:ui-overview}). Later days replay each person's recorded events with the times shifted by up to ten minutes, and weekends are quieter; no identity, building or zone is invented. The person at the keyboard is chosen by role, building and name (any Dean, Teacher or Student of any building), and what the page shows is then decided only by the two policy layers: the same feed shows a Dean of building 8 every event of that campus, a Teacher only the assigned students, and a Student only themselves.
+
+Choosing a building shows its nine zones; choosing a zone lists who was there in the time frame, named only where the role may see the exact location. Choosing a person opens their day as a track across buildings and zones (Figure~\ref{fig:ui-track}): each photo is the one the camera captured at that moment, a blue dashed line joins sightings inside a building and a red one a move to another building. The track and the photos are shown only where the role may see the exact location (disclosure L3 or higher), so a Student cannot follow a Dean. A query returns its answer with the ``Why this answer'' card (Figure~\ref{fig:ui-dean}).
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.62\textwidth]{figures/ui_overview.png}
-\caption{Campus overview: 11 buildings and 550 occupants, with building 11 marked as the all-masked building}\label{fig:ui-overview}
+\includegraphics[width=0.58\textwidth]{figures/ui_overview.png}
+\caption{Overview with a simulation running: clock, progress, counts and a live feed with photos; the sign-in (role, building, person) is at the top right}\label{fig:ui-overview}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.62\textwidth]{figures/ui_query_dean.png}
+\includegraphics[width=0.5\textwidth]{figures/ui_track.png}
+\caption{The track of one person across two buildings, with the photo captured at each sighting}\label{fig:ui-track}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.58\textwidth]{figures/ui_query_dean.png}
 \caption{A Dean's query with its ``Why this answer'' card (rule, evidence, uncertainty, withheld)}\label{fig:ui-dean}
 \end{figure}
-
-
 
 \section{Comparative Analysis}
 Table~\ref{tab:comparison} compares the approaches. The fair comparison for this project is the same pipeline with a central search; other published systems \cite{ref1,ref2,ref3,ref4,ref5} use different data and tasks and cannot be compared number for number.
@@ -872,7 +878,7 @@ Two findings change how the system should be described. First, the Bloom filters
 \clearpage
 \chapter{Conclusion}
 \section{Conclusion}
-This project built and evaluated a system that identifies and tracks occupants across buildings without pooling face data, answers queries according to the caller's role and relationship, and explains each answer. A visitor is found by routing a capture with LSH codes and per-building Bloom filters and verifying it only in the shortlisted buildings. On 11,000 events per day, averaged over five random populations, it identifies 91.5\% correctly against 92.2\% for a centralised search, touching 10.3\% of the galleries; the 95\% confidence interval of the accuracy is $\pm0.20$ points, and building-level state F1 is 0.950. A dynamic visitor database makes about two thirds of the visitor events free of routing. A two-layer class-teacher policy, sealed transfers and redacted explanations are implemented and covered by 571 automated tests. The uncertainty flags attached to answers catch about three quarters of the wrong identifications and four in five wrong answers for about 8\% of extra latency, although they rarely flag errors that come from the visitor database. Masked people are the hard case at 59.1\%, and the evidence points to the face model, not the routing, as the limit. Measuring the Bloom filters showed that their effective false-positive rate is about 3.5\%, not the 1\% configured, so the privacy argument rests on the one-way encoding and on exact verification. All six objectives are achieved in simulation (Table~\ref{tab:status}); the security work is a tested design on a simulated network and not a hardened deployment.
+This project built and evaluated a system that identifies and tracks occupants across buildings without pooling face data, answers queries according to the caller's role and relationship, and explains each answer. A visitor is found by routing a capture with LSH codes and per-building Bloom filters and verifying it only in the shortlisted buildings. On 11,000 events per day, averaged over five random populations, it identifies 91.5\% correctly against 92.2\% for a centralised search, touching 10.3\% of the galleries; the 95\% confidence interval of the accuracy is $\pm0.20$ points, and building-level state F1 is 0.950. A dynamic visitor database makes about two thirds of the visitor events free of routing. A two-layer class-teacher policy, sealed transfers and redacted explanations are implemented and covered by 575 automated tests. The uncertainty flags attached to answers catch about three quarters of the wrong identifications and four in five wrong answers for about 8\% of extra latency, although they rarely flag errors that come from the visitor database. Masked people are the hard case at 59.1\%, and the evidence points to the face model, not the routing, as the limit. Measuring the Bloom filters showed that their effective false-positive rate is about 3.5\%, not the 1\% configured, so the privacy argument rests on the one-way encoding and on exact verification. All six objectives are achieved in simulation (Table~\ref{tab:status}); the security work is a tested design on a simulated network and not a hardened deployment.
 
 \begin{table}[htbp]
 \centering
@@ -1082,7 +1088,7 @@ manuscript in preparation, Amrita School of Computing, 2026.
 \end{thebibliography}
 \clearpage
 \appendix\chapter{Source Code and Reproducibility}
-The complete source code, configuration and test suite of the project are in one Git repository: \texttt{github.com/yadhu-vipin/Occupant\_\allowbreak Tracking\_\allowbreak v2}, branch \texttt{test\_\allowbreak 7}, commit \texttt{b2db57fd}. No passwords, tokens or personal data are stored in the repository; the datasets and model files are public and are downloaded separately (see below), and the login master secret is supplied through an environment variable.
+The complete source code, configuration and test suite of the project are in one Git repository: \texttt{github.com/yadhu-vipin/Occupant\_\allowbreak Tracking\_\allowbreak v2}, branch \texttt{test\_\allowbreak 7}, commit \texttt{f76fa4da}. No passwords, tokens or personal data are stored in the repository; the datasets and model files are public and are downloaded separately (see below), and the login master secret is supplied through an environment variable.
 
 \section{Setup and execution}\label{app:setup}
 \textbf{Dependencies.} Python 3.12; the packages in \texttt{requirements.txt} (NumPy, pandas, cryptography, FastAPI, uvicorn, pydantic, prometheus\_\allowbreak client, PyYAML, httpx, pytest). The face models are needed only to build the masked building and are not needed to run the pipeline on the stored embeddings.

@@ -1605,65 +1605,67 @@ Underfull \hbox (badness 1436) in paragraph at lines 803--803
 [33]
 File: figures/ui_overview.png Graphic file (type bmp)
 <figures/ui_overview.png>
+File: figures/ui_track.png Graphic file (type bmp)
+<figures/ui_track.png>
 File: figures/ui_query_dean.png Graphic file (type bmp)
 <figures/ui_query_dean.png>
- [34]
-Underfull \hbox (badness 4132) in paragraph at lines 841--841
+
+Underfull \hbox (badness 4132) in paragraph at lines 847--847
 []|\T1/ptm/m/n/10.95 Centralised search over
  []
 
 
-Underfull \hbox (badness 4569) in paragraph at lines 841--841
+Underfull \hbox (badness 4569) in paragraph at lines 847--847
 []|\T1/ptm/m/n/10.95 Galleries pooled in one
  []
 
 
-Underfull \hbox (badness 4048) in paragraph at lines 841--841
+Underfull \hbox (badness 4048) in paragraph at lines 847--847
 []|\T1/ptm/m/n/10.95 92.24%; 100% of
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 842--842
+Underfull \hbox (badness 10000) in paragraph at lines 848--848
 []|\T1/ptm/m/n/10.95 Decentralised LSH +
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 842--842
+Underfull \hbox (badness 10000) in paragraph at lines 848--848
 \T1/ptm/m/n/10.95 Bloom rout-ing (this
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 842--842
+Underfull \hbox (badness 10000) in paragraph at lines 848--848
 []|\T1/ptm/m/n/10.95 Rank by Bloom
  []
 
 
-Underfull \hbox (badness 2119) in paragraph at lines 842--842
+Underfull \hbox (badness 2119) in paragraph at lines 848--848
 []|\T1/ptm/m/n/10.95 91.54%; 10.3% of
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 844--844
+Underfull \hbox (badness 10000) in paragraph at lines 850--850
 []|\T1/ptm/m/n/10.95 No cross-building
  []
 
 
-Underfull \hbox (badness 3396) in paragraph at lines 844--844
+Underfull \hbox (badness 3396) in paragraph at lines 850--850
 \T1/ptm/m/n/10.95 iden-tity, RBAC or
  []
 
 
-Overfull \hbox (8.39218pt too wide) in paragraph at lines 839--846
+Overfull \hbox (8.39218pt too wide) in paragraph at lines 845--852
  [][] 
  []
 
-[35]
+[34] [35] [36]
 LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 8
-61.
+67.
  (ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
-) [36]
-Overfull \hbox (3.69878pt too wide) in paragraph at lines 867--868
+)
+Overfull \hbox (3.69878pt too wide) in paragraph at lines 873--874
 []\T1/ptm/m/n/12 Every vis-i-tor is a per-son reg-is-tered in some build-ing; p
 eo-ple who are reg-is-tered nowhere
  []
@@ -1671,32 +1673,32 @@ eo-ple who are reg-is-tered nowhere
 [37]
 Chapter 7.
 
-Underfull \hbox (badness 10000) in paragraph at lines 883--883
+Underfull \hbox (badness 10000) in paragraph at lines 889--889
 []|\T1/ptm/m/n/10.95 BSTS over 11 build-ings;
  []
 
 
-Underfull \hbox (badness 5924) in paragraph at lines 884--884
+Underfull \hbox (badness 5924) in paragraph at lines 890--890
 \T1/ptm/m/n/10.95 ev-ery pol-icy cell tested, 64-
  []
 
 
-Underfull \hbox (badness 5077) in paragraph at lines 885--885
+Underfull \hbox (badness 5077) in paragraph at lines 891--891
 []|\T1/ptm/m/n/10.95 Faithfulness cases, flag re-call
  []
 
 
-Underfull \hbox (badness 4341) in paragraph at lines 886--886
+Underfull \hbox (badness 4341) in paragraph at lines 892--892
 \T1/ptm/m/n/10.95 point ac-cu-racy cost; ef-fec-tive
  []
 
 
-Underfull \hbox (badness 1859) in paragraph at lines 888--888
+Underfull \hbox (badness 1859) in paragraph at lines 894--894
 []|\T1/ptm/m/n/10.95 Event and state TP/FP/FN/TN,
  []
 
 
-Overfull \hbox (2.70215pt too wide) in paragraph at lines 881--890
+Overfull \hbox (2.70215pt too wide) in paragraph at lines 887--896
  [][] 
  []
 
@@ -1709,39 +1711,39 @@ Overfull \hbox (2.70215pt too wide) in paragraph at lines 881--890
 ] [41] [42]
 Appendix A.
 
-Overfull \hbox (24.71649pt too wide) in paragraph at lines 1085--1086
+Overfull \hbox (24.70949pt too wide) in paragraph at lines 1091--1092
 \T1/ptm/m/n/12 tory: \T1/lmtt/m/n/12 github.com/yadhu-vipin/Occupant_Tracking_v
 2\T1/ptm/m/n/12 , branch \T1/lmtt/m/n/12 test_7\T1/ptm/m/n/12 , com-mit \T1/lmt
-t/m/n/12 b2db57fd\T1/ptm/m/n/12 .
+t/m/n/12 f76fa4da\T1/ptm/m/n/12 .
  []
 
 
-Overfull \hbox (57.08913pt too wide) in paragraph at lines 1092--1093
+Overfull \hbox (57.08913pt too wide) in paragraph at lines 1098--1099
 []\T1/ptm/m/n/12 Clone the repos-i-tory, cre-ate a vir-tual en-vi-ron-ment and 
 run \T1/lmtt/m/n/12 pip install -r requirements.txt\T1/ptm/m/n/12 . 
  []
 
 
-Overfull \hbox (9.2016pt too wide) in paragraph at lines 1094--1095
+Overfull \hbox (9.2016pt too wide) in paragraph at lines 1100--1101
 \T1/lmtt/m/n/12 external/rmfd_download/ \T1/ptm/m/n/12 and the In-sight-Face bu
 f-falo_l model files (\T1/lmtt/m/n/12 det_10g.onnx\T1/ptm/m/n/12 ,
  []
 
 
-Overfull \hbox (42.52655pt too wide) in paragraph at lines 1094--1095
+Overfull \hbox (42.52655pt too wide) in paragraph at lines 1100--1101
 \T1/lmtt/m/n/12 masked\T1/ptm/m/n/12 . With-out it, set \T1/lmtt/m/n/12 masked_
 building.enabled: false \T1/ptm/m/n/12 in \T1/lmtt/m/n/12 config/experiment.yam
 l
  []
 
 
-Overfull \hbox (71.50752pt too wide) in paragraph at lines 1105--1105
+Overfull \hbox (71.50752pt too wide) in paragraph at lines 1111--1111
 []\T1/lmtt/m/n/12 python manage.py masked                      # build the mask
 ed building from RMFRD[] 
  []
 
 
-Overfull \hbox (83.85753pt too wide) in paragraph at lines 1105--1105
+Overfull \hbox (83.85753pt too wide) in paragraph at lines 1111--1111
 []\T1/lmtt/m/n/12 python manage.py run --seeds 0-4 --days 1    # five populatio
 ns and runs/summary.json[] 
  []
@@ -1750,25 +1752,25 @@ ns and runs/summary.json[]
 
 
 ]
-Overfull \hbox (90.03253pt too wide) in paragraph at lines 1105--1105
+Overfull \hbox (90.03253pt too wide) in paragraph at lines 1111--1111
 []\T1/lmtt/m/n/12 python -m centralized.compare_all            # centralised se
 arch against the pipeline[] 
  []
 
 
-Overfull \hbox (34.4575pt too wide) in paragraph at lines 1105--1105
+Overfull \hbox (34.4575pt too wide) in paragraph at lines 1111--1111
 []\T1/lmtt/m/n/12 python -m evaluation.evaluate_explanations   # explanation fl
 ags and overhead[] 
  []
 
 
-Overfull \hbox (65.33252pt too wide) in paragraph at lines 1105--1105
+Overfull \hbox (65.33252pt too wide) in paragraph at lines 1111--1111
 []\T1/lmtt/m/n/12 python tools/measure_bloom_fpr.py            # effective Bloo
 m false-positive rate[] 
  []
 
 
-Overfull \hbox (77.68253pt too wide) in paragraph at lines 1105--1105
+Overfull \hbox (77.68253pt too wide) in paragraph at lines 1111--1111
 []\T1/lmtt/m/n/12 DSTS_DEMO_MODE=1 python manage.py serve --seed 42   # API and
  dashboard on port 8000[] 
  []
@@ -1777,4 +1779,4 @@ Overfull \hbox (77.68253pt too wide) in paragraph at lines 1105--1105
 Package rerunfilecheck Info: File `S7_Project_Report.out' has not changed.
 (rerunfilecheck)             Checksum: 329F3E56B5C55B892DCBF6552AE070E2;5949.
  )
-Output written on S7_Project_Report.xdv (53 pages, 212308 bytes).
+Output written on S7_Project_Report.xdv (53 pages, 215008 bytes).
