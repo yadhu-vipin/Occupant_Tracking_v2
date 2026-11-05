@@ -77,7 +77,7 @@ from pipeline.explain import (                                               # n
 )
 from nodelib.deploy import PointerStore                                      # noqa: E402
 from access_control.authorize import (                                            # noqa: E402
-    Role, audit_policy_decision, authorize, authorize_decision, clear_audit_log, clear_registry, get_audit_log,
+    Role, audit_policy_decision, authorize, authorize_decision, clear_audit_log, clear_registry,
     register_node, set_enforce_policy,
 )
 from access_control.scope import building_scope_denial                            # noqa: E402

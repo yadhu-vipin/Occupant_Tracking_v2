@@ -9,10 +9,8 @@ counterpart will have.
 """
 from __future__ import annotations
 
-import hashlib
 import math
 import random
-from dataclasses import dataclass
 
 from dsts.contracts import BuildingRank, Candidate, Recognition
 

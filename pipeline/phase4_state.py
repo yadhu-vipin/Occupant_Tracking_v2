@@ -79,7 +79,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -103,7 +102,7 @@ from dsts.state.bsts import StateTable
 from dsts.state.probability import occupant_probabilities
 from dsts.state.store import FakeOccupantRegistry
 from dsts.state.zones import ZONES
-from nodelib.deploy import PointerStore, SplitSqliteStore
+from nodelib.deploy import SplitSqliteStore
 
 log = logging.getLogger(__name__)
 

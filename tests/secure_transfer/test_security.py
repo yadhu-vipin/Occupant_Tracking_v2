@@ -24,36 +24,20 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-try:
-    from secure_transfer.crypto import (
-        NodeIdentity, SecureChannel, ephemeral_handshake,
-        aes_gcm_encrypt, aes_gcm_decrypt, derive_session_key,
-        generate_nonce,
-    )
-    from secure_transfer.metadata import (
-        TransitionMetadata, SecureMetadataEnvelope,
-        seal_metadata, open_metadata, create_handoff_metadata,
-    )
-    from secure_transfer.replay_guard import ReplayGuard, ValidationResult
-    from access_control.authorize import (
-        authorize, Role, register_node, set_enforce_policy,
-        clear_audit_log, clear_registry, get_audit_log,
-    )
-except ImportError:
-    from v6.secure_transfer.crypto import (
-        NodeIdentity, SecureChannel, ephemeral_handshake,
-        aes_gcm_encrypt, aes_gcm_decrypt, derive_session_key,
-        generate_nonce,
-    )
-    from v6.secure_transfer.metadata import (
-        TransitionMetadata, SecureMetadataEnvelope,
-        seal_metadata, open_metadata, create_handoff_metadata,
-    )
-    from v6.secure_transfer.replay_guard import ReplayGuard, ValidationResult
-    from v6.access_control.authorize import (
-        authorize, Role, register_node, set_enforce_policy,
-        clear_audit_log, clear_registry, get_audit_log,
-    )
+from secure_transfer.crypto import (
+    NodeIdentity, SecureChannel, ephemeral_handshake,
+    aes_gcm_encrypt, aes_gcm_decrypt, derive_session_key,
+    generate_nonce,
+)
+from secure_transfer.metadata import (
+    TransitionMetadata, SecureMetadataEnvelope,
+    seal_metadata, open_metadata, create_handoff_metadata,
+)
+from secure_transfer.replay_guard import ReplayGuard, ValidationResult
+from access_control.authorize import (
+    authorize, Role, register_node, set_enforce_policy,
+    clear_audit_log, clear_registry, get_audit_log,
+)
 
 
 

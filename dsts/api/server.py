@@ -36,7 +36,7 @@ from fastapi import (
     Depends,
     status,
 )
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 from prometheus_client import (
     CONTENT_TYPE_LATEST,

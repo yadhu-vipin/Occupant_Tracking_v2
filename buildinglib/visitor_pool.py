@@ -25,13 +25,13 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from buildinglib.verify import vote_evidence
 from shared.experiment_config import PromotionRule, VisitorPoolConfig
-from shared.timeutil import DAY_SECONDS, day_of, to_seconds
+from shared.timeutil import DAY_SECONDS, to_seconds
 
 TRANSITION_ZONE = "zT"
 DEFAULT_RULES: Tuple[PromotionRule, ...] = VisitorPoolConfig().promote_when
