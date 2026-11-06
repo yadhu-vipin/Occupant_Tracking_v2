@@ -87,6 +87,7 @@ sys.path.insert(0, str(REPO / "tools"))
 
 
 def test_augmentation_is_seeded_and_changes_the_image():
+    pytest.importorskip("cv2")
     import build_masked_building as tool
     img = np.random.default_rng(1).integers(0, 255, (160, 160, 3), dtype=np.uint8)
     one, two = tool.augment(img, tool.seeded("y")), tool.augment(img, tool.seeded("y"))

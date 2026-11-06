@@ -42,8 +42,11 @@ ZONES = ("z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8", "zT")
 
 
 def load_events() -> list[dict]:
-    path = REPO_ROOT / "dsts" / "output" / "phase4_results.json"
-    with open(path, encoding="utf-8") as f:
+    from shared.paths import run_paths
+    p = run_paths().phase4_results
+    if not p.exists():
+        p = REPO_ROOT / "dsts" / "output" / "phase4_results.json"
+    with open(p, encoding="utf-8") as f:
         return json.load(f)
 
 
