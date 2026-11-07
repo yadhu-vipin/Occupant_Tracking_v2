@@ -79,7 +79,7 @@ def test_track_and_photos_follow_the_role():
     feed = client.get("/lane-d/api/events?limit=500", headers=auth(P.dean)).json()
     person = feed[-1]["occupant"]
     dean = client.get(f"/lane-d/api/track?occupant={person}", headers=auth(P.dean)).json()
-    assert dean["waypoints"] and dean["portrait"] and dean["disclosure"].startswith("L4")
+    assert dean["waypoints"] and dean["portrait"] and dean["disclosure"].startswith("L3")
     assert client.get(f"/lane-d/api/face/{person}", headers=auth(P.dean)).status_code == 200
     assert client.get(f"/lane-d/api/capture/{dean['waypoints'][0]['event_id']}", headers=auth(P.dean)).status_code == 200
     # a student may not follow a Dean, nor see the Dean's photo

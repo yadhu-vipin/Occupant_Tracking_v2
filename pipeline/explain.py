@@ -30,7 +30,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from dsts.state.zones import zone_sector
 from access_control.campus_policy import DisclosureLevel
 from shared.timeutil import to_seconds
 
@@ -193,16 +192,9 @@ PER_PERSON_WITHHELD = ("per-person evidence (occupant IDs, times, zones): only a
                        "or audit in their own building sees it")
 
 
-def _hour(hms: str | None) -> str | None:
-    return f"{hms[:2]}:00:00" if hms and len(hms) == 8 else hms
-
-
-def _current_position_item(item: EvidenceItem, precise: bool, zone_allowed: bool) -> dict:
-    """L2/L3 view of one current-position sighting: no event id, provenance mode only."""
-    zone = None
-    if zone_allowed and item.zone:
-        zone = item.zone if precise else zone_sector(item.zone)
-    return {"time": item.time if precise else _hour(item.time), "building": item.building, "zone": zone,
+def _current_position_item(item: EvidenceItem) -> dict:
+    """L2 view of one current-position sighting: no event id, provenance mode only."""
+    return {"time": item.time, "building": item.building, "zone": item.zone or None,
             "role": item.role, "provenance": {"mode": item.provenance.get("mode")} if item.provenance else None}
 
 
@@ -263,26 +255,20 @@ def redact(explanation: Explanation | None, decision, *, caller_building: str | 
         return out
 
     withheld = list(explanation.withheld)
-    if level < DisclosureLevel.L4_HISTORICAL_TRACK:
-        precise = level >= DisclosureLevel.L3_PRECISE_CURRENT
-        zone_allowed = precise or bool(set(decision.exposed_fields or ()) & {"sector", "zone", "current_zone"})
+    if level < DisclosureLevel.L3_HISTORICAL_TRACK:
         current = [e for e in explanation.evidence if e.role == "last_before_t"]
-        evidence = [_current_position_item(e, precise, zone_allowed) for e in current]
+        evidence = [_current_position_item(e) for e in current]
         if len(current) < len(explanation.evidence):
             withheld.append("history: this level shows the current position only")
         if explanation.evidence:
             withheld.append("event IDs")
-            if not precise:
-                withheld.append("exact times: rounded to the hour")
-                withheld.append("exact zone: functional sector only" if zone_allowed
-                                else "zone: not shown for this relationship")
             if any(e.provenance and len(e.provenance) > 1 for e in current):
                 withheld.append(ROUTING_WITHHELD)
         pointer = None
         if explanation.pointer_used:
             p = explanation.pointer_used
             pointer = {"current_building": p.get("current_building"),
-                       "entry_time": p.get("entry_time") if precise else _hour(p.get("entry_time"))}
+                       "entry_time": p.get("entry_time")}
             withheld.append("visit pointer id")
         if explanation.details:
             withheld.append("per-query details")
@@ -290,7 +276,7 @@ def redact(explanation: Explanation | None, decision, *, caller_building: str | 
                    uncertainty=list(explanation.uncertainty), pointer_used=pointer, withheld=withheld)
         return out
 
-    # L4: everything, except a visitor's history outside the caller's building.
+    # L3: everything, except a visitor's history outside the caller's building.
     evidence = list(explanation.evidence)
     pointer = explanation.pointer_used
     details = dict(explanation.details)

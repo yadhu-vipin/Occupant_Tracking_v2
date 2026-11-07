@@ -103,11 +103,9 @@ def heatmap(_: str = Depends(principal)) -> dict:
 
 @router.get("/api/events")
 def recent_events(limit: int = 200, who: str = Depends(principal)) -> List[dict]:
-    """The newest identified events, each run through the persona/building policy for the caller (exact zone at L3+,
-    sector and hour-rounded time at L2, nothing below). ``face`` says whether the caller may also see the person's photo."""
+    """The newest identified events, each run through the persona/building policy for the caller (exact zone and time at L2+,
+    nothing below). ``face`` says whether the caller may also see the person's photo."""
     from access_control.campus_policy import DisclosureLevel, QueryContext, QueryPurpose, evaluate_campus_query_policy
-    from dsts.state.zones import zone_sector
-    from shared.timeutil import approx_time
     srv = _srv()
     engine = srv._get_engine()
     limit = max(1, min(int(limit), 1000))
@@ -117,14 +115,13 @@ def recent_events(limit: int = 200, who: str = Depends(principal)) -> List[dict]
         ctx = QueryContext(purpose=QueryPurpose.GENERAL_LOOKUP, is_office_hours=is_office_hours(e.timestamp))
         d = evaluate_campus_query_policy(who, e.occupant_id, context=ctx, purpose=ctx.purpose,
                                          target_current_building=e.building)
-        if not d.permitted or d.level < DisclosureLevel.L2_CURRENT_ZONE:
+        if not d.permitted or d.level < DisclosureLevel.L2_PRECISE_CURRENT:
             continue                                  # L1 (presence only) and below never shows where somebody is
-        exact = d.level >= DisclosureLevel.L3_PRECISE_CURRENT
-        shown = e.timestamp if exact else approx_time(e.timestamp)
-        out.append({"building_id": e.building, "zone": e.zone if exact else zone_sector(e.zone),
-                    "occupant": e.occupant_id, "probability": e.identity_probability if exact else None,
+        shown = e.timestamp
+        out.append({"building_id": e.building, "zone": e.zone,
+                    "occupant": e.occupant_id, "probability": e.identity_probability,
                     "time": shown.replace(" ", "T"), "time_text": shown, "timestamp": to_seconds(e.timestamp),
-                    "disclosure": d.level.name, "face": exact, "event_id": e.event_id,
+                    "disclosure": d.level.name, "face": True, "event_id": e.event_id,
                     "visitor": e.building != e.home_building})
         if len(out) >= limit:
             break
@@ -137,7 +134,7 @@ def zone_presence(building: str, start: Optional[str] = None, end: Optional[str]
     """Who was in each zone of ``building`` at any time between ``start`` and ``end`` (default: the whole latest day).
 
     Counts per zone are aggregates and are shown to every signed-in role, like the heat map. The *names* are disclosed
-    occupant by occupant through the persona policy: only those the caller may see at L3+ (exact zone) are listed, the
+    occupant by occupant through the persona policy: only those the caller may see at L2+ (exact zone) are listed, the
     rest are counted as withheld. A Dean sees the names of their own campus's teachers and students (and other Deans) with any purpose; a Teacher only
     their assigned students; a Student themselves and their assigned teachers."""
     from access_control.authorize import audit_policy_decision
@@ -180,7 +177,7 @@ def zone_presence(building: str, start: Optional[str] = None, end: Optional[str]
     def may_name(occupant: str) -> bool:
         if occupant not in verdict:
             d = evaluate_campus_query_policy(who, occupant, context=ctx, purpose=parsed, target_current_building=bid)
-            verdict[occupant] = bool(d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT)
+            verdict[occupant] = bool(d.permitted and d.level >= DisclosureLevel.L2_PRECISE_CURRENT)
         return verdict[occupant]
 
     zones: Dict[str, dict] = {}
@@ -192,7 +189,7 @@ def zone_presence(building: str, start: Optional[str] = None, end: Optional[str]
         everyone.update(people)
         named.update(r["occupant"] for r in listed)
         zones[z] = {"label": zone_label(z), "count": len(people), "disclosed": len(listed), "occupants": listed}
-    audit_policy_decision(who, f"building:{bid}", True, "RULE_ZONE_PRESENCE_WINDOW", "L3_PRECISE_CURRENT",
+    audit_policy_decision(who, f"building:{bid}", True, "RULE_ZONE_PRESENCE_WINDOW", "L2_PRECISE_CURRENT",
                           f"zone presence {start_text} .. {end_text}")
     return {"building": bid, "start": start_text, "end": end_text, "purpose": parsed.value, "zones": zones,
             "total": len(everyone), "named": len(named), "withheld": len(everyone) - len(named),
@@ -319,11 +316,11 @@ def track(occupant: str, day: Optional[str] = None, who: str = Depends(principal
     """Where one occupant was during one day, waypoint by waypoint, shown at the detail the caller's role allows.
 
     Every sighting passes the persona/building policy for the caller: exact zone, time, confidence and the captured
-    photo at L3+, the functional sector and the hour at L2, nothing below. The answer is audited like a query."""
+    photo at L2+, nothing below. The answer is audited like a query."""
     from access_control.authorize import audit_policy_decision
     from access_control.campus_policy import DisclosureLevel
-    from dsts.state.zones import zone_label, zone_sector
-    from shared.timeutil import approx_time, day_of
+    from dsts.state.zones import zone_label
+    from shared.timeutil import day_of
     srv = _srv()
     engine = srv._get_engine()
     mine = sorted((e for e in engine.events if e.occupant_id == occupant), key=lambda e: e.timestamp)
@@ -335,15 +332,13 @@ def track(occupant: str, day: Optional[str] = None, who: str = Depends(principal
     waypoints, best, refused = [], None, None
     for e in todays:
         d = _may_see(who, occupant, e.building, e.timestamp)
-        if not d.permitted or d.level < DisclosureLevel.L2_CURRENT_ZONE:
+        if not d.permitted or d.level < DisclosureLevel.L2_PRECISE_CURRENT:
             refused = refused or d
             continue
         best = d if best is None or d.level > best.level else best
-        exact = d.level >= DisclosureLevel.L3_PRECISE_CURRENT
-        shown = e.timestamp if exact else approx_time(e.timestamp)
-        waypoints.append({"event_id": e.event_id, "building": e.building, "zone": e.zone if exact else zone_sector(e.zone),
-                          "zone_label": zone_label(e.zone) if exact else zone_sector(e.zone), "time": shown,
-                          "probability": e.identity_probability if exact else None, "capture": exact,
+        waypoints.append({"event_id": e.event_id, "building": e.building, "zone": e.zone,
+                          "zone_label": zone_label(e.zone), "time": e.timestamp,
+                          "probability": e.identity_probability, "capture": True,
                           "visitor": e.building != e.home_building})
     shown_level = best.level.name if best else None
     audit_policy_decision(who, f"occupant:{occupant}", bool(waypoints), (best or refused).policy_rule if (best or refused) else "RULE_NO_EVENTS",
@@ -354,7 +349,7 @@ def track(occupant: str, day: Optional[str] = None, who: str = Depends(principal
     elif not todays:
         note = "No sighting of this person on that day yet."
     return {"occupant": occupant, "role": role, "home_building": home, "day": chosen, "days": days,
-            "disclosure": shown_level, "portrait": bool(best and best.level >= DisclosureLevel.L3_PRECISE_CURRENT),
+            "disclosure": shown_level, "portrait": bool(best and best.level >= DisclosureLevel.L2_PRECISE_CURRENT),
             "waypoints": waypoints, "note": note,
             "buildings": sorted({w["building"] for w in waypoints}), "sightings": len(todays)}
 
@@ -368,19 +363,19 @@ def _image(path):
 
 @router.get("/api/face/{occupant}")
 def face(occupant: str, who: str = Depends(principal)):
-    """A reference photo of ``occupant``, only to callers who may see this person's exact location (L3+)."""
+    """A reference photo of ``occupant``, only to callers who may see this person's exact location (L2+)."""
     from access_control.campus_policy import DisclosureLevel
     sim, srv = _sim(), _srv()
     last = next((e for e in reversed(srv._get_engine().events) if e.occupant_id == occupant), None)
     d = _may_see(who, occupant, last.building if last else srv.get_occupant_building(occupant), last.timestamp if last else "12:00:00")
-    if not (d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT):
+    if not (d.permitted and d.level >= DisclosureLevel.L2_PRECISE_CURRENT):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not show this person's photo.")
     return _image(sim.faces.portrait(occupant))
 
 
 @router.get("/api/capture/{event_id}")
 def capture(event_id: str, who: str = Depends(principal)):
-    """The photo that was captured for one event, under the same L3+ rule as the portrait."""
+    """The photo that was captured for one event, under the same L2+ rule as the portrait."""
     from access_control.campus_policy import DisclosureLevel
     sim = _sim()
     owner = sim.owner_of(event_id)
@@ -389,7 +384,7 @@ def capture(event_id: str, who: str = Depends(principal)):
     if owner is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown event.")
     d = _may_see(who, owner[0], owner[1], "12:00:00")
-    if not (d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT):
+    if not (d.permitted and d.level >= DisclosureLevel.L2_PRECISE_CURRENT):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not show this person's photo.")
     return _image(sim.faces.capture(event_id))
 

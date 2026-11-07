@@ -443,12 +443,6 @@ ware Ex-plain-able Oc-cu-pant Track-
 
 
 ]
-Overfull \hbox (6.63737pt too wide) in paragraph at lines 186--187
-[]\T1/ptm/m/n/12 Keeping ev-ery face tem-plate in one cen-tral store con-cen-tr
-ates sen-si-tive bio-met-ric data, whereas
- []
-
-
 Overfull \hbox (4.17697pt too wide) in paragraph at lines 188--189
 []\T1/ptm/m/n/12 Keywords: Oc-cu-pant iden-ti-fi-ca-tion and track-ing; Dis-tri
 buted state tran-si-tion sys-tem; Locality-
@@ -503,11 +497,6 @@ Underfull \hbox (badness 10000) in paragraph at lines 227--227
 
 Underfull \hbox (badness 10000) in paragraph at lines 227--227
 \T1/ptm/m/n/10.95 nodes, building-level
- []
-
-
-Underfull \hbox (badness 1881) in paragraph at lines 228--228
-\T1/ptm/m/n/10.95 ter-face for Dean, Teacher
  []
 
 
@@ -590,17 +579,15 @@ Underfull \hbox (badness 1210) in paragraph at lines 232--232
 \T1/ptm/m/n/10.95 line; ex-pla-na-tion mea-sure-ments
  []
 
-[2] [3]
+[2] [3] [4]
 Chapter 2.
-[4
+[5
 
 
 ]
 Chapter 3.
-[5
+[6
 
-
-] [6
 
 ] [7
 
@@ -611,6 +598,8 @@ Chapter 3.
 ] [10
 
 ] [11
+
+] [12
 
 ]
 Underfull \hbox (badness 2828) in paragraph at lines 324--324
@@ -1097,10 +1086,10 @@ Underfull \hbox (badness 10000) in paragraph at lines 337--337
 \T1/ptm/m/n/10.95 codes; fewer
  []
 
-[12
+[13
 
 
-] [13] [14]
+] [14] [15]
 Chapter 4.
 
 Underfull \hbox (badness 1303) in paragraph at lines 352--352
@@ -1185,16 +1174,6 @@ Underfull \hbox (badness 10000) in paragraph at lines 357--357
 
 Underfull \hbox (badness 4647) in paragraph at lines 357--357
 \T1/ptm/m/n/10.95 query tem-plates (Q1--
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 357--357
-[]|\T1/ptm/m/n/10.95 Dean,
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 357--357
-\T1/ptm/m/n/10.95 Teacher,
  []
 
 
@@ -1312,7 +1291,7 @@ Underfull \hbox (badness 2080) in paragraph at lines 365--365
 \T1/ptm/m/n/10.95 hour; lock-out af-ter re-
  []
 
-[15
+[16
 
 
 
@@ -1382,7 +1361,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 384--384
 []|\T1/ptm/m/n/10.95 11,000 events in
  []
 
-[16] [17] [18]
+[17] [18] [19]
 Chapter 5.
 File: figures/arch.png Graphic file (type bmp)
 <figures/arch.png>
@@ -1403,10 +1382,10 @@ Underfull \hbox (badness 10000) in paragraph at lines 447--447
 []|\T1/ptm/m/n/10.95 visitor_pool.db and
  []
 
-[19
+[20
 
 
-] [20] [21]
+] [21] [22]
 LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 4
 78.
  (t1lmtt.fd
@@ -1417,7 +1396,7 @@ Overfull \hbox (13.13222pt too wide) in paragraph at lines 489--489
 nces come back sealed[] 
  []
 
-[22]
+[23]
 Underfull \hbox (badness 1418) in paragraph at lines 515--515
 \T1/ptm/m/n/10.95 the same day with no
  []
@@ -1432,173 +1411,173 @@ Underfull \hbox (badness 10000) in paragraph at lines 516--516
 []|\T1/ptm/m/n/10.95 Recognising fre-quent
  []
 
-[23]
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
+[24]
+Underfull \hbox (badness 10000) in paragraph at lines 544--544
 []|\T1/ptm/m/n/10.95 Dean (1 per
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
+Underfull \hbox (badness 10000) in paragraph at lines 544--544
 \T1/ptm/m/n/10.95 RULE_A_OWN_
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
+Underfull \hbox (badness 10000) in paragraph at lines 544--544
 \T1/ptm/m/n/10.95 CAMPUS_FULL
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
+Underfull \hbox (badness 10000) in paragraph at lines 544--544
 \T1/ptm/m/n/10.95 and RULE_A_
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
+Underfull \hbox (badness 10000) in paragraph at lines 544--544
 \T1/ptm/m/n/10.95 PEER_DEAN_
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
+Underfull \hbox (badness 10000) in paragraph at lines 544--544
 []|\T1/ptm/m/n/10.95 Teachers and stu-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
+Underfull \hbox (badness 10000) in paragraph at lines 544--544
 \T1/ptm/m/n/10.95 dents of other
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 546--546
-[]|\T1/ptm/m/n/10.95 L4 for ros-ter
+Underfull \hbox (badness 10000) in paragraph at lines 545--545
+[]|\T1/ptm/m/n/10.95 L3 for ros-ter
  []
 
 
-Underfull \hbox (badness 4291) in paragraph at lines 546--546
+Underfull \hbox (badness 4291) in paragraph at lines 545--545
 \T1/ptm/m/n/10.95 stu-dents (RULE_
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 546--546
+Underfull \hbox (badness 10000) in paragraph at lines 545--545
 \T1/ptm/m/n/10.95 B_ROSTER_
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 546--546
+Underfull \hbox (badness 10000) in paragraph at lines 545--545
 \T1/ptm/m/n/10.95 peer teach-ers, the
  []
 
 
-Underfull \hbox (badness 3701) in paragraph at lines 547--547
-[]|\T1/ptm/m/n/10.95 L4 for self, L3
+Underfull \hbox (badness 3701) in paragraph at lines 546--546
+[]|\T1/ptm/m/n/10.95 L3 for self, L2
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 547--547
+Underfull \hbox (badness 10000) in paragraph at lines 546--546
 \T1/ptm/m/n/10.95 for as-signed
  []
 
 
-Underfull \hbox (badness 4341) in paragraph at lines 547--547
+Underfull \hbox (badness 4341) in paragraph at lines 546--546
 \T1/ptm/m/n/10.95 teach-ers (RULE_
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 547--547
+Underfull \hbox (badness 10000) in paragraph at lines 546--546
 \T1/ptm/m/n/10.95 C_ASSIGNED_
  []
 
-[24]
-Underfull \hbox (badness 1521) in paragraph at lines 565--565
+[25]
+Underfull \hbox (badness 1521) in paragraph at lines 564--564
 []|\T1/ptm/m/n/10.95 The ac-cepted oc-cu-pant was not also the near-est can-di-
 date
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 567--567
+Underfull \hbox (badness 10000) in paragraph at lines 566--566
 []|\T1/ptm/m/n/10.95 verified_by_lower_ranked_
  []
 
-[25] [26]
+[26] [27]
 Chapter 6.
-[27
+[28
 
 
 ]
-Underfull \hbox (badness 10000) in paragraph at lines 638--638
+Underfull \hbox (badness 10000) in paragraph at lines 637--637
 []|\T1/ptm/b/n/10.95 Centralised
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 638--638
+Underfull \hbox (badness 10000) in paragraph at lines 637--637
 []|\T1/ptm/b/n/10.95 Decentralised
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 638--638
+Underfull \hbox (badness 10000) in paragraph at lines 637--637
 []|\T1/ptm/b/n/10.95 Gap
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 638--638
+Underfull \hbox (badness 10000) in paragraph at lines 637--637
 []|\T1/ptm/b/n/10.95 Gallery
  []
 
-[28]
-Underfull \hbox (badness 10000) in paragraph at lines 675--675
+[29]
+Underfull \hbox (badness 10000) in paragraph at lines 674--674
 []|\T1/ptm/m/n/10.95 0.956 / 0.896 /
  []
 
 
-Underfull \hbox (badness 6364) in paragraph at lines 678--678
+Underfull \hbox (badness 6364) in paragraph at lines 677--677
 []|\T1/ptm/m/n/10.95 Buildings con-tacted per vis-i-tor event, count-ing
  []
 
 
-Underfull \hbox (badness 3701) in paragraph at lines 679--679
+Underfull \hbox (badness 3701) in paragraph at lines 678--678
 []|\T1/ptm/m/n/10.95 1,449 (about two
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 681--681
+Underfull \hbox (badness 10000) in paragraph at lines 680--680
 []|\T1/ptm/m/n/10.95 0.945 / 0.924 /
  []
 
-[29]
-Underfull \hbox (badness 10000) in paragraph at lines 697--697
+[30]
+Underfull \hbox (badness 10000) in paragraph at lines 696--696
 []|\T1/ptm/b/n/10.95 Masked re-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 704--704
+Underfull \hbox (badness 10000) in paragraph at lines 703--703
 []|\T1/ptm/m/n/10.95 95% CI
  []
 
-[30] [31]
-Underfull \hbox (badness 10000) in paragraph at lines 757--757
+[31] [32]
+Underfull \hbox (badness 10000) in paragraph at lines 756--756
 []|\T1/ptm/b/n/10.95 Wrong,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 757--757
+Underfull \hbox (badness 10000) in paragraph at lines 756--756
 []|\T1/ptm/b/n/10.95 Correct,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 757--757
+Underfull \hbox (badness 10000) in paragraph at lines 756--756
 []|\T1/ptm/b/n/10.95 Flagged
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 757--757
+Underfull \hbox (badness 10000) in paragraph at lines 756--756
 \T1/ptm/b/n/10.95 that are
  []
 
-[32]
-Underfull \hbox (badness 1616) in paragraph at lines 799--799
+[33]
+Underfull \hbox (badness 1616) in paragraph at lines 798--798
 \T1/ptm/m/n/10.95 ing scope, lock-out, cre-den-tials, tick-ets, API-level
  []
 
-[33]
+[34]
 File: figures/ui_overview.png Graphic file (type bmp)
 <figures/ui_overview.png>
 File: figures/ui_track.png Graphic file (type bmp)
@@ -1606,111 +1585,111 @@ File: figures/ui_track.png Graphic file (type bmp)
 File: figures/ui_query_dean.png Graphic file (type bmp)
 <figures/ui_query_dean.png>
 
-Underfull \hbox (badness 10000) in paragraph at lines 845--845
+Underfull \hbox (badness 10000) in paragraph at lines 844--844
 []|\T1/ptm/b/n/10.95 Face data leav-ing a
  []
 
 
-Underfull \hbox (badness 1629) in paragraph at lines 846--846
+Underfull \hbox (badness 1629) in paragraph at lines 845--845
 []|\T1/ptm/m/n/10.95 Galleries pooled in one
  []
 
 
-Underfull \hbox (badness 1490) in paragraph at lines 846--846
+Underfull \hbox (badness 1490) in paragraph at lines 845--845
 []|\T1/ptm/m/n/10.95 92.24%; 100% of
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 847--847
+Underfull \hbox (badness 10000) in paragraph at lines 846--846
 []|\T1/ptm/m/n/10.95 Decentralised LSH +
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 847--847
+Underfull \hbox (badness 10000) in paragraph at lines 846--846
 \T1/ptm/m/n/10.95 Bloom rout-ing (this
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 847--847
+Underfull \hbox (badness 10000) in paragraph at lines 846--846
 []|\T1/ptm/m/n/10.95 Rank by Bloom
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 848--848
+Underfull \hbox (badness 10000) in paragraph at lines 847--847
 []|\T1/ptm/m/n/10.95 Not re-run; re-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 849--849
+Underfull \hbox (badness 10000) in paragraph at lines 848--848
 []|\T1/ptm/m/n/10.95 Edge-camera track-ing
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 849--849
+Underfull \hbox (badness 10000) in paragraph at lines 848--848
 []|\T1/ptm/m/n/10.95 No cross-building
  []
 
 
-Underfull \hbox (badness 1009) in paragraph at lines 849--849
+Underfull \hbox (badness 1009) in paragraph at lines 848--848
 \T1/ptm/m/n/10.95 iden-tity, RBAC or
  []
 
-[34] [35] [36]
+[35] [36]
 LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 8
-66.
+64.
  (ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
-) [37]
+) [37] [38]
 Chapter 7.
 
-Underfull \hbox (badness 10000) in paragraph at lines 888--888
+Underfull \hbox (badness 10000) in paragraph at lines 886--886
 []|\T1/ptm/m/n/10.95 BSTS over 11 build-ings;
  []
 
 
-Underfull \hbox (badness 5924) in paragraph at lines 889--889
+Underfull \hbox (badness 5924) in paragraph at lines 887--887
 \T1/ptm/m/n/10.95 ev-ery pol-icy cell tested, 64-
  []
 
 
-Underfull \hbox (badness 5077) in paragraph at lines 890--890
+Underfull \hbox (badness 5077) in paragraph at lines 888--888
 []|\T1/ptm/m/n/10.95 Faithfulness cases, flag re-call
  []
 
 
-Underfull \hbox (badness 4341) in paragraph at lines 891--891
+Underfull \hbox (badness 4341) in paragraph at lines 889--889
 \T1/ptm/m/n/10.95 point ac-cu-racy cost; ef-fec-tive
  []
 
 
-Underfull \hbox (badness 1859) in paragraph at lines 893--893
+Underfull \hbox (badness 1859) in paragraph at lines 891--891
 []|\T1/ptm/m/n/10.95 Event and state TP/FP/FN/TN,
  []
 
 
-Overfull \hbox (2.70215pt too wide) in paragraph at lines 886--895
+Overfull \hbox (2.70215pt too wide) in paragraph at lines 884--893
  [][] 
  []
 
-[38
+[39
 
 
-] [39] [40
+] [40] [41
 
 
-] [41] [42]
+] [42] [43]
 Appendix A.
 
-Underfull \hbox (badness 1910) in paragraph at lines 1097--1098
+Underfull \hbox (badness 1910) in paragraph at lines 1090--1091
 []\T1/ptm/m/n/12 Clone the repos-i-tory, cre-ate a vir-tual en-vi-ron-ment and 
 run \T1/lmtt/m/n/12 pip install -r
  []
 
-[43
+[44
 
 
-] [44] (S7_Project_Report.aux)
+] [45] (S7_Project_Report.aux)
 Package rerunfilecheck Info: File `S7_Project_Report.out' has not changed.
 (rerunfilecheck)             Checksum: 329F3E56B5C55B892DCBF6552AE070E2;5949.
  )
-Output written on S7_Project_Report.xdv (53 pages, 216712 bytes).
+Output written on S7_Project_Report.xdv (54 pages, 217536 bytes).

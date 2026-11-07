@@ -5,7 +5,7 @@
 For the Dean, the Teacher, the Student and a student of another building ("outsider"), against four targets (the
 teacher's rostered student, another student of the same building, the dean, the outsider) it asks Q3, Q6 and TRACK
 at 12:00 (office hours), and for the building-level queries Q1 and Q10 against the demo building and another one.
-One row per request: HTTP status, whether the query was answered (a trajectory query is refused below L4 even when
+One row per request: HTTP status, whether the query was answered (a trajectory query is refused below L3 even when
 the policy permits a coarser answer), the policy rule that fired and the disclosure level. It talks to the real
 FastAPI app in-process (same code path as the website), so it checks the whole chain -- token, Layer 1, scope,
 Layer 2, disclosure -- not just the policy function.

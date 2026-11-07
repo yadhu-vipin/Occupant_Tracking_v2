@@ -327,11 +327,10 @@ Secure mode is the default in both `nodelib.deploy.identify` and `RetrievalRunti
 |---|---|---|
 | L0 | Refused | — |
 | L1 | Presence only | "Available" / "Away" |
-| L2 | Building + sector + hour-rounded time + banded confidence (one rounding rule everywhere: `shared/timeutil.approx_time`) | `building_5`, Work & Study Wing, ~10:00, High |
-| L3 | Precise current (capped under minimum necessary) | — |
-| L4 | Full track: exact zone, time, probability | `z3`, 10:42:17, p = 0.950 |
+| L2 | Precise current: exact zone, time and confidence | `z3`, 10:42:17, p = 0.950 |
+| L3 | Full track: the whole movement history, with the evidence behind it | zone-by-zone trajectory |
 
-**Rules in practice:** a Dean follows every movement (L4, any purpose) of their own building's teachers and students, wherever on campus they are, and of the Deans of other buildings, and nobody else (visitors and other buildings' people are L0). A Teacher follows only the students assigned to them (class roster, L4), in any building. A Student sees their own data and where the teachers assigned to them are now (L3), and nobody else. Trajectory queries (Q3, Q4, Q5, Q7, Q8, Q9, Q11, TRACK) require L4 or are refused. Every decision returns `policy_rule`, `reason`, `visitor_status`, `exposed_fields` and `redacted_fields`; add `--explain` to the CLI to see them. Databases are unchanged: RBAC is a filter between storage and client. `python tools/rbac_matrix.py` prints the whole persona × query × target table for the active run.
+**Rules in practice:** a Dean follows every movement (L3, any purpose) of their own building's teachers and students, wherever on campus they are, and of the Deans of other buildings, and nobody else (visitors and other buildings' people are L0). A Teacher follows only the students assigned to them (class roster, L3), in any building. A Student sees their own data and where the teachers assigned to them are now (L2), and nobody else. Trajectory queries (Q3, Q4, Q5, Q7, Q8, Q9, Q11, TRACK) require L3 or are refused. Every decision returns `policy_rule`, `reason`, `visitor_status`, `exposed_fields` and `redacted_fields`; add `--explain` to the CLI to see them. Databases are unchanged: RBAC is a filter between storage and client. `python tools/rbac_matrix.py` prints the whole persona × query × target table for the active run.
 
 **Enforcement order in the API:** signed token → body `caller_id` must match the token (403 otherwise) → input validation → privileges derived from the role, never from the request → building scope → Layer 1 → Layer 2 → engine (cached **behind** the decision) → per-row disclosure filtering for aggregate and zone queries. Dean-only endpoints: reset, simulate, demo-walk, cache-stats.
 
@@ -348,7 +347,7 @@ Secure mode is the default in both `nodelib.deploy.identify` and `RetrievalRunti
 | Q5 | Did o visit all zones of b? |
 | Q6 | Where was o at time t? (follows a live visit pointer if one is open) |
 | Q7 | How many distinct zones did o visit in [t1, t2]? |
-| Q10–Q13 | Zone-level occupancy/visitor lists (per-occupant filtering at L3+, otherwise counts) |
+| Q10–Q13 | Zone-level occupancy/visitor lists (per-occupant filtering at L2+, otherwise counts) |
 | TRACK | Full trajectory, merged with closed pointer history |
 
 **Times.** A multi-day run stores `YYYY-MM-DD HH:MM:SS`. A bare `HH:MM:SS` given to a query means "on the latest simulated day"; give a full timestamp to ask about an earlier day.
@@ -368,13 +367,13 @@ Every answer comes with the reasoning behind it (`pipeline/explain.py`). Each qu
 | `stale_observation` | a point-in-time answer rests on a sighting more than 60 minutes old |
 | `pointer_based` | a value comes from a visit pointer with no identified sighting behind it: Q6's pointer fast path, or a TRACK pointer segment with no sighting inside it (raised on that segment, not on the whole TRACK answer) |
 
-Explanations are redacted to the caller's disclosure level before they leave the engine (`redact()`), so they never show more than the answer: nothing at L0, only an availability sentence at L1, the current position with sector and hour-rounded time and no routing details at L2, exact zone without history at L3, everything at L4 (minus a visitor's history outside the Dean's building). Aggregates and zone queries show per-person evidence only to an investigating Dean; others get counts. `withheld` lists what was removed and why. `--explain` on the CLI prints the access decision and then the reasoning; `POST /api/query` returns it as `explanation`; the dashboard shows it under the answer.
+Explanations are redacted to the caller's disclosure level before they leave the engine (`redact()`), so they never show more than the answer: nothing at L0, only an availability sentence at L1, the current position with sector and hour-rounded time and no routing details at L2, exact zone without history at L2, everything at L3 (minus a visitor's history outside the Dean's building). Aggregates and zone queries show per-person evidence only to an investigating Dean; others get counts. `withheld` lists what was removed and why. `--explain` on the CLI prints the access decision and then the reasoning; `POST /api/query` returns it as `explanation`; the dashboard shows it under the answer.
 
 ```
 $ python manage.py query --caller 0000205 --target 0000103 --query Q6 --at-time 12:00:00 --explain   # a student looks up an assigned teacher
   ...
-  Disclosed (L3_PRECISE_CURRENT): {'building': 'building_9', 'zone': 'z8', 'zone_label': 'Exit', 'time': '11:54:05', 'probability': 0.9999999153888284}
-  Reasoning (L3_PRECISE_CURRENT):
+  Disclosed (L2_PRECISE_CURRENT): {'building': 'building_9', 'zone': 'z8', 'zone_label': 'Exit', 'time': '11:54:05', 'probability': 0.9999999153888284}
+  Reasoning (L2_PRECISE_CURRENT):
     Rule:        location at t is the last identified sighting at or before t
     Evidence:    1 item(s)
       - [last_before_t] 11:54:05 building_9 z8 -- present_visitor_pool
@@ -406,7 +405,7 @@ Start it: `DSTS_DEMO_MODE=1 python manage.py serve [--seed N]`, then open http:/
 | `POST /api/auth/login` | persona (demo mode) or occupant id + that occupant's credential; lockout after repeated failures |
 | `POST /api/ws-ticket` | token; single-use WebSocket ticket |
 | `GET /api/health` | status only without a token; counts with a token |
-| `GET /api/layout`, `/api/occupancy`, `/api/heatmap` | token; occupancy rows are filtered per role (L3+ exact zone, L2 sector and approximate time, lower omitted) |
+| `GET /api/layout`, `/api/occupancy`, `/api/heatmap` | token; occupancy rows are filtered per role (L2+ exact zone; lower levels omitted) |
 | `GET /api/security-log` | token; own decisions |
 | `POST /api/query` | token; building scope and the two RBAC layers apply |
 | `POST /api/simulate`, `/api/demo-walk`, `/api/reset` | Dean only (reset never clears the audit log) |
@@ -503,7 +502,7 @@ for f in sorted(Path('runs/seed_42/nodes').iterdir()):
 
 **First review of the test_6 branch** found: no authentication (caller id from the body), self-asserted privileges, open endpoints returning every occupant, Q1/Q2 skipping Layer 2, default Grafana credentials, and a response cache in front of authorization. All were fixed in the passes below.
 
-**Pass 2, RBAC.** Tokens are signed, stateless and expire in 1 h (no session store: there are no user accounts, a JWT dependency was not worth about 40 lines). Secret from `DSTS_TOKEN_SECRET`, random otherwise. Authorization always runs first and is audited; only the engine computation is cached, keyed by everything the decision depends on. Zone queries filter per occupant at L3+ rather than blanket-deny, which reuses one source of truth. Deans are confined to their own building; a campus-wide view needs a separate admin role. Admin and simulation endpoints are Dean-only; reset never clears the audit log. `/metrics` uses a static bearer token (what Prometheus supports) or loopback. Health stays public but minimal.
+**Pass 2, RBAC.** Tokens are signed, stateless and expire in 1 h (no session store: there are no user accounts, a JWT dependency was not worth about 40 lines). Secret from `DSTS_TOKEN_SECRET`, random otherwise. Authorization always runs first and is audited; only the engine computation is cached, keyed by everything the decision depends on. Zone queries filter per occupant at L2+ rather than blanket-deny, which reuses one source of truth. Deans are confined to their own building; a campus-wide view needs a separate admin role. Admin and simulation endpoints are Dean-only; reset never clears the audit log. `/metrics` uses a static bearer token (what Prometheus supports) or loopback. Health stays public but minimal.
 
 **Pass 3, sealed transfer.** The encrypted envelope had carried only placeholder metadata while the capture and 20×512 reference tensor moved in plaintext, and the batch pipeline had no security at all. Fixed with sealed payloads, request/reply binding, replay check after signature, sender key from the CA certificate, fail-closed behaviour (no silent plaintext fallback), the same sealed path in the batch pipeline.
 
@@ -518,7 +517,7 @@ for f in sorted(Path('runs/seed_42/nodes').iterdir()):
 - *Visitor DB.* One database per building replaces the 4 h TTL pool: presence with the `zT` in-transit rule, a day-long cache, entry history and a permanent pool for frequent visitors. Phase 3 owns the visit lifecycle (pointer mint/clear, entries, promotion) because it must run in event order and the identity of an arrival is decided there.
 - *Ground truth and metrics.* Per-state truth with local/visitor status; one confusion helper for events and states; state metrics reset daily and score every visitor Phase 4 updated.
 - *Lane D hand-over.* The dashboard and demo layer from `dsts_final.zip` were added without touching the console: the dashboard runs on the real data through an adapter (`dsts/api/lane_d.py`), the original fake-backed server is kept as `dsts/api/standalone.py`. See [INTEGRATION.md](INTEGRATION.md).
-- *Hardening.* Structured Layer-1 decisions (no reason-string parsing), one building-scope rule for API and CLI, one L2 time-rounding rule, the dead and contradictory disclosure matrices removed (the code is the single source of truth, pinned by a test per cell), per-occupant login credentials with lockout, single-use WebSocket tickets, and CA certificates that bind and sign the X25519 key-agreement key.
+- *Hardening.* Structured Layer-1 decisions (no reason-string parsing), one building-scope rule for API and CLI, the dead and contradictory disclosure matrices removed (the code is the single source of truth, pinned by a test per cell), per-occupant login credentials with lockout, single-use WebSocket tickets, and CA certificates that bind and sign the X25519 key-agreement key.
 
 ---
 

@@ -47,7 +47,7 @@ from prometheus_client import (
 from shared.paths import run_paths  # noqa: E402
 from dsts.api import metrics as m
 from dsts.api.simulation import SIM
-from dsts.state.zones import ZONES, zone_label, zone_sector
+from dsts.state.zones import ZONES, zone_label
 from pipeline.query import (
     IdentifiedEvent,
     build_engine,
@@ -69,7 +69,7 @@ from pipeline.query import (
 from pipeline.explain import redact, refused_explanation
 from pipeline.query_cache import QueryCache
 from access_control.personas import resolve_personas
-from shared.timeutil import approx_time, is_office_hours
+from shared.timeutil import is_office_hours
 from access_control.credentials import verify_credential
 from access_control.rate_limit import LoginGuard
 from access_control.scope import building_scope_denial
@@ -507,11 +507,6 @@ def get_cache_stats(principal: str = Depends(get_current_principal)) -> dict:
 # RBAC-PROTECTED SYSTEM ENDPOINTS (S3)
 # ================================================================
 
-def _quantize_hms(ts: str) -> str:
-    """L2 discloses an approximate time only: the clock rounded down to the hour (``HH:00``)."""
-    return approx_time(ts)[:-3]
-
-
 def determine_office_hours(query_time: Optional[str] = None) -> bool:
     """Whether campus office hours (08:00-18:00) are active.
 
@@ -527,8 +522,7 @@ def determine_office_hours(query_time: Optional[str] = None) -> bool:
 def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
     """Run every occupant in the snapshot through the persona/building policy for ``principal``.
 
-    L3+ : listed under the exact zone, with probability and exact time.
-    L2  : listed under the functional sector only, with an approximate time.
+    L2+ : listed under the exact zone, with probability and exact time.
     L1/L0/denied: not listed (aggregate counts are available from /api/heatmap).
     """
     out: Dict[str, List[dict]] = {z: [] for z in raw}
@@ -542,14 +536,8 @@ def _disclosed_occupancy(principal: str, raw: Dict[str, List[dict]]) -> Dict[str
                                              target_current_building=row["building_id"])
             if not d.permitted:
                 continue
-            if d.level >= DisclosureLevel.L3_PRECISE_CURRENT:
+            if d.level >= DisclosureLevel.L2_PRECISE_CURRENT:
                 out[zone].append({**row, "disclosure": d.level.name})
-            elif d.level == DisclosureLevel.L2_CURRENT_ZONE:
-                sector = zone_sector(zone)
-                out.setdefault(sector, []).append({
-                    **row, "zone": sector, "zone_label": sector, "probability": None,
-                    "timestamp": _quantize_hms(ts), "disclosure": d.level.name,
-                })
     return out
 
 
@@ -1024,7 +1012,7 @@ def execute_query_endpoint(
         key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}|{is_office_hours_now}")
         # The per-occupant disclosure levels are fixed by (caller, purpose, investigation
         # rights, office hours); the grant is spelled out so levels never share an entry.
-        grant = "L4_INVESTIGATION" if auth_inv else "L2_COUNTS"
+        grant = "L3_INVESTIGATION" if auth_inv else "L1_COUNTS"
         key = QueryCache.make_key(*base_key, caller_role=f"zone|{caller_id}|{parsed_purpose.value}|{auth_inv}"
                                                          f"|{is_office_hours_now}|{grant}")
 
@@ -1097,7 +1085,7 @@ def execute_query_endpoint(
         out["decision"] = decision.to_dict()
         return out
 
-    if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L4_HISTORICAL_TRACK:
+    if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L3_HISTORICAL_TRACK:
         m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
         return {
             "success": False,
@@ -1109,7 +1097,7 @@ def execute_query_endpoint(
             "answer": None,
             "evidence": [],
             "explanation": refused_explanation(q_type),
-            "error": f"{q_type} is a full trajectory query requiring L4_HISTORICAL_TRACK; caller only holds {decision.level.name}.",
+            "error": f"{q_type} is a full trajectory query requiring L3_HISTORICAL_TRACK; caller only holds {decision.level.name}.",
         }
 
     # Execute (cached behind the decision: the key carries the caller identity, granted

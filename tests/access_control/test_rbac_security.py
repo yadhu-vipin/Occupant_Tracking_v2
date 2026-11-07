@@ -139,7 +139,7 @@ def test_cache_does_not_upgrade_a_denied_query_to_a_cached_result():
     # served the Dean's cached answer
     base = {"query_type": "Q5", "target_id": TARGET5, "building_id": "building_5"}
     dean = q(DEAN5, **base, purpose="general_lookup").json()
-    assert dean["success"] and dean["decision"]["disclosure_level"] == "L4_HISTORICAL_TRACK"
+    assert dean["success"] and dean["decision"]["disclosure_level"] == "L3_HISTORICAL_TRACK"
     unassigned = next(t for t in srv._roles if srv._roles[t] == "teacher" and get_occupant_building(t) == "building_5"
                       and TARGET5 not in srv._rosters.get(t, []))
     other = q(unassigned, **base).json()
@@ -321,5 +321,5 @@ def test_policy_denies_when_building_unresolved():
 
 def test_policy_default_context_gives_the_dean_their_own_campus_and_nobody_else_more():
     from access_control.campus_policy import evaluate_campus_query_policy
-    assert evaluate_campus_query_policy(DEAN5, TARGET5).level.name == "L4_HISTORICAL_TRACK"
+    assert evaluate_campus_query_policy(DEAN5, TARGET5).level.name == "L3_HISTORICAL_TRACK"
     assert evaluate_campus_query_policy(STUDENT5, TARGET5).level.name == "L0_NONE"

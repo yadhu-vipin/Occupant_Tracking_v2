@@ -11,7 +11,7 @@ Design
 * **Key**: A canonical tuple derived from (query_type, building_id, target_id,
   zone, at_time, t1, t2, caller_role).  The caller_role is included because
   two callers with different RBAC levels may receive different answers for the
-  same query parameters (e.g., L2 vs L4 disclosure level).
+  same query parameters (e.g., L2 vs L3 disclosure level).
 * **Value**: The serialisable dict returned by the query endpoint.  Stored as-is
   so the cache is response-level, not query-engine-level.
 * **TTL (Time-To-Live)**: Entries expire after ``ttl_seconds`` (default 30 s)

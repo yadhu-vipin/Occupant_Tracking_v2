@@ -149,15 +149,11 @@ def test_occupancy_student_sees_no_peer_students():
 
 
 def test_occupancy_rows_are_never_more_precise_than_policy_allows():
-    """Every row is the per-occupant policy outcome: exact zone only at L3+, else sector with no probability."""
+    """Every row is the per-occupant policy outcome: a row is listed under its exact zone only at L2+, never below."""
     from dsts.state.zones import ZONES
     for token in (DEAN_TOKEN, TEACHER_TOKEN, STUDENT_TOKEN):
         for zone, r in _occupancy(token):
-            if r["disclosure"] == "L2_CURRENT_ZONE":
-                assert zone not in ZONES and r["probability"] is None
-                assert len(r["timestamp"]) == 5              # approximate HH:MM only
-            else:
-                assert r["disclosure"] in ("L3_PRECISE_CURRENT", "L4_HISTORICAL_TRACK") and zone in ZONES
+            assert r["disclosure"] in ("L2_PRECISE_CURRENT", "L3_HISTORICAL_TRACK") and zone in ZONES
 
 
 def test_occupancy_teacher_sees_only_assigned_students():
@@ -169,7 +165,7 @@ def test_occupancy_teacher_sees_only_assigned_students():
     for zone, r in rows:
         assert r["occupant"] in assigned, r                      # class-teacher: assigned students (and themselves) only
         if get_real_role(r["occupant"]) == "student":
-            assert r["disclosure"] == "L4_HISTORICAL_TRACK"
+            assert r["disclosure"] == "L3_HISTORICAL_TRACK"
 
 
 def test_occupancy_dean_confined_to_own_building_scope():

@@ -24,7 +24,7 @@ def test_form_times_become_engine_timestamps(raw, multi_day, expected):
 def test_denials_and_answers_are_phrased_for_the_page():
     dec = {"permitted": False, "policy_rule": "RULE_C_PEER_STALKING_DENIED", "reason": "anti-stalking"}
     assert _describe("Q6", False, dec, None, [], {}).startswith("Denied — RULE_C_PEER_STALKING_DENIED")
-    assert _describe("Q6", False, {"permitted": True}, None, [], {"error": "needs L4"}) == "Not answered: needs L4"
+    assert _describe("Q6", False, {"permitted": True}, None, [], {"error": "needs L3"}) == "Not answered: needs L3"
     assert _describe("Q3", True, {}, True, ["  YES — left"], {}).startswith("Yes.")
     assert _describe("Q3", True, {}, False, ["  NO — never left"], {}).startswith("No.")
     assert "7 distinct" in _describe("Q7", True, {}, 7, [], {})

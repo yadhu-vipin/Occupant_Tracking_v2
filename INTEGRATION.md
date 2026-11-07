@@ -17,7 +17,7 @@ This document says what the zip contained, what I found when I compared it with 
 | `server.py` | 305 lines, open endpoints, no login | 1,200+ lines, signed tokens, 2-layer RBAC, audit log, lockout, WebSocket tickets |
 | `app.js` / `index.html` / `style.css` | 107 / 69 / 56 lines (dense) | 2,477 / 1,102 / 2,116 lines |
 | Data | fakes: 4 buildings, 16 occupants, `InMemoryStore` | the real pipeline: 10 buildings, 500 occupants, SQLite state, Phase 4 results |
-| Roles | `officer` / `analyst` / `self` (row filters) | Dean / Teacher / Student, building-scoped, disclosure levels L0–L4 |
+| Roles | `officer` / `analyst` / `self` (row filters) | Dean / Teacher / Student, building-scoped, disclosure levels L0–L3 |
 | Queries | Q1–Q13 answered by string-matching a list of retained events | Q1–Q13 + TRACK answered by the real query engine behind RBAC |
 | Voice query, heat map, metrics, monitoring | yes | yes (already present) |
 
@@ -94,7 +94,7 @@ The module imports `dsts.api.server` lazily, inside the handlers, because the se
 | `GET /lane-d/api/layout` | buildings and their occupants, plus the caller's `home_building`, the run's `default_target` and `default_date` (for the form defaults) | `server._load_layout()` |
 | `GET /lane-d/api/occupancy` | `{zone: [rows]}` filtered row by row by the caller's role | `_compute_real_occupancy` + `_disclosed_occupancy` |
 | `GET /lane-d/api/heatmap` | `{building: {zone: count}}` | `_compute_real_occupancy` |
-| `GET /lane-d/api/events` | the newest ≤ 200 identified events, each judged by the persona policy for the caller (exact zone at L3+, sector + hour at L2, nothing below) | policy engine |
+| `GET /lane-d/api/events` | the newest ≤ 200 identified events, each judged by the persona policy for the caller (exact zone and time at L2+, nothing below) | policy engine |
 | `GET /lane-d/api/security-summary` | counts and the recent decisions; the Dean sees everyone's, others only their own | audit log |
 | `GET /lane-d/api/security-log` | the audit log (Dean only; `[]` for others) | `server.get_security_log` |
 | `POST /lane-d/api/simulate`, `/demo-walk`, `/reset` | the generator, the replayed real walk, the reset – Dean only | the console's handlers, called directly |
@@ -106,9 +106,9 @@ The page has an Officer / Analyst / Self selector. The adapter does not interpre
 
 | Page role | Acts as | What the project's RBAC then allows |
 |---|---|---|
-| Officer | the Dean of the demo building | every movement (L4, any purpose) of that building's teachers and students, and of other buildings' Deans; nobody else |
-| Analyst | a Teacher of that building | only the students assigned to them (class roster, L4), in any building; nobody else |
-| Self | a Student of that building | their own data (L4), and where the teachers assigned to them are now (L3); never other students |
+| Officer | the Dean of the demo building | every movement (L3, any purpose) of that building's teachers and students, and of other buildings' Deans; nobody else |
+| Analyst | a Teacher of that building | only the students assigned to them (class roster, L3), in any building; nobody else |
+| Self | a Student of that building | their own data (L3), and where the teachers assigned to them are now (L2); never other students |
 
 The personas are picked from the active run's roles (`access_control/personas.py`), so they follow the seed. The query form shows "Acting as officer → occupant 0002253 (dean)". Nothing in the adapter grants anything: a forged `security_investigation` from the Analyst role is refused by the server (403), and a cross-building query is denied by the same scope rule as in the console.
 
@@ -133,7 +133,7 @@ In **Building & Zones**, pick a building, set *From* / *To*, choose *View as* (O
 
 * **Meaning of "was in a zone".** After an event at (building, zone) a person stays there until their next event, and at the latest until the end of that day (nobody stays on campus overnight). A zone's people for a window are everyone with such a stay overlapping it. The logic is a pure function, `dsts/presence.py::presence_in_window`, used by both back ends.
 * **Endpoint.** `GET /lane-d/api/zone-presence?building=&start=&end=&purpose=` (real server) and `GET /api/zone-presence?...&role=` (standalone). Default window: the whole latest day.
-* **Who may see names.** The *counts* per zone are aggregates and go to every signed-in role, like the heat map. The *names* are decided occupant by occupant by the persona policy: only people the caller may see at L3+ are listed; the rest are counted as "not named for this role". In practice: an Officer (Dean) sees the names of their own campus's teachers and students (wherever they are, with any purpose) and other Deans, and counts only for everyone else; a Teacher is named the students assigned to them; a Student themselves and their assigned teachers. A non-Dean asking for an investigation purpose gets 403. The request is written to the audit log.
+* **Who may see names.** The *counts* per zone are aggregates and go to every signed-in role, like the heat map. The *names* are decided occupant by occupant by the persona policy: only people the caller may see at L2+ are listed; the rest are counted as "not named for this role". In practice: an Officer (Dean) sees the names of their own campus's teachers and students (wherever they are, with any purpose) and other Deans, and counts only for everyone else; a Teacher is named the students assigned to them; a Student themselves and their assigned teachers. A non-Dean asking for an investigation purpose gets 403. The request is written to the audit log.
 * **Files.** `dsts/presence.py` (new), `dsts/api/lane_d.py` (endpoint), `dsts/api/standalone.py` (demo endpoint), `static_lane_d/{index.html,app.js}` (controls, `applyWindow`, `windowDetail`, `renderZoneTable`). Tests: `tests/api/test_zone_presence.py` (6 unit tests of the stay logic), `tests/api/test_zone_presence_integrated.py` (5, real run and RBAC), one in `tests/standalone/test_standalone_api.py`.
 * **Console UI.** Not changed: the filter is in the Lane D dashboard only.
 
@@ -196,7 +196,7 @@ bash scripts/run_demo.sh --standalone | --no-server
 
 `.claude/launch.json` has two preview configurations, `dsts-dashboard` (:8000, demo mode on) and `dsts-standalone` (:8001).
 
-Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Building & Zones (zone tiles, real names) → Research Queries: as **Officer** run Q6 on the demo target (L4, exact zone), run Q3 (trajectory, no purpose needed for their own campus), switch to **Self** and ask about someone else (refused, with the rule shown), then **Self** about themselves (allowed) → Security tab (every decision, both layers) → Event Generator / B1 → B5 demo (Dean only).
+Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Building & Zones (zone tiles, real names) → Research Queries: as **Officer** run Q6 on the demo target (L3, exact zone), run Q3 (trajectory, no purpose needed for their own campus), switch to **Self** and ask about someone else (refused, with the rule shown), then **Self** about themselves (allowed) → Security tab (every decision, both layers) → Event Generator / B1 → B5 demo (Dean only).
 
 ---
 
@@ -204,12 +204,12 @@ Suggested demo order on `/lane-d/`: Overview (10 buildings, live feed) → Build
 
 * **Tests:** the full suite now has 391 tests, all passing (it was 334 before this integration). 45 new: 5 (the zip's own, unchanged) + 4 (offline server) + 18 (dashboard on the real data and RBAC) + 17 (adapter helpers) + 1 (Layer-2 audit regression).
 * **Browser, standalone (`:8001`):** the page renders 4 buildings; the B1 → B5 demo adds 7 events, the KPIs, feed and campus update.
-* **Browser, integrated (`/lane-d/`):** 10 buildings, 500 occupants, 90 zones, a live feed disclosed at L2 (sector names, hour-rounded times), no console errors. Queries run through the real RBAC, for example (run seed 42):
-  * Officer, Q6 on the demo target → *"At building_5 / Common Amenities Wing at 16:00:00 (confidence High)"*, `RULE_A_OWN_CAMPUS_FULL`, L4.
-  * Officer, Q3 → *"Yes. occupant … left building_5"*, `RULE_A_OWN_CAMPUS_FULL`, L4 (no purpose needed).
+* **Browser, integrated (`/lane-d/`):** 10 buildings, 500 occupants, 90 zones, a live feed disclosed at the exact-zone level, no console errors. Queries run through the real RBAC, for example (run seed 42):
+  * Officer, Q6 on the demo target → *"At building_5 / Common Amenities Wing at 16:00:00 (confidence High)"*, `RULE_A_OWN_CAMPUS_FULL`, L3.
+  * Officer, Q3 → *"Yes. occupant … left building_5"*, `RULE_A_OWN_CAMPUS_FULL`, L3 (no purpose needed).
   * Officer, Q1 on another building → `RULE_A_CROSS_BUILDING_DENIED`.
-  * Analyst, Q6 on the rostered student at noon → `RULE_B_ROSTER_STUDENT`, L4, at any hour; a student not on the roster → `RULE_B_UNASSIGNED_DENIED`; investigation purpose → HTTP 403.
-  * Self, Q6 on a peer → `RULE_C_PEER_STALKING_DENIED`; on themselves → `RULE_SELF_LOOKUP`, L4; on a teacher → L1 "Away from Cabin".
+  * Analyst, Q6 on the rostered student at noon → `RULE_B_ROSTER_STUDENT`, L3, at any hour; a student not on the roster → `RULE_B_UNASSIGNED_DENIED`; investigation purpose → HTTP 403.
+  * Self, Q6 on a peer → `RULE_C_PEER_STALKING_DENIED`; on themselves → `RULE_SELF_LOOKUP`, L3; on a teacher → L1 "Away from Cabin".
   * Event Generator (30 events), B1 → B5 demo (20 events) and Reset work from the page; the Security tab lists the Dean's and own decisions.
 * **Unchanged on purpose:** the backend API and its tests (the old console UI was later removed); `paper/` and its experiments.
 

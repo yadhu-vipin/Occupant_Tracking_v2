@@ -8,7 +8,7 @@ explanation_overhead.json
     Every query type (Q1-Q13, TRACK) run --runs times with explanations off
     (QueryEngine(explain=False)) and on: mean latency of the engine call,
     mean latency of redact() + JSON encoding, and the JSON size of the
-    response without and with the full (L4) explanation.
+    response without and with the full (L3) explanation.
 
 explanation_flags.json
     Over phase4_results.json, checked against events/output/ground_truth.json:
@@ -40,8 +40,8 @@ from shared.paths import run_paths                                              
 
 REPORTS = run_paths().results_dir
 GROUND_TRUTH = run_paths().ground_truth
-# The largest view anyone gets: L4 with investigation rights (per-person evidence in aggregates too).
-FULL = PolicyDecision(permitted=True, level=DisclosureLevel.L4_HISTORICAL_TRACK,
+# The largest view anyone gets: L3 with investigation rights (per-person evidence in aggregates too).
+FULL = PolicyDecision(permitted=True, level=DisclosureLevel.L3_HISTORICAL_TRACK,
                       context=QueryContext(authorized_investigation=True))
 
 _P = resolve_personas()                   # a student with a roster teacher, in a building of this run
@@ -115,7 +115,7 @@ def measure_overhead(runs):
     return {
         "runs_per_query": runs,
         "parameters": {"target": TARGET, "building": BUILDING, "zone": ZONE, "t": T, "t1": T1, "t2": T2},
-        "note": "json_bytes_with uses the full L4 explanation, the largest any caller can receive",
+        "note": "json_bytes_with uses the full L3 explanation, the largest any caller can receive",
         "queries": rows,
         "totals": {**totals, "latency_overhead_pct": round(
             100 * (totals["latency_ms_with"] - totals["latency_ms_without"]) / totals["latency_ms_without"], 1)},

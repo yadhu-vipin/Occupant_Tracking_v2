@@ -78,7 +78,7 @@ def test_recent_events_are_disclosed_per_role():
     assert {"building_id", "zone", "occupant", "time", "timestamp", "disclosure"} <= set(dean[0])
     my_teachers = {t for t, students in srv._rosters.items() if P.student in students}
     assert {e["occupant"] for e in student} <= {P.student} | my_teachers
-    assert all(e["probability"] is None for e in dean if e["disclosure"] == "L2_CURRENT_ZONE")   # L2 hides the raw number
+    assert all(e["disclosure"] in ("L2_PRECISE_CURRENT", "L3_HISTORICAL_TRACK") for e in dean + student)   # nothing below an exact zone is listed
 
 
 def test_security_views_show_all_decisions_to_the_dean_and_only_own_to_others():
@@ -103,7 +103,7 @@ def test_officer_gets_a_located_answer_with_the_policy_decision():
     d = ask(P.dean, query_id="Q6", occupant=P.target, time="12:00")
     assert d["success"] and d["rows"] and d["rows"][0]["occupant"] == P.target
     assert d["decision"]["policy_rule"] == "RULE_A_OWN_CAMPUS_FULL"
-    assert d["decision"]["disclosure_level"] == "L4_HISTORICAL_TRACK"
+    assert d["decision"]["disclosure_level"] == "L3_HISTORICAL_TRACK"
 
 
 def test_the_same_query_is_refused_or_reduced_for_other_roles():

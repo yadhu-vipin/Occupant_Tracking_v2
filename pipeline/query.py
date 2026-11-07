@@ -7,7 +7,7 @@ during [t1, t2]?") are new -- neither existed in the original query_engine.py.
 Both are implemented as plain filter/aggregate passes over the exact same
 already-loaded event log every other query already uses (see QueryEngine.Q4/
 Q7 below); no DB schema or storage change was needed for either. Both are
-gated the same all-or-nothing way as Q3/Q5 (TRAJECTORY_QUERIES, L4 required
+gated the same all-or-nothing way as Q3/Q5 (TRAJECTORY_QUERIES, L3 required
 outright) -- RBAC itself is unchanged in this addition.
 
     python pipeline/query.py demo
@@ -94,7 +94,7 @@ INTERNAL_ZONES = frozenset(ZONES) - {"zT"}
 TRANSITION_ZONE = "zT"
 ROLES_DIR = run_paths().roles_dir
 DEFAULT_AT_TIME = "23:59:59"   # "as of end of day" -> most recent known detection
-TRAJECTORY_QUERIES = {"Q3", "Q4", "Q5", "Q7", "Q8", "Q9", "Q11", "TRACK"}   # require L4 outright, no partial redaction
+TRAJECTORY_QUERIES = {"Q3", "Q4", "Q5", "Q7", "Q8", "Q9", "Q11", "TRACK"}   # require L3 outright, no partial redaction
 BUILDING_PARAM_QUERIES = {"Q3", "Q4", "Q5", "Q8", "Q9"}   # trajectory queries that take a building_id
 
 
@@ -703,7 +703,7 @@ class QueryEngine:
 
     # ─── TRACK: full historical trajectory ─────────────────────────────────
     def track(self, occupant_id: str) -> dict:
-        """Full real historical trajectory -- the L4/TRACK-only capability.
+        """Full real historical trajectory -- the L3/TRACK-only capability.
 
         NEW: additionally merges in CLOSED visit-pointer history from the
         occupant's home building (no status filter -- every visit_id ever
@@ -1210,9 +1210,6 @@ def q6_disclosed(engine: QueryEngine, target_id: str, level: DisclosureLevel, at
             "arrival_time": ts,
             "confidence": _confidence_band(prob),
         }, current
-    if level == DisclosureLevel.L2_CURRENT_ZONE:
-        return {"building": building, "sector": zone_sector(zone) if zone else "Unknown",
-                "approx_time": quantize(ts, 60), "confidence": _confidence_band(prob)}, current
     return {"building": building, "zone": zone, "zone_label": zone_label(zone) if zone else "Unknown",
             "time": ts, "probability": prob}, current
 
@@ -1220,7 +1217,7 @@ def q6_disclosed(engine: QueryEngine, target_id: str, level: DisclosureLevel, at
 def occupant_query_result(engine: QueryEngine, q_type: str, target_id: str, *, building_id: str | None,
                           before_time: str | None, t1: str | None, t2: str | None,
                           zone: str | None) -> QueryResult:
-    """Q3/Q4/Q5/Q7/Q8/Q9/Q11 for one target -- the trajectory queries behind L4."""
+    """Q3/Q4/Q5/Q7/Q8/Q9/Q11 for one target -- the trajectory queries behind L3."""
     if q_type == "Q3":
         return engine.Q3(occupant_id=target_id, building_id=building_id, before_time=before_time)
     if q_type == "Q4":
@@ -1349,14 +1346,14 @@ def filter_zone_answer(q_type: str, answer: Any, keep: set) -> Any:
 
 
 def zone_disclosed_ids(caller_id: str, ids: list[str], context: QueryContext, building_id: str) -> set[str]:
-    """A zone answer reveals an exact zone per occupant, i.e. L3 disclosure about each of them,
+    """A zone answer reveals an exact zone per occupant, i.e. L2 disclosure about each of them,
     so each occupant goes through the same persona/building policy as a point query; only
-    those the caller may see at L3+ are disclosed, the rest are counted."""
+    those the caller may see at L2+ are disclosed, the rest are counted."""
     keep = set()
     for occ in ids:
         d = evaluate_campus_query_policy(caller_id, occ, context=context, purpose=context.purpose,
                                          target_current_building=building_id)
-        if d.permitted and d.level >= DisclosureLevel.L3_PRECISE_CURRENT:
+        if d.permitted and d.level >= DisclosureLevel.L2_PRECISE_CURRENT:
             keep.add(occ)
     return keep
 
@@ -1374,7 +1371,7 @@ def aggregate_decision(q_type: str, *, include_evidence: bool, purpose: QueryPur
     if q_type in ("Q1", "Q2"):
         return PolicyDecision(
             permitted=True,
-            level=DisclosureLevel.L4_HISTORICAL_TRACK if include_evidence else DisclosureLevel.L2_CURRENT_ZONE,
+            level=DisclosureLevel.L3_HISTORICAL_TRACK if include_evidence else DisclosureLevel.L1_PRESENCE,
             policy_rule="RULE_BUILDING_AGGREGATE",
             reason="Building-level aggregate permitted; individual occupant IDs redacted unless an authorized investigation",
             purpose=purpose, context=context, visitor_status="AGGREGATE",
@@ -1383,9 +1380,9 @@ def aggregate_decision(q_type: str, *, include_evidence: bool, purpose: QueryPur
         )
     return PolicyDecision(
         permitted=True,
-        level=DisclosureLevel.L3_PRECISE_CURRENT if disclosed else DisclosureLevel.L2_CURRENT_ZONE,
+        level=DisclosureLevel.L2_PRECISE_CURRENT if disclosed else DisclosureLevel.L1_PRESENCE,
         policy_rule="RULE_ZONE_PER_OCCUPANT_FILTER",
-        reason=f"Zone query in {building_id}: each occupant filtered through persona/building policy (L3+ required to be listed)",
+        reason=f"Zone query in {building_id}: each occupant filtered through persona/building policy (L2+ required to be listed)",
         purpose=purpose, context=context, visitor_status="ZONE_MONITORING",
         exposed_fields=["occupants (policy-permitted only)", "counts", "zone_id", "building_id"],
         redacted_fields=["occupants (policy-denied)", "biometric_raw_gallery"],
@@ -1519,8 +1516,8 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
 
     if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
         return _refused(q_type, explain)
-    if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L4_HISTORICAL_TRACK:
-        print(f"  DENIED (temporal scope): {q_type} is a trajectory query requiring L4_HISTORICAL_TRACK outright; "
+    if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L3_HISTORICAL_TRACK:
+        print(f"  DENIED (temporal scope): {q_type} is a trajectory query requiring L3_HISTORICAL_TRACK outright; "
              f"caller only holds {decision.level.name}")
         return _refused(q_type, explain)
 
@@ -1532,7 +1529,7 @@ def run_occupant_query(engine: QueryEngine, caller_id: str, target_id: str, q_ty
     if q_type in ("Q6", "TRACK"):
         print(f"  Disclosed ({decision.level.name}): {outcome['answer']}")
     else:
-        print(f"  Disclosed (L4_HISTORICAL_TRACK): answer={outcome['answer']}  evidence={outcome['evidence']}")
+        print(f"  Disclosed (L3_HISTORICAL_TRACK): answer={outcome['answer']}  evidence={outcome['evidence']}")
     if outcome["withheld"]:
         print(f"  Withheld: {'; '.join(outcome['withheld'])}")
     if explain:
@@ -1546,7 +1543,7 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
                    is_office_hours: bool = True, explain: bool = False) -> dict:
     """Q10/Q12/Q13 -- zone queries, under the same rules as POST /api/query:
     students are denied outright, the caller must be in their own building,
-    and each listed occupant must pass the persona policy at L3+ (in practice
+    and each listed occupant must pass the persona policy at L2+ (in practice
     a Dean on an investigation or audit); everyone else gets counts only.
     Without --building the query is scoped to the caller's own building.
     Returns what was shown (see run_building_query)."""
@@ -1588,7 +1585,7 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
     ids = zone_ids(q_type, res.answer)
     keep = zone_disclosed_ids(caller_id, ids, context, building_id)
     print(f"  Layer 2 (per-occupant persona filter): {len(keep)} of {len(ids)} occupant(s) disclosed "
-          f"(L3+ required to be listed)")
+          f"(L2+ required to be listed)")
     answer = filter_zone_answer(q_type, res.answer, keep)
     shown_evidence = [f"{len(keep)} of {len(ids)} occupant(s) disclosed; "
                       f"{len(ids) - len(keep)} withheld by persona/building policy"]
@@ -1608,15 +1605,15 @@ def run_zone_query(engine: QueryEngine, caller_id: str, q_type: str, zone: str,
 def print_role_capabilities() -> None:
     print(f"\n{'=' * 78}\nROLE CAPABILITIES: BUILDING-SCOPED HIERARCHICAL RBAC (A > B > C)\n")
     print("ROLE A: DEAN (Building Administrator / Senior Executive registered to Br)")
-    print("  CAN:  follow every movement (L4, any purpose) of the Teachers and Students registered to Br, wherever they are.")
-    print("  CAN:  follow every movement (L4) of the Deans of any building.")
+    print("  CAN:  follow every movement (L3, any purpose) of the Teachers and Students registered to Br, wherever they are.")
+    print("  CAN:  follow every movement (L3) of the Deans of any building.")
     print("  CANNOT: query anyone else: other buildings' Teachers and Students, visitors (L0 hard deny).")
     print("\nROLE B: TEACHER (Faculty registered to Br)")
-    print("  CAN:  follow every movement (L4) of the Students assigned to them (class roster), in any building.")
+    print("  CAN:  follow every movement (L3) of the Students assigned to them (class roster), in any building.")
     print("  CANNOT: query anyone else: unassigned Students, peer Teachers, the Dean (L0).")
     print("\nROLE C: STUDENT (Registered to Br)")
-    print("  CAN:  query self with full historical track (L4 self-query exemption).")
-    print("  CAN:  see where the Teachers assigned to them are now (L3), in any building.")
+    print("  CAN:  query self with full historical track (L3 self-query exemption).")
+    print("  CAN:  see where the Teachers assigned to them are now (L2), in any building.")
     print("  CANNOT: query peer Students under any circumstances (L0 anti-stalking isolation).")
     print("  CANNOT: query any other Teacher, the Dean, or anyone in another building (L0).")
 
@@ -1701,7 +1698,7 @@ def demo_scenarios(engine: QueryEngine, roles: dict[str, str], rosters: dict[str
         occ(teacher_a, cross_building_student, "Q6", "general_lookup", True, False),
         # Student querying student in another building -> DENIED
         occ(roster_student, cross_building_student, "Q6", "general_lookup", True, False),
-        # Dean querying peer Dean in other building -> PERMITTED at coarse L2 status
+        # Dean querying peer Dean in other building -> PERMITTED (full history)
         occ(dean_id, other_dean, "Q6", "admin_consultation", True, False),
 
         ("section", "OTHER PERSONA RULES"),

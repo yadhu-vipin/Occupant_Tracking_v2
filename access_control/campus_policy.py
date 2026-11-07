@@ -1,33 +1,30 @@
 """
-access_control/campus_policy.py — Campus Privacy Policy, 5-Tier Disclosure & Contextual ReBAC
+access_control/campus_policy.py — Campus Privacy Policy, 4-Tier Disclosure & Contextual ReBAC
 =======================================================================================
 Implements the Layer-2 Contextual Privacy & Relationship-Based Access Control (ReBAC)
 policy for campus location queries, separating what information is exposed from who is asking.
 
-1. Five Information Disclosure Levels (L0 - L4):
+1. Four Information Disclosure Levels (L0 - L3):
      L0 — None:             Nothing exposed; query rejected.
      L1 — Presence:         Boolean presence at designated location / cabin availability.
                             ("Teacher available in cabin: Yes / No")
-     L2 — Current Zone:     Current functional sector (a group of zones on the single floor)
-                            + quantized timestamp; the exact zone is withheld.
-                            ("Dean is in the Work & Study Wing, ~10:40 AM")
-     L3 — Precise Current:  Exact zone ID + zone label + detection confidence + exact timestamp.
+     L2 — Precise Current:  Exact zone ID + zone label + detection confidence + exact timestamp.
                             The building is a single floor with 8-9 zones — there is no
                             room-level or coordinate-level granularity beyond the zone itself.
                             ("Dean is in z3 (Office), 94% confidence, 10:42 AM")
-     L4 — Historical Track: Full historical trajectory / movement across zones over time.
+     L3 — Historical Track: Full historical trajectory / movement across zones over time.
                             ("Student's zone-by-zone movements over the last 2 hours")
 
 2. The rules (the code in ``evaluate_campus_query_policy`` is the single source of truth, and
    ``tests/access_control/test_policy_matrix.py`` pins every role x relationship cell):
-     Dean    -> teacher / student of their own building : L4, wherever on campus they are, any purpose
-     Dean    -> any Dean (co-dean or other building)    : L4
+     Dean    -> teacher / student of their own building : L3, wherever on campus they are, any purpose
+     Dean    -> any Dean (co-dean or other building)    : L3
      Dean    -> anyone else (other buildings' teachers / students, visitors) : L0
-     Teacher -> a student assigned to them (class roster), in ANY building : L4
+     Teacher -> a student assigned to them (class roster), in ANY building : L3
      Teacher -> everyone else                            : L0
-     Student -> a teacher the student is assigned to (roster), in ANY building : L3 (where they are now)
+     Student -> a teacher the student is assigned to (roster), in ANY building : L2 (where they are now)
      Student -> everyone else                            : L0 (anti-stalking)
-     Anyone  -> self                                     : L4 (self-query exemption)
+     Anyone  -> self                                     : L3 (self-query exemption)
      Unresolved role / building                          : L0 (fail closed)
 
 3. Purpose & Context Policy Layer (ABAC):
@@ -64,14 +61,13 @@ class CampusRole(Enum):
 
 class DisclosureLevel(IntEnum):
     """
-    Five-tier ordered hierarchical disclosure levels.
+    Four-tier ordered hierarchical disclosure levels.
     Higher levels disclose strictly more persistent and granular spatial information.
     """
     L0_NONE = 0              # Nothing exposed / query rejected
     L1_PRESENCE = 1          # Boolean presence at designated location / availability (e.g. cabin)
-    L2_CURRENT_ZONE = 2      # Current functional sector (zone-group) + quantized timestamp; exact zone withheld
-    L3_PRECISE_CURRENT = 3   # Exact zone ID, zone label, and detection confidence + exact timestamp (single floor, no rooms)
-    L4_HISTORICAL_TRACK = 4  # Movement history / trajectory across zones over time intervals
+    L2_PRECISE_CURRENT = 2   # Exact zone ID, zone label, and detection confidence + exact timestamp (single floor, no rooms)
+    L3_HISTORICAL_TRACK = 3  # Movement history / trajectory across zones over time intervals
 
     @classmethod
     def from_str(cls, val: Union[str, int]) -> "DisclosureLevel":
@@ -86,13 +82,12 @@ class DisclosureLevel(IntEnum):
         aliases = {
             "NONE": cls.L0_NONE,
             "PRESENCE": cls.L1_PRESENCE,
-            "COARSE": cls.L2_CURRENT_ZONE,
-            "ZONE": cls.L2_CURRENT_ZONE,
-            "CURRENT": cls.L2_CURRENT_ZONE,
-            "PRECISE": cls.L3_PRECISE_CURRENT,
-            "EXACT": cls.L3_PRECISE_CURRENT,
-            "FULL_TRACK": cls.L4_HISTORICAL_TRACK,
-            "TRACK": cls.L4_HISTORICAL_TRACK,
+            "ZONE": cls.L2_PRECISE_CURRENT,
+            "CURRENT": cls.L2_PRECISE_CURRENT,
+            "PRECISE": cls.L2_PRECISE_CURRENT,
+            "EXACT": cls.L2_PRECISE_CURRENT,
+            "FULL_TRACK": cls.L3_HISTORICAL_TRACK,
+            "TRACK": cls.L3_HISTORICAL_TRACK,
         }
         if norm in aliases:
             return aliases[norm]
@@ -144,16 +139,15 @@ class AccessScope(Enum):
 class LocationGranularity(Enum):
     """Spatial resolution granted by policy (legacy compatibility)."""
     NONE = "none"              # No location data
-    ZONE = "zone"              # Building / functional sector only (exact zone withheld)
+    ZONE = "zone"              # Zone-level location (kept as an alias; no sector level exists any more)
     PRECISE = "precise"        # Exact zone-level location (finest granularity — single floor, no rooms)
 
 
 LEVEL_TO_SCOPE_GRANULARITY: Dict[DisclosureLevel, Tuple[AccessScope, LocationGranularity]] = {
     DisclosureLevel.L0_NONE:             (AccessScope.NONE, LocationGranularity.NONE),
     DisclosureLevel.L1_PRESENCE:         (AccessScope.PRESENCE, LocationGranularity.NONE),
-    DisclosureLevel.L2_CURRENT_ZONE:     (AccessScope.CURRENT, LocationGranularity.ZONE),
-    DisclosureLevel.L3_PRECISE_CURRENT:  (AccessScope.CURRENT, LocationGranularity.PRECISE),
-    DisclosureLevel.L4_HISTORICAL_TRACK: (AccessScope.FULL_TRACK, LocationGranularity.PRECISE),
+    DisclosureLevel.L2_PRECISE_CURRENT:  (AccessScope.CURRENT, LocationGranularity.PRECISE),
+    DisclosureLevel.L3_HISTORICAL_TRACK: (AccessScope.FULL_TRACK, LocationGranularity.PRECISE),
 }
 
 
@@ -372,10 +366,10 @@ def evaluate_campus_query_policy(
       Visitor(p, b, t) <=> current_building(p, t) == b and registered_building(p) != b
 
     Hierarchy & Scoping Rules:
-      1. Self-query: caller == target -> L4_HISTORICAL_TRACK (RULE_SELF_LOOKUP).
-      2. Dean of Br: teachers/students of Br -> L4 (RULE_A_OWN_CAMPUS_FULL); any Dean -> L4; everyone else L0.
-      3. Teacher: students on their class roster, in any building -> L4 (RULE_B_ROSTER_STUDENT); everyone else L0.
-      4. Student: teachers whose roster lists them, in any building -> L3 (RULE_C_ASSIGNED_TEACHER); everyone else L0.
+      1. Self-query: caller == target -> L3_HISTORICAL_TRACK (RULE_SELF_LOOKUP).
+      2. Dean of Br: teachers/students of Br -> L3 (RULE_A_OWN_CAMPUS_FULL); any Dean -> L3; everyone else L0.
+      3. Teacher: students on their class roster, in any building -> L3 (RULE_B_ROSTER_STUDENT); everyone else L0.
+      4. Student: teachers whose roster lists them, in any building -> L2 (RULE_C_ASSIGNED_TEACHER); everyone else L0.
       5. Principle of Minimum Necessary Disclosure:
          effective_level = min(requested_level, ceiling)
     """
@@ -393,7 +387,7 @@ def evaluate_campus_query_policy(
 
     # Rule 1: Self-query exemption (Data subject privacy rights)
     if caller_id and target_id and caller_id == target_id:
-        max_level = DisclosureLevel.L4_HISTORICAL_TRACK
+        max_level = DisclosureLevel.L3_HISTORICAL_TRACK
         eff_level = min(parsed_requested, max_level) if parsed_requested is not None else max_level
         ctx = context or QueryContext(purpose=QueryPurpose.SELF_INSPECTION)
         return PolicyDecision(
@@ -501,7 +495,7 @@ def evaluate_campus_query_policy(
         if c_role == CampusRole.DEAN:
             if t_role == CampusRole.DEAN:
                 policy_rule = "RULE_A_LOCAL_DEAN" if is_local else "RULE_A_PEER_DEAN_TRACK"
-                ceiling = DisclosureLevel.L4_HISTORICAL_TRACK
+                ceiling = DisclosureLevel.L3_HISTORICAL_TRACK
                 reason = (f"Policy permitted: Dean of {c_b} may follow the movements of "
                           + ("the co-dean" if is_local else f"the Dean of {t_home_b}"))
                 exposed_fields = ["occupant_id", "role", "home_building", "current_building", "zone", "zone_label",
@@ -509,7 +503,7 @@ def evaluate_campus_query_policy(
             elif t_role in (CampusRole.TEACHER, CampusRole.STUDENT) and is_local:
                 # their own campus's teachers and students: full movements, wherever on campus they are
                 policy_rule = "RULE_A_OWN_CAMPUS_FULL"
-                ceiling = DisclosureLevel.L4_HISTORICAL_TRACK
+                ceiling = DisclosureLevel.L3_HISTORICAL_TRACK
                 reason = (f"Policy permitted: Dean of {c_b} may follow every movement of {t_role.value} '{target_id}' "
                           f"of {c_b}")
                 exposed_fields = ["occupant_id", "role", "home_building", "current_building", "zone", "zone_label",
@@ -530,7 +524,7 @@ def evaluate_campus_query_policy(
                     and is_student_in_roster(caller_id, target_id)))
             if assigned:
                 policy_rule = "RULE_B_ROSTER_STUDENT"
-                ceiling = DisclosureLevel.L4_HISTORICAL_TRACK
+                ceiling = DisclosureLevel.L3_HISTORICAL_TRACK
                 reason = (f"Policy permitted: Teacher '{caller_id}' may follow the movements of assigned student "
                           f"'{target_id}' in any building (class-teacher roster)")
                 exposed_fields = ["occupant_id", "home_building", "current_building", "zone", "zone_label",
@@ -547,7 +541,7 @@ def evaluate_campus_query_policy(
             if (t_role == CampusRole.TEACHER and caller_id is not None and target_id is not None
                     and is_student_in_roster(target_id, caller_id)):
                 policy_rule = "RULE_C_ASSIGNED_TEACHER"
-                ceiling = DisclosureLevel.L3_PRECISE_CURRENT
+                ceiling = DisclosureLevel.L2_PRECISE_CURRENT
                 reason = (f"Policy permitted: student '{caller_id}' may see where their assigned teacher "
                           f"'{target_id}' is now, in any building")
                 exposed_fields = ["occupant_id", "current_building", "zone", "zone_label", "timestamp", "confidence"]
@@ -564,9 +558,9 @@ def evaluate_campus_query_policy(
         elif c_role == CampusRole.VISITOR:
             if t_role in (CampusRole.DEAN, CampusRole.TEACHER):
                 policy_rule = "RULE_VISITOR_STAFF_LOOKUP"
-                ceiling = DisclosureLevel.L2_CURRENT_ZONE
-                reason = f"Policy permitted: visitor granted L2_CURRENT_ZONE for {t_role.value} in {t_home_b}"
-                exposed_fields = ["occupant_id", "current_building", "sector", "approx_time"]
+                ceiling = DisclosureLevel.L1_PRESENCE
+                reason = f"Policy permitted: visitor granted L1_PRESENCE for {t_role.value} in {t_home_b}"
+                exposed_fields = ["occupant_id", "availability", "status"]
                 redacted_fields = ["exact_zone", "movement_history"]
             else:
                 policy_rule = "RULE_VISITOR_DENIED"
@@ -603,9 +597,7 @@ def evaluate_campus_query_policy(
     if effective_level < ceiling:
         if effective_level == DisclosureLevel.L1_PRESENCE:
             exposed_fields = ["occupant_id", "availability", "is_present_at_office", "designated_location", "status"]
-            redacted_fields = sorted(set(redacted_fields) | {"exact_zone", "full_trajectory", "sector", "coordinates"})
-        elif effective_level == DisclosureLevel.L2_CURRENT_ZONE:
-            redacted_fields = sorted(set(redacted_fields) | {"full_trajectory", "exact_zone", "precise_coordinates"})
+            redacted_fields = sorted(set(redacted_fields) | {"exact_zone", "full_trajectory", "coordinates"})
         elif effective_level == DisclosureLevel.L0_NONE:
             exposed_fields = []
             redacted_fields = ["all_location_data"]

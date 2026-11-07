@@ -362,7 +362,7 @@ def _outcomes(demo):
 
 def test_demo_covers_every_disclosure_level(demo):
     levels = {o["explanation"]["disclosure_level"] for _, o, _ in _outcomes(demo)}
-    assert {"L0_NONE", "L2_CURRENT_ZONE", "L3_PRECISE_CURRENT", "L4_HISTORICAL_TRACK"} <= levels
+    assert {"L0_NONE", "L2_PRECISE_CURRENT", "L3_HISTORICAL_TRACK"} <= levels
 
 
 def test_no_explanation_reveals_more_than_its_answer(demo, capsys):
@@ -377,12 +377,12 @@ def test_no_explanation_reveals_more_than_its_answer(demo, capsys):
             continue
         investigation = bool(decision.context and decision.context.authorized_investigation)
         if kind in ("building", "zone") and investigation:
-            # Per-person evidence (with L4 provenance) is the investigator's right, but only
+            # Per-person evidence (with L3 provenance) is the investigator's right, but only
             # for the people the answer shows, and only sightings in the queried building.
             queried = args[2] if kind == "building" else scenario[2]["building_id"]
             assert {e["building"] for e in expl["evidence"]} <= {queried}, scenario
             leaked = {("occupant", e["occupant_id"]) for e in expl["evidence"]} - allowed
-        elif level == DisclosureLevel.L4_HISTORICAL_TRACK:
+        elif level == DisclosureLevel.L3_HISTORICAL_TRACK:
             if decision.visitor_status == "VISITOR_IN_BUILDING":
                 caller_building = cp.get_occupant_building(args[0])
                 assert {e["building"] for e in expl["evidence"]} <= {caller_building}, scenario
@@ -399,7 +399,7 @@ def test_no_explanation_reveals_more_than_its_answer(demo, capsys):
 def test_teachers_and_students_never_see_routing_identity(demo, capsys):
     seen = 0
     for _, outcome, caller_role in _outcomes(demo):
-        if caller_role in ("teacher", "student") and outcome["explanation"]["disclosure_level"] != "L4_HISTORICAL_TRACK":
+        if caller_role in ("teacher", "student") and outcome["explanation"]["disclosure_level"] != "L3_HISTORICAL_TRACK":
             text = json.dumps(outcome["explanation"])
             assert "\"verifying_building\":" not in text and "\"shortlist\":" not in text
             seen += 1
@@ -409,38 +409,25 @@ def test_teachers_and_students_never_see_routing_identity(demo, capsys):
 
 @pytest.mark.parametrize("level,exposed", [
     (DisclosureLevel.L1_PRESENCE, []),
-    (DisclosureLevel.L2_CURRENT_ZONE, ["sector"]),           # teacher -> roster student
-    (DisclosureLevel.L2_CURRENT_ZONE, ["current_building"]),  # dean -> peer dean: no zone at all
-    (DisclosureLevel.L3_PRECISE_CURRENT, []),
+    (DisclosureLevel.L2_PRECISE_CURRENT, []),
 ])
 def test_routed_sighting_below_l4_hides_shortlist_and_verifier(level, exposed):
     eng = QueryEngine([_ev("X1", "09:00:00", "building_2", "z3", "A", "building_1")], REGISTRY, enforce_rbac=False)
     out = redact(eng.Q6("A", "09:30:00").explanation, PolicyDecision(True, level, exposed_fields=exposed))
     text = json.dumps(out)
     assert "\"verifying_building\":" not in text and "\"shortlist\":" not in text and "X1" not in text
-    if level == DisclosureLevel.L2_CURRENT_ZONE:
-        assert out["evidence"][0]["time"] == "09:00:00"   # hour-rounded (already on the hour here)
-        assert out["evidence"][0]["zone"] in (None, "Work & Study Wing")
     if level == DisclosureLevel.L1_PRESENCE:
         assert set(out) == {"query_id", "query_class", "disclosure_level", "rule", "withheld"}
 
 
-def test_l2_rounds_times_and_uses_sectors(engine):
-    out = redact(engine.Q6("A", "09:30:00").explanation,
-                 PolicyDecision(True, DisclosureLevel.L2_CURRENT_ZONE, exposed_fields=["sector"]))
-    assert out["evidence"] == [{"time": "09:00:00", "building": "building_1", "zone": "Circulation & Access Hub",
-                                "role": "last_before_t", "provenance": {"mode": "local"}}]
-    assert "exact times: rounded to the hour" in out["withheld"]
-
-
 def test_l3_shows_current_position_but_no_history(engine):
     out = redact(engine.Q11("A", "09:00:00", "10:30:00").explanation,
-                 PolicyDecision(True, DisclosureLevel.L3_PRECISE_CURRENT))
+                 PolicyDecision(True, DisclosureLevel.L2_PRECISE_CURRENT))
     assert out["evidence"] == [] and any("history" in w for w in out["withheld"])
 
 
 def test_l4_visitor_view_drops_history_outside_the_building(engine):
-    decision = PolicyDecision(True, DisclosureLevel.L4_HISTORICAL_TRACK, visitor_status="VISITOR_IN_BUILDING")
+    decision = PolicyDecision(True, DisclosureLevel.L3_HISTORICAL_TRACK, visitor_status="VISITOR_IN_BUILDING")
     out = redact(engine.track_explained("A")[1], decision, caller_building="building_2")
     assert {e["building"] for e in out["evidence"]} == {"building_2"}
     assert "history outside this building" in out["withheld"]
@@ -497,9 +484,9 @@ def test_api_query_responses_carry_a_redacted_explanation(api):
     dean = api(DEAN5, query_type="Q6", target_id=TARGET5, purpose="security_investigation", time_t="12:00:00")
     assigned = api(TARGET5, query_type="Q6", target_id=TEACHER5, time_t="12:00:00")     # a student looks up their teacher
     peer = api(STUDENT5, query_type="Q6", target_id=TARGET5, time_t="12:00:00")
-    assert dean["explanation"]["disclosure_level"] == "L4_HISTORICAL_TRACK"
+    assert dean["explanation"]["disclosure_level"] == "L3_HISTORICAL_TRACK"
     assert dean["explanation"]["evidence"][0]["event_id"]
-    assert assigned["explanation"]["disclosure_level"] == "L3_PRECISE_CURRENT"
+    assert assigned["explanation"]["disclosure_level"] == "L2_PRECISE_CURRENT"
     assert "event_id" not in json.dumps(assigned["explanation"])
     assert peer["explanation"]["disclosure_level"] == "L0_NONE"
 
@@ -512,8 +499,8 @@ def test_api_cache_never_shares_an_explanation_across_levels(api):
     again = api(DEAN5, **body, purpose="general_lookup")
     assert dean["explanation"]["evidence"] and teacher["explanation"]["evidence"] == []
     assert again.get("_cache_hit") and again["explanation"] == dean["explanation"]
-    assert dean["explanation"]["disclosure_level"] == "L4_HISTORICAL_TRACK"
-    assert teacher["explanation"]["disclosure_level"] != "L4_HISTORICAL_TRACK"
+    assert dean["explanation"]["disclosure_level"] == "L3_HISTORICAL_TRACK"
+    assert teacher["explanation"]["disclosure_level"] != "L3_HISTORICAL_TRACK"
 
 
 def test_api_zone_query_explanation_for_teacher_is_counts_only(api):
@@ -565,7 +552,7 @@ def assert_scoped_to(shown, building, events, target, params=()):
 
 
 def _visitor_decision():
-    return PolicyDecision(True, DisclosureLevel.L4_HISTORICAL_TRACK, visitor_status="VISITOR_IN_BUILDING",
+    return PolicyDecision(True, DisclosureLevel.L3_HISTORICAL_TRACK, visitor_status="VISITOR_IN_BUILDING",
                           policy_rule="RULE_A_VISITOR_IN_OWN_BUILDING_INVESTIGATION")
 
 
