@@ -1,0 +1,152 @@
+{
+ "sequential:0": {
+  "routed": 579,
+  "correct": 495,
+  "misidentified": 13,
+  "abstained": 71,
+  "asked_mean": 1.7219343696027634,
+  "accuracy_all": 0.9467,
+  "visitor_accuracy": 0.9175,
+  "routing_recall": 0.9119170984455959
+ },
+ "sequential:1": {
+  "routed": 584,
+  "correct": 493,
+  "misidentified": 16,
+  "abstained": 75,
+  "asked_mean": 1.7465753424657535,
+  "accuracy_all": 0.9435,
+  "visitor_accuracy": 0.903,
+  "routing_recall": 0.9126712328767124
+ },
+ "sequential:2": {
+  "routed": 591,
+  "correct": 493,
+  "misidentified": 22,
+  "abstained": 76,
+  "asked_mean": 1.7834179357021998,
+  "accuracy_all": 0.9464,
+  "visitor_accuracy": 0.915,
+  "routing_recall": 0.9001692047377327
+ },
+ "sequential:3": {
+  "routed": 595,
+  "correct": 498,
+  "misidentified": 17,
+  "abstained": 80,
+  "asked_mean": 1.796638655462185,
+  "accuracy_all": 0.9474,
+  "visitor_accuracy": 0.919,
+  "routing_recall": 0.9092436974789916
+ },
+ "sequential:4": {
+  "routed": 582,
+  "correct": 494,
+  "misidentified": 13,
+  "abstained": 75,
+  "asked_mean": 1.7233676975945018,
+  "accuracy_all": 0.9486,
+  "visitor_accuracy": 0.9165,
+  "routing_recall": 0.9072164948453608
+ },
+ "verify_all:0": {
+  "routed": 577,
+  "correct": 494,
+  "misidentified": 12,
+  "abstained": 71,
+  "asked_mean": 5.0,
+  "accuracy_all": 0.9464,
+  "visitor_accuracy": 0.916,
+  "routing_recall": 0.9220103986135182
+ },
+ "verify_all:1": {
+  "routed": 581,
+  "correct": 493,
+  "misidentified": 14,
+  "abstained": 74,
+  "asked_mean": 5.0,
+  "accuracy_all": 0.9436,
+  "visitor_accuracy": 0.9035,
+  "routing_recall": 0.9259896729776248
+ },
+ "verify_all:2": {
+  "routed": 588,
+  "correct": 494,
+  "misidentified": 18,
+  "abstained": 76,
+  "asked_mean": 5.0,
+  "accuracy_all": 0.947,
+  "visitor_accuracy": 0.918,
+  "routing_recall": 0.9098639455782312
+ },
+ "verify_all:3": {
+  "routed": 592,
+  "correct": 498,
+  "misidentified": 14,
+  "abstained": 80,
+  "asked_mean": 5.0,
+  "accuracy_all": 0.9476,
+  "visitor_accuracy": 0.92,
+  "routing_recall": 0.9206081081081081
+ },
+ "verify_all:4": {
+  "routed": 581,
+  "correct": 495,
+  "misidentified": 11,
+  "abstained": 75,
+  "asked_mean": 5.0,
+  "accuracy_all": 0.9487,
+  "visitor_accuracy": 0.917,
+  "routing_recall": 0.9173838209982789
+ },
+ "adaptive:0": {
+  "routed": 578,
+  "correct": 495,
+  "misidentified": 12,
+  "abstained": 71,
+  "asked_mean": 2.7785467128027683,
+  "accuracy_all": 0.9468,
+  "visitor_accuracy": 0.918,
+  "routing_recall": 0.9186851211072664
+ },
+ "adaptive:1": {
+  "routed": 581,
+  "correct": 493,
+  "misidentified": 14,
+  "abstained": 74,
+  "asked_mean": 2.6695352839931155,
+  "accuracy_all": 0.9436,
+  "visitor_accuracy": 0.9035,
+  "routing_recall": 0.9242685025817556
+ },
+ "adaptive:2": {
+  "routed": 589,
+  "correct": 494,
+  "misidentified": 19,
+  "abstained": 76,
+  "asked_mean": 2.828522920203735,
+  "accuracy_all": 0.9469,
+  "visitor_accuracy": 0.9175,
+  "routing_recall": 0.9083191850594228
+ },
+ "adaptive:3": {
+  "routed": 591,
+  "correct": 498,
+  "misidentified": 13,
+  "abstained": 80,
+  "asked_mean": 2.8257191201353637,
+  "accuracy_all": 0.9478,
+  "visitor_accuracy": 0.921,
+  "routing_recall": 0.9187817258883249
+ },
+ "adaptive:4": {
+  "routed": 580,
+  "correct": 495,
+  "misidentified": 10,
+  "abstained": 75,
+  "asked_mean": 2.668965517241379,
+  "accuracy_all": 0.9489,
+  "visitor_accuracy": 0.918,
+  "routing_recall": 0.9172413793103448
+ }
+}

@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -117,6 +118,13 @@ class RetrievalRuntime:
         # secure=True: every candidate check is a sealed round trip (see
         # secure_transfer/payload.py) and fails closed. False keeps the bare in-process call.
         self.secure = secure
+        # Shortlist verification policy (DSTS_VERIFY_POLICY): "sequential" (default; rank order, the first confirmation ends
+        # the search), "verify_all" (every shortlisted building verifies, the most votes wins) or "adaptive" (verify_all when
+        # the gap between the two best Bloom scores is at most DSTS_ADAPTIVE_GAP, default 5, otherwise sequential).
+        self.verify_policy = os.environ.get("DSTS_VERIFY_POLICY", "sequential")
+        if self.verify_policy not in ("sequential", "verify_all", "adaptive"):
+            raise ValueError(f"unknown DSTS_VERIFY_POLICY {self.verify_policy!r}")
+        self.adaptive_gap = int(os.environ.get("DSTS_ADAPTIVE_GAP", "5"))
         self.secure_failures: list = []     # (current, candidate, reason) for every failed sealed exchange
         self.embeddings = embeddings
         self.meta = meta
@@ -237,6 +245,11 @@ class RetrievalRuntime:
             shortlist, scores = route(codes[0], margins[0], self.filters, candidates,
                                       self.contract.space, self.contract.n_probes,
                                       self.contract.shortlist_k)
+        policy = getattr(self, "verify_policy", "sequential")
+        ask_all = policy == "verify_all"
+        if policy == "adaptive" and len(shortlist) >= 2:
+            ask_all = (scores[shortlist[0]] - scores[shortlist[1]]) <= getattr(self, "adaptive_gap", 5)
+        best_votes = -1
         for candidate in shortlist:
             reply = self._ask_candidate(query, current, candidate)
             if reply is None:           # secure exchange failed closed: this candidate says nothing
@@ -246,9 +259,14 @@ class RetrievalRuntime:
                       "candidate_distances": getattr(reply, "candidate_distances", None)}
             replies.append(record)
             if reply.matched:
-                verified = record
-                verified_refs = getattr(reply, "refs", None)
-                break
+                if not ask_all:
+                    verified = record
+                    verified_refs = getattr(reply, "refs", None)
+                    break
+                if reply.votes > best_votes:      # verify all: the most votes wins, ties keep the better rank
+                    best_votes = reply.votes
+                    verified = record
+                    verified_refs = getattr(reply, "refs", None)
 
         if verified:
             self._track_visit(event, current, verified["building"], verified["occupant_id"], verified_refs)

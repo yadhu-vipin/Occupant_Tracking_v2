@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Optional
 
 REPO = Path(__file__).resolve().parents[1]
-RUNS_DIR = REPO / "runs"
+RUNS_DIR = Path(os.environ["DSTS_RUNS_DIR"]) if os.environ.get("DSTS_RUNS_DIR") else REPO / "runs"   # DSTS_RUNS_DIR: write/read runs elsewhere
 SHARED_DIR = REPO / "shared"
 CORPUS_DIR = REPO / "corpus"
 DEFAULT_SEED = 42

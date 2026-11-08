@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Tuple
 
+import os
 import yaml
 
 from shared.paths import REPO
 
-CONFIG_FILE = REPO / "config" / "experiment.yaml"
+CONFIG_FILE = Path(os.environ["DSTS_CONFIG"]) if os.environ.get("DSTS_CONFIG") else REPO / "config" / "experiment.yaml"   # DSTS_CONFIG: alternative config file
 
 
 @dataclass(frozen=True)

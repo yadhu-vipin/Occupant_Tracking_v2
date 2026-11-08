@@ -1,0 +1,189 @@
+{
+ "central": {
+  "all": {
+   "events": 10000,
+   "cen": 95.48,
+   "dec": 94.65200000000002,
+   "touched": 11.028599999999999,
+   "gap": 0.8279999999999887
+  },
+  "local": {
+   "events": 8000,
+   "cen": 95.465,
+   "dec": 95.46,
+   "touched": 10.000000000000002,
+   "gap": 0.005000000000009663
+  },
+  "visitor": {
+   "events": 2000,
+   "cen": 95.54,
+   "dec": 91.41999999999999,
+   "touched": 15.143000000000004,
+   "gap": 4.120000000000019
+  }
+ },
+ "events": {
+  "all": {
+   "tp": 9465.2,
+   "fp": 190.6,
+   "fn": 534.8,
+   "precision": 0.9802601433243033,
+   "recall": 0.9465200000000001,
+   "f1": 0.9630946051796971
+  },
+  "local": {
+   "tp": 7636.8,
+   "fp": 94.4,
+   "fn": 363.2,
+   "precision": 0.9877896202408912,
+   "recall": 0.9545999999999999,
+   "f1": 0.9709111239495108
+  },
+  "visitor": {
+   "tp": 1828.4,
+   "fp": 96.2,
+   "fn": 171.6,
+   "precision": 0.9500189632656584,
+   "recall": 0.9141999999999999,
+   "f1": 0.9317648498113899
+  }
+ },
+ "events_n": {
+  "all": 10000,
+  "local": 8000,
+  "visitor": 2000
+ },
+ "n_labels": 500,
+ "visitor": {
+  "routing_recall": 90.82435456768788,
+  "per_routed": 1.7543868001654808,
+  "per_visitor_event": 0.531712681491836,
+  "served_db": 1348.2,
+  "pointer_prec": 98.31298542402574,
+  "routed_events": 586.2
+ },
+ "seeds": [
+  {
+   "seed": 0,
+   "all": 94.67,
+   "local": 95.39999999999999,
+   "visitor": 91.75,
+   "routing": 91.19170984455958
+  },
+  {
+   "seed": 1,
+   "all": 94.35,
+   "local": 95.3625,
+   "visitor": 90.3,
+   "routing": 91.26712328767124
+  },
+  {
+   "seed": 2,
+   "all": 94.64,
+   "local": 95.42500000000001,
+   "visitor": 91.5,
+   "routing": 90.01692047377327
+  },
+  {
+   "seed": 3,
+   "all": 94.74000000000001,
+   "local": 95.45,
+   "visitor": 91.9,
+   "routing": 90.92436974789916
+  },
+  {
+   "seed": 4,
+   "all": 94.86,
+   "local": 95.6625,
+   "visitor": 91.64999999999999,
+   "routing": 90.72164948453609
+  }
+ ],
+ "seed_ci": {
+  "all": 0.23446931480259828,
+  "local": 0.14615251143924848,
+  "visitor": 0.7980698255165388,
+  "routing": 0.621816324199483
+ },
+ "seed_sd_all": 0.18886503117305747,
+ "state": {
+  "building": {
+   "p": 0.9638281947670239,
+   "r": 0.9615067297010684,
+   "f1": 0.9626415711337118,
+   "vr": 0.9298112327577149
+  },
+  "zone": {
+   "p": 0.9411722727235825,
+   "r": 0.9388747141374629,
+   "f1": 0.9399979131259226,
+   "vr": 0.9368425826703277
+  },
+  "location": {
+   "p": 0.9251523722321613,
+   "r": 0.9228768197747848,
+   "f1": 0.9239892460373064,
+   "vr": 0.8871207009154188
+  }
+ },
+ "state_sd_building_f1": 0.0029340888068399773,
+ "flags_ident": {
+  "all": {
+   "identified_events": 9655.8,
+   "wrong_identifications": 190.6,
+   "share_of_wrong_flagged": 77.94399999999999,
+   "share_of_correct_flagged": 2.3299999999999996,
+   "share_of_flagged_that_are_wrong": 40.224000000000004
+  },
+  "local": {
+   "identified_events": 7748.8,
+   "wrong_identifications": 112.0,
+   "share_of_wrong_flagged": 82.94600000000001,
+   "share_of_correct_flagged": 0.8639999999999999,
+   "share_of_flagged_that_are_wrong": 58.15
+  },
+  "routed": {
+   "identified_events": 567.8,
+   "wrong_identifications": 67.2,
+   "share_of_wrong_flagged": 81.814,
+   "share_of_correct_flagged": 30.876000000000005,
+   "share_of_flagged_that_are_wrong": 26.25
+  },
+  "db": {
+   "identified_events": 1339.2,
+   "wrong_identifications": 11.4,
+   "share_of_wrong_flagged": 4.25,
+   "share_of_correct_flagged": 0.0,
+   "share_of_flagged_that_are_wrong": 100.0
+  }
+ },
+ "per_flag": {
+  "vote_winner_not_nearest": 99.61977186311788,
+  "low_votes": 54.956085319949814,
+  "verified_by_lower_ranked_building": 32.796780684104625,
+  "narrow_routing_margin": 22.717622080679405
+ },
+ "answers": {
+  "n": 6947.4,
+  "share_flagged": 20.747999999999998,
+  "wrong": 736.4,
+  "recall": 75.95400000000001,
+  "precision": 38.812000000000005
+ },
+ "overhead": {
+  "lat_wo": 6.325900000000001,
+  "lat_w": 7.108639999999999,
+  "pooled": 12.373575301538109,
+  "pct_min": 11.3,
+  "pct_max": 13.5,
+  "bytes_wo": 16153.0,
+  "bytes_w": 119040.8
+ },
+ "bloom": {
+  "effective_fpr": 3.550783242258652,
+  "slot_collision_rate": 2.6373770491803277,
+  "random_integer_fpr": 0.9447742138083258,
+  "expected_slot_collision_if_uniform": 2.44140625
+ },
+ "n_buildings": 10
+}

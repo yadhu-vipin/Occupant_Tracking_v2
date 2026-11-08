@@ -367,7 +367,7 @@ URLs (an `<img src>` cannot send headers).
   session scratchpad (temporary directory), not in the repo**; if they are gone, regenerate the report by editing
   `S7_Project_Report.tex` directly (it is the committed output and is complete).
 - Compile with **Tectonic (XeTeX)** (`tectonic --keep-logs S7_Project_Report.tex` inside `final_review/latex/`), or
-  pdfLaTeX/Overleaf. Helper checks (`check_tex.py`): all 28 references cited, preamble diff vs template, no leftover
+  pdfLaTeX/Overleaf. Helper checks (`check_tex.py`): all 27 references cited (ref28 was removed, see section 22), preamble diff vs template, no leftover
   `[placeholders]`, template headings present, page count.
 - **Page budget story:** the user asked for **≥50 and ≤60 pages**. First build was 69 pages (Tectonic) while the user saw
   **75** in their own engine (~9% longer). It was trimmed to **53 pages in Tectonic** (expect ~57 for the user) by
@@ -380,7 +380,7 @@ URLs (an `<img src>` cannot send headers).
   people); explanation quality *measured* (flags catch 74.2% of wrong IDs; cohort split); the missing privacy finding
   (Bloom effective FPR 3.55% vs 1%); "eleven groups" fixed; Sandhu RBAC reference [21] cited; `CROSS_BUILDING_DENIED`
   wording; visitor events accounted for (1,447 + 708 + 45 = 2,200 in seed 42); "0.47 points" replaced by the five-seed
-  0.70; relation to the routing paper reconciled (paper: 92.81% vs 95.50% on routed visitor events only, 10 buildings,
+  0.70; the earlier reconciliation with the routing paper was REMOVED on 8 Nov 2026 (the manuscript is no longer cited; it said: paper 92.81% vs 95.50% on routed visitor events only, 10 buildings,
   20 seeds); mask handler on by default stated; "gap stated below Table 2" ordering fixed.
 - Text conventions: five-seed averages everywhere; plain, specific language; no AI-sounding filler.
 
@@ -843,7 +843,7 @@ Keep appending here when something changes. Commit hashes are local to the user'
 - **Editorial review pass of the whole report** (formal tone, no colloquialisms, British spelling outside quoted titles,
   claims tied to evidence, tables fitted to the 15.5 cm text width, `\emergencystretch`, code listings shortened, three new
   limitations: ArcFace training data may overlap CASIA-WebFace; no DHT/ANN alternative was evaluated; the dashboard's week
-  and month are replays of one day). Builds at **53 pages** in Tectonic (about 58 in the user's engine). Commit `4a2db6be`.
+  and month are replays of one day). Builds at **53 pages** in Tectonic (54 after the 8 Nov changes; about 58-59 in the user's engine). Commit `4a2db6be`.
   Unsupported sentence removed: "the identity probability is close to 1 for most misidentifications".
 - **Diagrams redrawn** (`final_review/latex/figures/arch.png`, `flow.png`; generator `make_diagrams.py` in the scratchpad):
   the old ones said "Mutual TLS" and omitted the visitor database, day cache, two-layer policy, explanations and audit log.
@@ -914,6 +914,72 @@ file) and merged into the local `test_7` as `7fdd63e0`; **575 tests pass** after
 - Still unchanged and to be aware of: `access_control/authorize.py` has a separate Layer-1 `PrecisionLevel` (EXACT / COARSE / ABSTRACT)
   for infrastructure roles, which is not the disclosure model; `pipeline/query.py` keeps two unused rule branches
   (`RULE_A_PEER_DEAN_COARSE`, visitor-in-own-building) that still mention a sector.
+
+**8 Nov 2026 — report introduction, citations and role wording (final_review/latex/S7_Project_Report.tex; not committed)**
+- **1.1 Background and motivation rewritten** (four paragraphs): (1) the smart-space definition (indoor environment with sensors, IoT
+  devices and intelligent infrastructure collecting indoor location data; campuses, hospitals, corporate estates, military bases);
+  (2) the work **extends DSTS (Mohan and Menon)**, which identifies visitors with a centralised master list; centralised is
+  presented as simple and accurate, *not* as a bad design, the recognition part measures how a distributed design holds up
+  against it (accuracy given up, share of data consulted); (3) role-based filtering of what a requester sees, with no Dean/Teacher/
+  Student named; (4) the three-part contribution, and the data-flow wording was corrected: a building first shares only a Bloom
+  filter of hashed LSH codes, then the *capture embedding* goes over a sealed channel to the shortlisted buildings, and a person's
+  reference embeddings are released only after a confirmed match (the old text wrongly said only a one-way Bloom filter leaves).
+- The abstract now opens with the same smart-space definition (campuses, hospitals, military bases) and no longer names the roles.
+  "rarely treats access control and explanation together" was softened to "among the works reviewed, none treats..." because it
+  rests on the report's 14-work review, not an exhaustive survey.
+- **Reference [28] (the routing manuscript) removed everywhere**: its bibliography entry, the introduction sentence, the
+  "same finding as the earlier routing study" sentence in the Bloom false-positive section and the whole "Relation to the earlier
+  routing study" paragraph in the discussion. The report now has 27 references.
+- **Roles abstracted until Chapter 5**: objective 2, "Intended users" (scope), "Stakeholders and consequences" (Chapter 2) and
+  requirement FR6 no longer name Dean/Teacher/Student; Chapter 5 (access-control design) is the first place they appear.
+  Open point: "auditors" in the stakeholders sentence is loose (there is no auditor role; it means whoever reviews the audit log).
+  A clearer wording was proposed ("the administrators who must be able to review who accessed whose data"); not applied yet.
+- Report builds at **54 pages** in Tectonic. For Overleaf upload the whole `final_review/latex/` folder (keep `figures/` and
+  `amrita-logo.png` beside the .tex); all six included images exist. `README.txt` there still says "69 pages" (stale).
+- The Edit tool converted `S7_Project_Report.tex` from CRLF to LF line endings; harmless for LaTeX.
+
+- **Query table added (8 Nov 2026)**: Chapter 5 now has Table "The fourteen query templates supported by the system" (Q1-Q13 and TRACK,
+  wording taken from `TEMPLATE_QUERIES` in `dsts/api/server.py`, with a kind column) and FR6 points to it. Q6 is the point-in-time query
+  redacted to the caller's level; Q3, Q4, Q5, Q7, Q8, Q9, Q11 and TRACK are refused below the full-history level (`TRAJECTORY_QUERIES`).
+  The report still builds at 54 pages in Tectonic after this.
+
+
+**8 Nov 2026 — masked recognition removed from the report; all numbers re-measured on 10 buildings (uncommitted)**
+- Decision (the user's): remove everything about masks from `final_review/latex/S7_Project_Report.tex` for now; they will add it back
+  if the masked results become acceptable. Implemented by deleting the mask handler and masked-building sections, the masked and
+  unmasked rows/columns, FR12 (requirements renumbered FR1-FR13), the "what was tried" subsection, the cohort paragraph on flags, the
+  masked limitation, the "Better masked recognition" future-work item, the RMFRD reference (ref20; 26 references now), the appendix steps and
+  the dataset documentation. The pre-removal report is kept at `final_review/latex/versions/S7_Project_Report_with_masked_building.tex`.
+- Because every number had been measured with building 11 in the run, the five seeds (0-4) and seed 42 were **re-run with the masked
+  building disabled** (`masked_building.enabled: false`, one-day generator): **500 occupants, 10 buildings, 10,000 events per day
+  (8,000 local + 2,000 visitor), 500 event labels, 90 (building, zone) labels.** Roles/ids change with the population size
+  (the Dean of building 8 is now 0001054; 0000884 is a Teacher), so persona ids written earlier in this file are for the old 11-building run.
+- New five-seed headline numbers: centralised 95.48%, decentralised 94.65%, gap 0.83 points, gallery touched 11.0%; local 95.47% vs
+  95.46% (gap 0.01); visitor 95.54% vs 91.42% (gap 4.12, gallery 15.1%); routing recall 90.8%; 1.75 buildings per routed lookup, 0.53 per
+  visitor event; 1,348 of 2,000 visitor events served from the visitor DB; pointer precision 98.3%; state F1 building 0.963, zone 0.940,
+  building+zone 0.924; 95% CI of accuracy +-0.23; SD 0.19. Seed 42: 1,335 served + 585 routed + 80 accepted as locals = 2,000; centralised
+  95.48% vs pipeline 94.68% (80 events, 0.80 points).
+- Explanations (five seeds): 9,656 identified, 191 wrong; **77.9% of wrong flagged, 2.3% of correct flagged**, 40.2% of flagged are wrong;
+  local 82.9% / 0.9%, routed visitors 81.8% / 30.9%, visitor DB 4.3% (2 flags in 5 seeds, both on wrong ones); `vote_winner_not_nearest`
+  262 of 263 wrong; answers: 6,947 scored, 20.7% flagged, 736 wrong, recall 76.0%, precision 38.8%. **Overhead is now 6.3 -> 7.1 ms = 12.4%
+  (per seed 11.3-13.5%)**, response 16,150 -> 119,040 bytes; the older "about 7%" was measured under machine load. The abstract, discussion,
+  conclusion and status table say about 12%.
+- Bloom effective false-positive rate unchanged: 3.55% (slot collisions 2.64%, random integers 0.94%, uniform expectation 2.44%).
+- Dashboard figures retaken from the 10-building run: `ui_overview.png` (10 buildings, 90 zones, 500 occupants) and `ui_query_dean.png`
+  (Dean 0001054, Q6 on 0001272 at 16:00: `low_votes`, `verified_by_lower_ranked_building`, `narrow_routing_margin`); `ui_track.png`
+  (0000598) is unchanged because that person's events are identical. Report: 53 pages in Tectonic, no undefined references.
+- New environment variables (code change, backwards compatible): `DSTS_RUNS_DIR` (where `runs/` lives; `shared/paths.py`) and
+  `DSTS_CONFIG` (alternative config file; `shared/experiment_config.py`). The no-mask runs were produced with
+  `DSTS_RUNS_DIR=<dir> DSTS_CONFIG=final_review/latex/versions/experiment_nomask.yaml python manage.py run --seeds 0-4 --days 1`, followed per seed by
+  `python -m centralized.compare_all`, `python -m evaluation.evaluate_explanations --runs 100` (with `DSTS_RUN_DIR`/`DSTS_SEED` set) and once
+  `python tools/measure_bloom_fpr.py`, plus `python manage.py pipeline --seed 42 --days 1` for the detailed run. The runs themselves live in a
+  temporary folder and are not kept; `versions/aggregate_numbers.py` turns a runs folder into every number the report uses
+  (`versions/numbers_10_buildings_no_mask.json` and `numbers_11_buildings_with_masked.json` hold both sets; the script reproduces the old report values).
+- **Not updated for this change**: the deck (`final_review/S7_Final_Review_Group_C3.pptx`: masked slide content, 11 buildings, 550 people, old
+  numbers), `README.md`, `INTEGRATION.md`, the dashboard demo data in `runs/` (still the 11-building runs with the masked building) and the
+  tests (572 pass). The user may want the deck brought in line next.
+
+- **Shortlist verification policies (8 Nov 2026)**: the pipeline now has a selectable policy, `DSTS_VERIFY_POLICY` = `sequential` (default, unchanged behaviour: rank order, first confirmation ends the search), `verify_all` (every shortlisted building verifies, most votes wins) or `adaptive` (verify_all when the gap between the two best Bloom scores is <= `DSTS_ADAPTIVE_GAP`, default 5, else sequential); code in `pipeline/route_and_recognize.py` `RetrievalRuntime.retrieve`. The report has a design subsection "Shortlist verification policies" and a results subsection "Shortlist verification policies compared". Measured by the assistant on the five 10-building populations, rerunning from phase 3 (`final_review/latex/versions/run_policies.py`, raw results in `policy_results_10_buildings.json`; the sequential run reproduced the original results exactly): on routed visitor lookups (about 584 per run) correct / wrong person / abstained / buildings contacted = sequential 84.38 / 2.76 / 12.86 % / 1.75; adaptive 84.79 / 2.33 / 12.88 % / 2.75; verify all 84.76 / 2.36 / 12.88 % / 5.00; accuracy over all 10,000 events 94.65 / 94.68 / 94.67 %. Adaptive and verify-all beat sequential by about 0.4 points in all five seeds; adaptive vs verify-all differ by 0.03 points with mixed sign. The older numbers in `paper/presentation_notes.md` (92.81 / 92.19 / 92.95) belong to the separate routing-paper experiment and are NOT used in the report. The report is now 55 pages in Tectonic (about 60 on Overleaf, at the upper limit).
 
 **Still open / ideas**: the user may ask for the same sensor-neutral and no-class-teacher wording in the LaTeX report
 (it still says "camera events" and "class-teacher model" in places); the report and the deck are otherwise consistent.
