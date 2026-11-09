@@ -47,3 +47,7 @@ evaluate_pipeline/
 
 # the face photo folders (CASIA-WebFace splits), large and not versioned here
 dataset_splits/
+
+# the shared photo archive: far over GitHub's 100 MB limit, shared manually
+dataset_splits.zip
+*.zip
