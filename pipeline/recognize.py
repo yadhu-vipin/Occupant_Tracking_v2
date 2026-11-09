@@ -23,6 +23,8 @@ which does have that context).
 """
 from __future__ import annotations
 
+import os
+
 import numpy as np
 
 from buildinglib._vendored.lsh import preprocess
@@ -109,13 +111,17 @@ class LocalRecognizer:
         # Initial vote pass with original thresholds
         angles, votes = vote_evidence(refs, query, self.params.accept_angle_deg)
 
-        # Mask detection + threshold adjustment
-        adjusted_params, mask_report = apply_mask_handling(
-            angles, votes, self.params, self.mask_config
-        )
+        # Mask detection + threshold adjustment. Off by default: the reported experiments use one fixed accept angle
+        # and vote rule everywhere. Set DSTS_MASK_HANDLER=on to relax the thresholds when the angle spread is high.
+        if os.environ.get("DSTS_MASK_HANDLER", "off").lower() == "on":
+            adjusted_params, mask_report = apply_mask_handling(
+                angles, votes, self.params, self.mask_config
+            )
+        else:
+            adjusted_params, mask_report = self.params, None
 
         # If mask was detected, re-run vote_evidence with the relaxed angle
-        if mask_report.mask_detected:
+        if mask_report is not None and mask_report.mask_detected:
             angles, votes = vote_evidence(refs, query, adjusted_params.accept_angle_deg)
 
         winner = int(np.lexsort((angles.min(axis=1), -votes))[0])

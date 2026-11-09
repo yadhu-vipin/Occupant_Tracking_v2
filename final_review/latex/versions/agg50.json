@@ -1,0 +1,264 @@
+{
+ "n_seeds": 50,
+ "central": {
+  "all": {
+   "events": 10000,
+   "cen": 95.17240000000001,
+   "dec": 95.01399999999998,
+   "touched": 11.048599999999999,
+   "gap": 0.15840000000002874,
+   "gap_stat": {
+    "mean": 0.15839999999999946,
+    "sd": 0.06290128320290146,
+    "min": 0.030000000000001137,
+    "max": 0.3399999999999892,
+    "ci": 0.01787634689291097
+   }
+  },
+  "local": {
+   "events": 8000,
+   "cen": 95.9375,
+   "dec": 95.9375,
+   "touched": 10.000000000000002,
+   "gap": 0.0,
+   "gap_stat": {
+    "mean": 0.0,
+    "sd": 0.0,
+    "min": 0.0,
+    "max": 0.0,
+    "ci": 0.0
+   }
+  },
+  "visitor": {
+   "events": 2000,
+   "cen": 92.11200000000001,
+   "dec": 91.31999999999998,
+   "touched": 15.243000000000004,
+   "gap": 0.79200000000003,
+   "gap_stat": {
+    "mean": 0.7920000000000016,
+    "sd": 0.31450641601449963,
+    "min": 0.14999999999999147,
+    "max": 1.7000000000000028,
+    "ci": 0.08938173446455265
+   }
+  }
+ },
+ "events": {
+  "all": {
+   "tp": 9501.4,
+   "fp": 155.46,
+   "fn": 498.6,
+   "precision": 0.983901675201047,
+   "recall": 0.9501399999999998,
+   "f1": 0.9667261114113819
+  },
+  "local": {
+   "tp": 7675.0,
+   "fp": 59.64,
+   "fn": 325.0,
+   "precision": 0.9922894293378733,
+   "recall": 0.959375,
+   "f1": 0.9755544277474628
+  },
+  "visitor": {
+   "tp": 1826.4,
+   "fp": 95.82,
+   "fn": 173.6,
+   "precision": 0.9501524714224868,
+   "recall": 0.9132000000000001,
+   "f1": 0.9313063447836616
+  }
+ },
+ "n_labels": 500,
+ "acc_stats": {
+  "all": {
+   "mean": 95.01399999999998,
+   "sd": 0.11376667852608431,
+   "min": 94.67,
+   "max": 95.23,
+   "ci": 0.032332132297306734
+  },
+  "local": {
+   "mean": 95.9375,
+   "sd": 0.09129873593688538,
+   "min": 95.72500000000001,
+   "max": 96.1625,
+   "ci": 0.025946813663997814
+  },
+  "visitor": {
+   "mean": 91.31999999999998,
+   "sd": 0.6610134457862452,
+   "min": 89.7,
+   "max": 92.45,
+   "ci": 0.187857942732848
+  },
+  "routing": {
+   "mean": 90.63781413956575,
+   "sd": 1.0051792315746144,
+   "min": 88.31385642737897,
+   "max": 92.56055363321799,
+   "ci": 0.2856687768231195
+  }
+ },
+ "visitor": {
+  "per_routed": 1.7749267965424211,
+  "per_visitor_event": 0.5417591355322972,
+  "served_db": 1344.94,
+  "pointer_prec": 98.28296464698634,
+  "routed_events": 590.58
+ },
+ "state_keys": [
+  "location",
+  "building",
+  "zone"
+ ],
+ "state": {
+  "building": {
+   "p": 0.9618148517282988,
+   "r": 0.9595042203830206,
+   "f1": 0.9606400757287464,
+   "vr": 0.9495689183939604,
+   "f1_sd": 0.004418126359754299
+  },
+  "zone": {
+   "p": 0.9421820068338574,
+   "r": 0.9398918093672419,
+   "f1": 0.9410175960124179,
+   "vr": 0.9371730292932593,
+   "f1_sd": 0.003944842998128288
+  },
+  "location": {
+   "p": 0.9259224254380382,
+   "r": 0.9236491381948754,
+   "f1": 0.9247665717524107,
+   "vr": 0.9034709533618943,
+   "f1_sd": 0.004996217571352349
+  }
+ },
+ "flags_ident": {
+  "all": {
+   "identified_events": 9656.86,
+   "wrong_identifications": 155.46,
+   "share_of_wrong_flagged": 73.947,
+   "share_of_correct_flagged": 2.3214,
+   "share_of_flagged_that_are_wrong": 34.2228,
+   "pooled_wrong": 7773,
+   "pooled_wrong_flagged": 5737,
+   "pooled_flagged": 16763
+  },
+  "local": {
+   "identified_events": 7751.68,
+   "wrong_identifications": 76.68,
+   "share_of_wrong_flagged": 74.23379999999999,
+   "share_of_correct_flagged": 0.9101999999999999,
+   "share_of_flagged_that_are_wrong": 44.6108,
+   "pooled_wrong": 3834,
+   "pooled_wrong_flagged": 2835,
+   "pooled_flagged": 6329
+  },
+  "routed": {
+   "identified_events": 569.4,
+   "wrong_identifications": 67.52,
+   "share_of_wrong_flagged": 85.2822,
+   "share_of_correct_flagged": 30.00879999999999,
+   "share_of_flagged_that_are_wrong": 27.665599999999994,
+   "pooled_wrong": 3376,
+   "pooled_wrong_flagged": 2878,
+   "pooled_flagged": 10409
+  },
+  "db": {
+   "identified_events": 1335.78,
+   "wrong_identifications": 11.26,
+   "share_of_wrong_flagged": 4.3284,
+   "share_of_correct_flagged": 0.0014,
+   "share_of_flagged_that_are_wrong": 95.0,
+   "pooled_wrong": 563,
+   "pooled_wrong_flagged": 24,
+   "pooled_flagged": 25
+  }
+ },
+ "per_flag": {
+  "vote_winner_not_nearest": {
+   "events": 730,
+   "wrong": 714,
+   "share": 97.8082191780822
+  },
+  "low_votes": {
+   "events": 8089,
+   "wrong": 4379,
+   "share": 54.135245394980835
+  },
+  "verified_by_lower_ranked_building": {
+   "events": 5179,
+   "wrong": 1746,
+   "share": 33.7130720216258
+  },
+  "narrow_routing_margin": {
+   "events": 9389,
+   "wrong": 2258,
+   "share": 24.049419533496646
+  }
+ },
+ "answers": {
+  "n": 6946.38,
+  "share_flagged": 20.818199999999997,
+  "wrong": 713.52,
+  "recall": 78.90140000000001,
+  "precision": 38.906800000000004
+ },
+ "bloom": {
+  "effective_fpr": 3.5610236794171217,
+  "slot_collision_rate": 2.638404371584699,
+  "random_integer_fpr": 0.949718726353835,
+  "expected_slot_collision_if_uniform": 2.44140625,
+  "effective_sd": 0.018287928172337212
+ },
+ "policies": {
+  "sequential": {
+   "routed": 590.58,
+   "correct": 83.89411293131514,
+   "wrong": 2.9476122508483185,
+   "abst": 13.158274817836544,
+   "asked": 1.7749267965424211,
+   "acc_all": 95.01399999999998
+  },
+  "verify_all": {
+   "routed": 587.14,
+   "correct": 84.41685513057797,
+   "wrong": 2.3588357122172896,
+   "abst": 13.22430915720475,
+   "asked": 5.0,
+   "acc_all": 95.0404
+  },
+  "adaptive": {
+   "routed": 586.98,
+   "correct": 84.48785008402753,
+   "wrong": 2.2877419366103235,
+   "abst": 13.224407979362153,
+   "asked": 2.75713967851806,
+   "acc_all": 95.0578
+  },
+  "paired": {
+   "adaptive_vs_seq_correct": {
+    "mean": 0.5937371527123869,
+    "better": 50,
+    "ci": 0.09353333099027177
+   },
+   "verifyall_vs_seq_correct": {
+    "mean": 0.5227421992628214,
+    "better": 48,
+    "ci": 0.10145628836109677
+   },
+   "adaptive_vs_verifyall_correct": {
+    "mean": 0.07099495344956551,
+    "better": 24,
+    "ci": 0.050103599657316644
+   },
+   "adaptive_vs_seq_wrong": {
+    "mean": -0.6598703142379955,
+    "ci": 0.09814792786256882
+   }
+  }
+ }
+}

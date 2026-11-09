@@ -570,6 +570,11 @@ Underfull \hbox (badness 2096) in paragraph at lines 232--232
  []
 
 
+Underfull \hbox (badness 10000) in paragraph at lines 232--232
+[]|\T1/ptm/m/n/10.95 Sealed-transfer and
+ []
+
+
 Underfull \hbox (badness 1308) in paragraph at lines 233--233
 \T1/ptm/m/n/10.95 and re-call, com-mu-ni-ca-tion
  []
@@ -837,28 +842,23 @@ Underfull \hbox (badness 10000) in paragraph at lines 331--331
  []
 
 
-Underfull \hbox (badness 2065) in paragraph at lines 331--331
-\T1/ptm/m/n/10.95 and re-ID on Jet-son
+Underfull \hbox (badness 6910) in paragraph at lines 331--331
+\T1/ptm/m/n/10.95 and re-ID on edge
  []
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 331--331
-[]|\T1/ptm/m/n/10.95 Own cam-pus
+[]|\T1/ptm/m/n/10.95 Multi-camera
  []
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 331--331
-\T1/ptm/m/n/10.95 record-ings, one
- []
-
-
-Underfull \hbox (badness 1603) in paragraph at lines 331--331
-[]|\T1/ptm/m/n/10.95 IDF1, FPS, re-ID
+\T1/ptm/m/n/10.95 surveil-lance
  []
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 331--331
-\T1/ptm/m/n/10.95 30 FPS, about
+[]|\T1/ptm/m/n/10.95 Real-time edge
  []
 
 
@@ -893,7 +893,12 @@ Underfull \hbox (badness 10000) in paragraph at lines 332--332
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 332--332
-[]|\T1/ptm/m/n/10.95 Abstract frame-
+[]|\T1/ptm/m/n/10.95 Two-building
+ []
+
+
+Underfull \hbox (badness 6493) in paragraph at lines 332--332
+[]|\T1/ptm/m/n/10.95 State-based pre-ci-
  []
 
 
@@ -983,26 +988,6 @@ Underfull \hbox (badness 10000) in paragraph at lines 335--335
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 336--336
-[]|\T1/ptm/m/n/10.95 Work 10
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 336--336
-\T1/ptm/m/n/10.95 [[], []]
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 336--336
-\T1/ptm/m/n/10.95 Kirsch and
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 336--336
-\T1/ptm/m/n/10.95 Mitzen-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 336--336
 []|\T1/ptm/m/n/10.95 Compact set
  []
 
@@ -1013,17 +998,17 @@ Underfull \hbox (badness 6284) in paragraph at lines 336--336
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 336--336
-\T1/ptm/m/n/10.95 func-tions; dou-ble
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 336--336
 []|\T1/ptm/m/n/10.95 Exact mem-ber-
  []
 
 
 Underfull \hbox (badness 1997) in paragraph at lines 336--336
 \T1/ptm/m/n/10.95 ship only; as-sumes
+ []
+
+
+Underfull \hbox (badness 1205) in paragraph at lines 336--336
+\T1/ptm/m/n/10.95 queries un-re-lated to
  []
 
 
@@ -1047,13 +1032,38 @@ Underfull \hbox (badness 10000) in paragraph at lines 337--337
  []
 
 
-Underfull \hbox (badness 2261) in paragraph at lines 338--338
-[]\T1/ptm/m/n/10.95 ] Charikar,
+Underfull \hbox (badness 10000) in paragraph at lines 338--338
+[]|\T1/ptm/m/n/10.95 Work 12
+ []
+
+
+Underfull \hbox (badness 4291) in paragraph at lines 338--338
+\T1/ptm/m/n/10.95 [[], [], []]
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 338--338
+\T1/ptm/m/n/10.95 Charikar,
  []
 
 
 Underfull \hbox (badness 2556) in paragraph at lines 338--338
 \T1/ptm/m/n/10.95 2002; Lv et
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 338--338
+\T1/ptm/m/n/10.95 al., 2007;
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 338--338
+\T1/ptm/m/n/10.95 Kirsch and
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 338--338
+\T1/ptm/m/n/10.95 Mitzen-
  []
 
 
@@ -1069,6 +1079,11 @@ Underfull \hbox (badness 10000) in paragraph at lines 338--338
 
 Underfull \hbox (badness 1275) in paragraph at lines 338--338
 []|\T1/ptm/m/n/10.95 Random hy-per-planes;
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 338--338
+\T1/ptm/m/n/10.95 multi-probe lookup;
  []
 
 
@@ -1378,8 +1393,8 @@ Underfull \hbox (badness 3058) in paragraph at lines 444--444
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 446--446
-[]|\T1/ptm/m/n/10.95 visitor_pool.db and
+Underfull \hbox (badness 4859) in paragraph at lines 446--446
+[]|\T1/ptm/m/n/10.95 Visitor en-try his-tory
  []
 
 [20
@@ -1412,11 +1427,6 @@ Underfull \hbox (badness 1418) in paragraph at lines 516--516
  []
 
 
-Underfull \hbox (badness 5490) in paragraph at lines 517--517
-[]|\T1/ptm/m/n/10.95 Disk: vis-i-tor_pool.db,
- []
-
-
 Underfull \hbox (badness 10000) in paragraph at lines 517--517
 []|\T1/ptm/m/n/10.95 Recognising fre-quent
  []
@@ -1424,26 +1434,6 @@ Underfull \hbox (badness 10000) in paragraph at lines 517--517
 [24]
 Underfull \hbox (badness 10000) in paragraph at lines 545--545
 []|\T1/ptm/m/n/10.95 Dean (1 per
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
-\T1/ptm/m/n/10.95 RULE_A_OWN_
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
-\T1/ptm/m/n/10.95 CAMPUS_FULL
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
-\T1/ptm/m/n/10.95 and RULE_A_
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 545--545
-\T1/ptm/m/n/10.95 PEER_DEAN_
  []
 
 
@@ -1458,58 +1448,21 @@ Underfull \hbox (badness 10000) in paragraph at lines 545--545
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 546--546
-[]|\T1/ptm/m/n/10.95 L3 for ros-ter
- []
-
-
-Underfull \hbox (badness 4291) in paragraph at lines 546--546
-\T1/ptm/m/n/10.95 stu-dents (RULE_
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 546--546
-\T1/ptm/m/n/10.95 B_ROSTER_
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 546--546
 \T1/ptm/m/n/10.95 peer teach-ers, the
  []
 
-
-Underfull \hbox (badness 3701) in paragraph at lines 547--547
-[]|\T1/ptm/m/n/10.95 L3 for self, L2
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 547--547
-\T1/ptm/m/n/10.95 for as-signed
- []
-
-
-Underfull \hbox (badness 4341) in paragraph at lines 547--547
-\T1/ptm/m/n/10.95 teach-ers (RULE_
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 547--547
-\T1/ptm/m/n/10.95 C_ASSIGNED_
- []
-
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 557.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.4> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 557.
 [25]
-Underfull \hbox (badness 1521) in paragraph at lines 588--588
-[]|\T1/ptm/m/n/10.95 The ac-cepted oc-cu-pant was not also the near-est can-di-
-date
- []
-
-
 Underfull \hbox (badness 10000) in paragraph at lines 590--590
-[]|\T1/ptm/m/n/10.95 verified_by_lower_ranked_
+[]|\T1/ptm/m/n/10 Lower-ranked build-ing
  []
 
-[26] [27] [28]
+[26] [27]
 Chapter 6.
-[29
+[28
 
 
 ]
@@ -1532,162 +1485,144 @@ Underfull \hbox (badness 10000) in paragraph at lines 658--658
 []|\T1/ptm/b/n/10.95 Gallery
  []
 
-[30]
+[29]
 Underfull \hbox (badness 10000) in paragraph at lines 691--691
-[]|\T1/ptm/m/n/10.95 0.950 / 0.914 /
+[]|\T1/ptm/m/n/10.95 0.950 / 0.913 /
  []
 
 
-Underfull \hbox (badness 6364) in paragraph at lines 694--694
-[]|\T1/ptm/m/n/10.95 Buildings con-tacted per vis-i-tor event, count-ing
+Underfull \hbox (badness 10000) in paragraph at lines 694--694
+[]|\T1/ptm/m/n/10.95 1,345 (67.2%,
  []
 
 
-Underfull \hbox (badness 3701) in paragraph at lines 695--695
-[]|\T1/ptm/m/n/10.95 1,348 (about two
+Underfull \hbox (badness 10000) in paragraph at lines 696--696
+[]|\T1/ptm/m/n/10.95 0.950 / 0.937 /
  []
 
-
-Underfull \hbox (badness 10000) in paragraph at lines 697--697
-[]|\T1/ptm/m/n/10.95 0.930 / 0.937 /
- []
-
-[31]
-Underfull \hbox (badness 10000) in paragraph at lines 713--713
+[30]
+Underfull \hbox (badness 10000) in paragraph at lines 712--712
 []|\T1/ptm/b/n/10.95 Wrong per-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 713--713
+Underfull \hbox (badness 10000) in paragraph at lines 712--712
 []|\T1/ptm/b/n/10.95 Buildings
  []
 
 
-Overfull \hbox (5.27531pt too wide) in paragraph at lines 712--718
+Overfull \hbox (5.27531pt too wide) in paragraph at lines 711--717
  [][] 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 737--737
-[]|\T1/ptm/m/n/10.95 95% CI
- []
-
-[32]
-Underfull \hbox (badness 10000) in paragraph at lines 772--772
-[]|\T1/ptm/b/n/10.95 Wrong,
+Underfull \hbox (badness 10000) in paragraph at lines 734--734
+[]|\T1/ptm/m/n/10.95 Gap to the cen-tralised
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 772--772
-[]|\T1/ptm/b/n/10.95 Correct,
+Overfull \hbox (13.81038pt too wide) in paragraph at lines 728--736
+ [][] 
  []
 
-
-Underfull \hbox (badness 10000) in paragraph at lines 772--772
-[]|\T1/ptm/b/n/10.95 Flagged
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 772--772
-\T1/ptm/b/n/10.95 that are
- []
-
-[33] [34]
-Underfull \hbox (badness 1616) in paragraph at lines 813--813
+[31] [32] [33]
+Underfull \hbox (badness 1616) in paragraph at lines 807--807
 \T1/ptm/m/n/10.95 ing scope, lock-out, cre-den-tials, tick-ets, API-level
  []
 
-[35]
+[34]
 File: figures//ui_overview.png Graphic file (type bmp)
 <figures//ui_overview.png>
 File: figures//ui_track.png Graphic file (type bmp)
 <figures//ui_track.png>
 File: figures//ui_query_dean.png Graphic file (type bmp)
 <figures//ui_query_dean.png>
- [36]
-Underfull \hbox (badness 10000) in paragraph at lines 859--859
+File: figures//ui_query_student.png Graphic file (type bmp)
+<figures//ui_query_student.png>
+ [35]
+Underfull \hbox (badness 10000) in paragraph at lines 854--854
 []|\T1/ptm/b/n/10.95 Face data leav-ing a
  []
 
 
-Underfull \hbox (badness 1629) in paragraph at lines 860--860
+Underfull \hbox (badness 10000) in paragraph at lines 855--855
+[]|\T1/ptm/m/n/10.95 Direct search of
+ []
+
+
+Underfull \hbox (badness 1629) in paragraph at lines 855--855
 []|\T1/ptm/m/n/10.95 Galleries pooled in one
  []
 
 
-Underfull \hbox (badness 1490) in paragraph at lines 860--860
-[]|\T1/ptm/m/n/10.95 95.48%; 100% of
+Underfull \hbox (badness 1490) in paragraph at lines 855--855
+[]|\T1/ptm/m/n/10.95 95.17%; 100% of
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 861--861
+Underfull \hbox (badness 10000) in paragraph at lines 856--856
 []|\T1/ptm/m/n/10.95 Decentralised LSH +
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 861--861
+Underfull \hbox (badness 10000) in paragraph at lines 856--856
 \T1/ptm/m/n/10.95 Bloom rout-ing (this
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 861--861
+Underfull \hbox (badness 10000) in paragraph at lines 856--856
 []|\T1/ptm/m/n/10.95 Rank by Bloom
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 861--861
+Underfull \hbox (badness 10000) in paragraph at lines 856--856
 \T1/ptm/m/n/10.95 score, ver-ify the
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 862--862
+Underfull \hbox (badness 10000) in paragraph at lines 857--857
 []|\T1/ptm/m/n/10.95 Not re-run; re-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 863--863
+Underfull \hbox (badness 10000) in paragraph at lines 858--858
 []|\T1/ptm/m/n/10.95 Edge-camera track-ing
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 863--863
+Underfull \hbox (badness 10000) in paragraph at lines 858--858
 []|\T1/ptm/m/n/10.95 No cross-building
  []
 
 
-Underfull \hbox (badness 1009) in paragraph at lines 863--863
+Underfull \hbox (badness 1009) in paragraph at lines 858--858
 \T1/ptm/m/n/10.95 iden-tity, RBAC or
  []
 
-[37] [38]
+[36] [37] [38]
 Chapter 7.
 
-Underfull \hbox (badness 10000) in paragraph at lines 900--900
+Underfull \hbox (badness 10000) in paragraph at lines 895--895
 []|\T1/ptm/m/n/10.95 BSTS over 10 build-ings;
  []
 
 
-Underfull \hbox (badness 5924) in paragraph at lines 901--901
+Underfull \hbox (badness 5924) in paragraph at lines 896--896
 \T1/ptm/m/n/10.95 ev-ery pol-icy cell tested, 64-
  []
 
 
-Underfull \hbox (badness 5077) in paragraph at lines 902--902
+Underfull \hbox (badness 5077) in paragraph at lines 897--897
 []|\T1/ptm/m/n/10.95 Faithfulness cases, flag re-call
  []
 
 
-Underfull \hbox (badness 4341) in paragraph at lines 903--903
+Underfull \hbox (badness 4341) in paragraph at lines 898--898
 \T1/ptm/m/n/10.95 point ac-cu-racy cost; ef-fec-tive
  []
 
 
-Underfull \hbox (badness 1859) in paragraph at lines 905--905
-[]|\T1/ptm/m/n/10.95 Event and state TP/FP/FN/TN,
- []
-
-
-Overfull \hbox (2.70215pt too wide) in paragraph at lines 898--907
+Overfull \hbox (2.70215pt too wide) in paragraph at lines 893--902
  [][] 
  []
 
@@ -1700,7 +1635,7 @@ Overfull \hbox (2.70215pt too wide) in paragraph at lines 898--907
 ] [42] [43]
 Appendix A.
 
-Underfull \hbox (badness 1910) in paragraph at lines 1097--1098
+Underfull \hbox (badness 1910) in paragraph at lines 1092--1093
 []\T1/ptm/m/n/12 Clone the repos-i-tory, cre-ate a vir-tual en-vi-ron-ment and 
 run \T1/lmtt/m/n/12 pip install -r
  []
@@ -1712,4 +1647,4 @@ run \T1/lmtt/m/n/12 pip install -r
 Package rerunfilecheck Info: File `S7_Project_Report.out' has not changed.
 (rerunfilecheck)             Checksum: 329F3E56B5C55B892DCBF6552AE070E2;5949.
  )
-Output written on S7_Project_Report.xdv (55 pages, 215692 bytes).
+Output written on S7_Project_Report.xdv (55 pages, 216796 bytes).

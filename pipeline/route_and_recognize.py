@@ -244,7 +244,7 @@ class RetrievalRuntime:
             codes, margins = encode_with_margins(query[None], self.contract.hyperplanes, self.contract.params.k)
             shortlist, scores = route(codes[0], margins[0], self.filters, candidates,
                                       self.contract.space, self.contract.n_probes,
-                                      self.contract.shortlist_k)
+                                      int(os.environ.get("DSTS_SHORTLIST_K") or self.contract.shortlist_k))
         policy = getattr(self, "verify_policy", "sequential")
         ask_all = policy == "verify_all"
         if policy == "adaptive" and len(shortlist) >= 2:
