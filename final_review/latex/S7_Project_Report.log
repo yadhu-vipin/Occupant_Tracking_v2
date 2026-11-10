@@ -1539,7 +1539,7 @@ File: figures//ui_query_dean.png Graphic file (type bmp)
 <figures//ui_query_dean.png>
 File: figures//ui_query_student.png Graphic file (type bmp)
 <figures//ui_query_student.png>
- [35]
+
 Underfull \hbox (badness 10000) in paragraph at lines 854--854
 []|\T1/ptm/b/n/10.95 Face data leav-ing a
  []
@@ -1599,30 +1599,30 @@ Underfull \hbox (badness 1009) in paragraph at lines 858--858
 \T1/ptm/m/n/10.95 iden-tity, RBAC or
  []
 
-[36] [37] [38]
+[35] [36] [37] [38]
 Chapter 7.
 
-Underfull \hbox (badness 10000) in paragraph at lines 895--895
+Underfull \hbox (badness 10000) in paragraph at lines 896--896
 []|\T1/ptm/m/n/10.95 BSTS over 10 build-ings;
  []
 
 
-Underfull \hbox (badness 5924) in paragraph at lines 896--896
+Underfull \hbox (badness 5924) in paragraph at lines 897--897
 \T1/ptm/m/n/10.95 ev-ery pol-icy cell tested, 64-
  []
 
 
-Underfull \hbox (badness 5077) in paragraph at lines 897--897
+Underfull \hbox (badness 5077) in paragraph at lines 898--898
 []|\T1/ptm/m/n/10.95 Faithfulness cases, flag re-call
  []
 
 
-Underfull \hbox (badness 4341) in paragraph at lines 898--898
+Underfull \hbox (badness 4341) in paragraph at lines 899--899
 \T1/ptm/m/n/10.95 point ac-cu-racy cost; ef-fec-tive
  []
 
 
-Overfull \hbox (2.70215pt too wide) in paragraph at lines 893--902
+Overfull \hbox (2.70215pt too wide) in paragraph at lines 894--903
  [][] 
  []
 
@@ -1635,7 +1635,7 @@ Overfull \hbox (2.70215pt too wide) in paragraph at lines 893--902
 ] [42] [43]
 Appendix A.
 
-Underfull \hbox (badness 1910) in paragraph at lines 1092--1093
+Underfull \hbox (badness 1910) in paragraph at lines 1097--1098
 []\T1/ptm/m/n/12 Clone the repos-i-tory, cre-ate a vir-tual en-vi-ron-ment and 
 run \T1/lmtt/m/n/12 pip install -r
  []
@@ -1647,4 +1647,4 @@ run \T1/lmtt/m/n/12 pip install -r
 Package rerunfilecheck Info: File `S7_Project_Report.out' has not changed.
 (rerunfilecheck)             Checksum: 329F3E56B5C55B892DCBF6552AE070E2;5949.
  )
-Output written on S7_Project_Report.xdv (55 pages, 216796 bytes).
+Output written on S7_Project_Report.xdv (55 pages, 218496 bytes).

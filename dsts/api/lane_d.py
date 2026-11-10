@@ -315,8 +315,10 @@ def _may_see(who: str, occupant: str, building: Optional[str], ts: str):
 def track(occupant: str, day: Optional[str] = None, who: str = Depends(principal)) -> dict:
     """Where one occupant was during one day, waypoint by waypoint, shown at the detail the caller's role allows.
 
-    Every sighting passes the persona/building policy for the caller: exact zone, time, confidence and the captured
-    photo at L2+, nothing below. The answer is audited like a query."""
+    A track is a history, so it needs the full-history level (L3): a Dean for their campus and the other Deans, a Teacher
+    for rostered students, anyone for themselves. A caller who may only see an exact current location (L2, a Student
+    looking at an assigned teacher) gets no track. Every sighting passes the persona/building policy for the caller, and
+    the answer is audited like a query."""
     from access_control.authorize import audit_policy_decision
     from access_control.campus_policy import DisclosureLevel
     from dsts.state.zones import zone_label
@@ -332,7 +334,7 @@ def track(occupant: str, day: Optional[str] = None, who: str = Depends(principal
     waypoints, best, refused = [], None, None
     for e in todays:
         d = _may_see(who, occupant, e.building, e.timestamp)
-        if not d.permitted or d.level < DisclosureLevel.L2_PRECISE_CURRENT:
+        if not d.permitted or d.level < DisclosureLevel.L3_HISTORICAL_TRACK:
             refused = refused or d
             continue
         best = d if best is None or d.level > best.level else best
@@ -349,7 +351,7 @@ def track(occupant: str, day: Optional[str] = None, who: str = Depends(principal
     elif not todays:
         note = "No sighting of this person on that day yet."
     return {"occupant": occupant, "role": role, "home_building": home, "day": chosen, "days": days,
-            "disclosure": shown_level, "portrait": bool(best and best.level >= DisclosureLevel.L2_PRECISE_CURRENT),
+            "disclosure": shown_level, "portrait": bool(best and best.level >= DisclosureLevel.L3_HISTORICAL_TRACK),
             "waypoints": waypoints, "note": note,
             "buildings": sorted({w["building"] for w in waypoints}), "sightings": len(todays)}
 
@@ -503,7 +505,7 @@ def query(body: QueryIn, authorization: Optional[str] = Header(None), x_api_toke
     ok = bool(res.get("success"))
     return {"rows": _rows(q, ok, answer, evidence, res, building, request.zone),
             "redacted": bool(dec.get("redacted_fields")) or not ok,
-            "answer": _describe(q, ok, dec, answer, evidence, res),
+            "answer": _describe(q, ok, dec, answer, evidence, res) + (f" ({res['note']})" if res.get("note") else ""),
             "success": ok,
             # the reasoning behind the answer, already redacted by the server for this caller's disclosure level
             "explanation": res.get("explanation"), "withheld": res.get("withheld") or [],

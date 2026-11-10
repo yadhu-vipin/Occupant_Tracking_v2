@@ -507,6 +507,15 @@ def get_cache_stats(principal: str = Depends(get_current_principal)) -> dict:
 # RBAC-PROTECTED SYSTEM ENDPOINTS (S3)
 # ================================================================
 
+def _present_time(engine) -> Optional[str]:
+    """The 'now' of the replay: the simulated clock while a simulation runs, otherwise the latest recorded sighting."""
+    from dsts.api.simulation import SIM
+    if SIM.active:
+        return SIM.now_text()
+    events = getattr(engine, "events", None)
+    return events[-1].timestamp if events else None
+
+
 def determine_office_hours(query_time: Optional[str] = None) -> bool:
     """Whether campus office hours (08:00-18:00) are active.
 
@@ -1085,6 +1094,26 @@ def execute_query_endpoint(
         out["decision"] = decision.to_dict()
         return out
 
+    # Without the full-history level (L3) a location can only be given for the present: the exact zone is for the time at
+    # which the caller asks, never for an earlier time, so repeated queries cannot rebuild a track.
+    time_note = None
+    if q_type == "Q6" and decision.level < DisclosureLevel.L3_HISTORICAL_TRACK:
+        present = _present_time(engine)
+        if present:
+            if present != at_time:
+                time_note = f"Shown for the current time ({present}), not for the time asked: a location at another time needs full-history access."
+            at_time = present
+            target_curr_b = resolve_target_current_building(engine, target_id, at_time)
+            target_meta["current_building"] = target_curr_b
+            ctx = QueryContext(purpose=parsed_purpose, is_office_hours=determine_office_hours(at_time),
+                               authorized_investigation=auth_inv)
+            decision = evaluate_campus_query_policy(
+                caller_id, target_id, context=ctx, purpose=ctx.purpose, target_current_building=target_curr_b)
+            if not decision.permitted or decision.level == DisclosureLevel.L0_NONE:
+                out = _denied_response(q_type, template_fmt, caller_meta, decision.policy_rule, decision.reason, target_meta)
+                out["decision"] = decision.to_dict()
+                return out
+
     if q_type in TRAJECTORY_QUERIES and decision.level != DisclosureLevel.L3_HISTORICAL_TRACK:
         m.queries_executed_total.labels(query_type=q_type, status="denied").inc()
         return {
@@ -1104,7 +1133,7 @@ def execute_query_endpoint(
     # disclosure level and the policy rule, so callers with different identities or
     # different policy outcomes never share a cache entry even if all other parameters match).
     key = QueryCache.make_key(*base_key,
-                              caller_role=f"occ|{caller_id}|{decision.level.name}|{decision.policy_rule}")
+                              caller_role=f"occ|{caller_id}|{decision.level.name}|{decision.policy_rule}|{at_time}")
 
     def _run_occupant() -> dict:
         # Q3 reads its cut-off from time_t; a visitor's answer is scoped to the caller's building
@@ -1125,6 +1154,8 @@ def execute_query_endpoint(
         "explanation": data["explanation"],
         "withheld": data["withheld"],
     }
+    if time_note:
+        result["note"] = time_note
     if hit:
         result["_cache_hit"] = True
     return result

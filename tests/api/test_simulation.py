@@ -87,3 +87,38 @@ def test_track_and_photos_follow_the_role():
     assert student["waypoints"] == [] and not student["portrait"] and student["note"]
     assert client.get(f"/lane-d/api/face/{person}", headers=auth(P.student)).status_code == 403
     assert client.get(f"/lane-d/api/track?occupant={person}").status_code == 401
+
+
+def test_a_student_gets_no_track_of_an_assigned_teacher_but_a_dean_and_the_student_do():
+    """A track is a history (L3). A Student may see an assigned teacher's exact current zone (L2) but never their track."""
+    _run("day", 60)
+    teachers = [t for t, students in srv._rosters.items() if P.student in students]
+    assert teachers
+    seen = [e["occupant"] for e in client.get("/lane-d/api/events?limit=1000", headers=auth(P.dean)).json()]
+    teacher = next((t for t in teachers if t in seen), None)
+    assert teacher, "no assigned teacher has a recognised event in the run"
+    # the Dean (full history) gets the track, the Student does not
+    assert client.get(f"/lane-d/api/track?occupant={teacher}", headers=auth(P.dean)).json()["waypoints"]
+    refused = client.get(f"/lane-d/api/track?occupant={teacher}", headers=auth(P.student)).json()
+    assert refused["waypoints"] == [] and not refused["portrait"] and refused["note"]
+    # ...although the exact current position is still allowed at L2
+    q = client.post("/lane-d/api/query", headers=auth(P.student), json={"query_id": "Q6", "occupant": teacher, "time": "2026-01-05T12:00"}).json()
+    assert q["decision"]["disclosure_level"] == "L2_PRECISE_CURRENT"
+
+
+def test_a_student_gets_an_assigned_teachers_location_for_the_present_only():
+    """L2 is a current location: whatever time a Student asks for, the answer is for the present, so repeated queries
+    cannot rebuild a track. A Dean (L3) can still ask for any time."""
+    _run("day", 60)
+    teachers = [t for t, students in srv._rosters.items() if P.student in students]
+    seen = [e["occupant"] for e in client.get("/lane-d/api/events?limit=1000", headers=auth(P.dean)).json()]
+    teacher = next(t for t in teachers if t in seen)
+
+    def ask(token, hh):
+        return client.post("/lane-d/api/query", headers=auth(token),
+                           json={"query_id": "Q6", "occupant": teacher, "time": f"2026-01-05T{hh}"}).json()
+
+    early, late = ask(P.student, "08:30"), ask(P.student, "15:30")
+    assert early["answer"].split(" (")[0] == late["answer"].split(" (")[0]          # the same present-time answer
+    assert "current time" in early["answer"]
+    assert "current time" not in ask(P.dean, "08:30")["answer"]                      # a Dean is not limited
