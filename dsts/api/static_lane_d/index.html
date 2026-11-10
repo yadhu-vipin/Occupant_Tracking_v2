@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DSTS · Multi-Building Occupant Tracking</title>
 <!-- __MODE__ / __STATIC__ are filled in by the server: "integrated" (real data, login, /lane-d) or "standalone" (offline demo) -->
-<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=15"></head>
+<meta name="dsts-mode" content="__MODE__"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@700;800&amp;display=swap"><link rel="stylesheet" href="__STATIC__/style.css?v=16"></head>
 <body><div class="app">
 <aside class="side">
  <div class="brand"><div class="logo">▲</div><div><b>dsts</b><small>Occupant tracking</small></div></div>
@@ -72,7 +72,7 @@
 
 <section id="v-metrics" class="view"><div class="card"><h3>Prometheus &amp; Grafana</h3><p class="muted">Live counters are exposed at <code>/metrics</code>. Open Grafana at <a href="http://localhost:3000" target="_blank" rel="noopener">localhost:3000</a>.</p><div class="row"><a class="btn" href="/metrics" target="_blank" rel="noopener">Open raw metrics →</a></div></div></section>
 
-<section id="v-settings" class="view"><div class="card"><h3>Recognition threshold</h3><input id="theta" type="range" min="0" max="100" value="40"><div class="muted" id="theta-value">0.40</div>
+<section id="v-settings" class="view"><div class="card"><h3>Fixed parameters</h3><p class="muted">Set once for every building by the shared configuration; they cannot be changed from this page.</p><table class="tbl"><tr><td>Accept angle / minimum votes</td><td>80.43&deg; / 12 of 20 references</td></tr><tr><td>LSH bits per slot / slots</td><td>11 / 122</td></tr><tr><td>Bloom filter target false-positive rate</td><td>1%</td></tr><tr><td>Shortlist size / extra probes</td><td>5 / 3</td></tr><tr><td>Visitor promotion</td><td>3 entries in 7 days or 8 in 30</td></tr></table>
 <h3 class="mt">About this demo</h3><p class="muted">DSTS identifies and tracks occupants across buildings: local recognition, LSH and Bloom-filter routing to find a visitor's home building, probabilistic state tracking, role-based access and explained answers. Occupancy and query answers use the data of this running instance.</p></div></section>
 </main></div>
-<div id="track" class="modal" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="Track of one person"><button class="x ghost" id="track-x" aria-label="Close">×</button><div id="track-head"></div><div id="track-body"></div></div></div><script src="__STATIC__/app.js?v=15"></script></body></html>
+<div id="track" class="modal" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="Track of one person"><button class="x ghost" id="track-x" aria-label="Close">×</button><div id="track-head"></div><div id="track-body"></div></div></div><script src="__STATIC__/app.js?v=16"></script></body></html>

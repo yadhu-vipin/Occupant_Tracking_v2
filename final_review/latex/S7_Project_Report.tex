@@ -824,6 +824,24 @@ The dashboard demonstrates the access model as much as the tracking. A Dean star
 
 Choosing a building shows its nine zones; choosing a zone lists who was there in the time frame, named only where the role may see the exact location. Choosing a person opens their day as a track across buildings and zones (Figure~\ref{fig:ui-track}): each photo is the one the camera captured at that moment, a blue dashed line joins sightings inside a building and a red one a move to another building. The track is shown only where the role may see the full history (disclosure L3): a Dean for the people of their own campus and for the other Deans, a Teacher for the students on their roster, and a Student for themselves. A Student sees the exact current position of an assigned Teacher but no track: a location query from a Student is always answered for the present, whatever time is asked, so repeated queries cannot rebuild a history. A Student gets nothing at all about a Dean, a peer or an unassigned Teacher. Photos follow the exact-location level (L2 or higher). A query returns its answer with the ``Why this answer'' card, and the same query from a Student, who may not follow that person, is refused with a rule code and no explanation (Figure~\ref{fig:ui-dean}).
 
+Table~\ref{tab:ui-pages} lists every page of the dashboard and the results it can produce. The ``confidence'' shown on the overview and in the answers is the identity probability of Equation~\ref{eq:prob}; it is not a calibrated confidence, and the uncertainty flags are the warning signal (Section~\ref{sec:res-expl}).
+
+\begin{table}[htbp]
+\centering
+\caption{What each dashboard page shows}\label{tab:ui-pages}
+{\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{|p{2.5cm}|p{8.1cm}|p{3.9cm}|}\hline
+\textbf{Page} & \textbf{What it shows} & \textbf{What the role changes}\\\hline
+Overview & The simulation controls and clock, the counts of buildings, zones, tracked occupants and recognised events, the average identity probability, a campus map with the number of people in each building, and a live feed of recognised events with photos & The feed lists only the people the role may see; only a Dean controls the simulation\\\hline
+Occupancy & The latest position (building, zone, identity probability, last time seen) of each person & Only the people the role may see\\\hline
+Building and zones & The zones of each building with their counts and, for a time frame, who was in each zone (visitors marked) & Counts for everyone, names only where the role may see the exact location\\\hline
+Research queries & The fourteen query templates with the answer, the ``Why this answer'' card, the rule, the evidence, the uncertainty flags and what was withheld & Answer and card redacted to the caller's level\\\hline
+Person track & A person's day across buildings and zones, with the photo at each sighting & Full-history level only\\\hline
+Security & Counts of users, sessions, requests and blocked requests, the access log of every decision, and the roles, policies and certificate mechanisms & A Dean sees all decisions, other roles only their own\\\hline
+Metrics and settings & The raw Prometheus counters of the queries executed, and the fixed recognition and routing parameters of Table~\ref{tab:params} (read-only) & Same for every role\\\hline
+\end{tabular}}
+\end{table}
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.42\textwidth]{ui_overview.png}

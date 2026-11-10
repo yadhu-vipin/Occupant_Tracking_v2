@@ -465,14 +465,14 @@ buted state tran-si-tion sys-tem; Locality-
 
 
 ]
-(S7_Project_Report.lot)
+(S7_Project_Report.lot [6
+
+
+])
 \tf@lot=\write6
 \openout6 = `S7_Project_Report.lot'.
 
- [6
-
-
-] [7]
+ [7]
 Chapter 1.
 [1
 
@@ -1531,6 +1531,20 @@ Underfull \hbox (badness 1616) in paragraph at lines 807--807
  []
 
 [34]
+Underfull \hbox (badness 1354) in paragraph at lines 836--836
+[]|\T1/ptm/m/n/10 Only the peo-ple the role
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 837--837
+[]|\T1/ptm/m/n/10 Building and
+ []
+
+
+Underfull \hbox (badness 1112) in paragraph at lines 841--841
+[]|\T1/ptm/m/n/10 Metrics and set-
+ []
+
 File: figures//ui_overview.png Graphic file (type bmp)
 <figures//ui_overview.png>
 File: figures//ui_track.png Graphic file (type bmp)
@@ -1539,90 +1553,90 @@ File: figures//ui_query_dean.png Graphic file (type bmp)
 <figures//ui_query_dean.png>
 File: figures//ui_query_student.png Graphic file (type bmp)
 <figures//ui_query_student.png>
-
-Underfull \hbox (badness 10000) in paragraph at lines 854--854
+[35] [36]
+Underfull \hbox (badness 10000) in paragraph at lines 872--872
 []|\T1/ptm/b/n/10.95 Face data leav-ing a
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 855--855
+Underfull \hbox (badness 10000) in paragraph at lines 873--873
 []|\T1/ptm/m/n/10.95 Direct search of
  []
 
 
-Underfull \hbox (badness 1629) in paragraph at lines 855--855
+Underfull \hbox (badness 1629) in paragraph at lines 873--873
 []|\T1/ptm/m/n/10.95 Galleries pooled in one
  []
 
 
-Underfull \hbox (badness 1490) in paragraph at lines 855--855
+Underfull \hbox (badness 1490) in paragraph at lines 873--873
 []|\T1/ptm/m/n/10.95 95.17%; 100% of
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 856--856
+Underfull \hbox (badness 10000) in paragraph at lines 874--874
 []|\T1/ptm/m/n/10.95 Decentralised LSH +
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 856--856
+Underfull \hbox (badness 10000) in paragraph at lines 874--874
 \T1/ptm/m/n/10.95 Bloom rout-ing (this
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 856--856
+Underfull \hbox (badness 10000) in paragraph at lines 874--874
 []|\T1/ptm/m/n/10.95 Rank by Bloom
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 856--856
+Underfull \hbox (badness 10000) in paragraph at lines 874--874
 \T1/ptm/m/n/10.95 score, ver-ify the
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 857--857
+Underfull \hbox (badness 10000) in paragraph at lines 875--875
 []|\T1/ptm/m/n/10.95 Not re-run; re-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 858--858
+Underfull \hbox (badness 10000) in paragraph at lines 876--876
 []|\T1/ptm/m/n/10.95 Edge-camera track-ing
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 858--858
+Underfull \hbox (badness 10000) in paragraph at lines 876--876
 []|\T1/ptm/m/n/10.95 No cross-building
  []
 
 
-Underfull \hbox (badness 1009) in paragraph at lines 858--858
+Underfull \hbox (badness 1009) in paragraph at lines 876--876
 \T1/ptm/m/n/10.95 iden-tity, RBAC or
  []
 
-[35] [36] [37] [38]
+[37] [38]
 Chapter 7.
 
-Underfull \hbox (badness 10000) in paragraph at lines 896--896
+Underfull \hbox (badness 10000) in paragraph at lines 914--914
 []|\T1/ptm/m/n/10.95 BSTS over 10 build-ings;
  []
 
 
-Underfull \hbox (badness 5924) in paragraph at lines 897--897
+Underfull \hbox (badness 5924) in paragraph at lines 915--915
 \T1/ptm/m/n/10.95 ev-ery pol-icy cell tested, 64-
  []
 
 
-Underfull \hbox (badness 5077) in paragraph at lines 898--898
+Underfull \hbox (badness 5077) in paragraph at lines 916--916
 []|\T1/ptm/m/n/10.95 Faithfulness cases, flag re-call
  []
 
 
-Underfull \hbox (badness 4341) in paragraph at lines 899--899
+Underfull \hbox (badness 4341) in paragraph at lines 917--917
 \T1/ptm/m/n/10.95 point ac-cu-racy cost; ef-fec-tive
  []
 
 
-Overfull \hbox (2.70215pt too wide) in paragraph at lines 894--903
+Overfull \hbox (2.70215pt too wide) in paragraph at lines 912--921
  [][] 
  []
 
@@ -1635,7 +1649,7 @@ Overfull \hbox (2.70215pt too wide) in paragraph at lines 894--903
 ] [42] [43]
 Appendix A.
 
-Underfull \hbox (badness 1910) in paragraph at lines 1097--1098
+Underfull \hbox (badness 1910) in paragraph at lines 1115--1116
 []\T1/ptm/m/n/12 Clone the repos-i-tory, cre-ate a vir-tual en-vi-ron-ment and 
 run \T1/lmtt/m/n/12 pip install -r
  []
@@ -1647,4 +1661,4 @@ run \T1/lmtt/m/n/12 pip install -r
 Package rerunfilecheck Info: File `S7_Project_Report.out' has not changed.
 (rerunfilecheck)             Checksum: 329F3E56B5C55B892DCBF6552AE070E2;5949.
  )
-Output written on S7_Project_Report.xdv (55 pages, 218496 bytes).
+Output written on S7_Project_Report.xdv (55 pages, 222644 bytes).
