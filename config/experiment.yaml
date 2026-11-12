@@ -9,7 +9,7 @@ masked_building:
   # building_11: 50 more people, every one of them seen WITH A MASK (RMFRD faces, see corpus/masked/README.md).
   # Their galleries are unmasked, their capture embeddings are masked. Build the data once with
   # `python tools/build_masked_building.py`; set enabled: false to run the original 10 buildings only.
-  enabled: true
+  enabled: false
   building: building_11
   dir: corpus/masked
 

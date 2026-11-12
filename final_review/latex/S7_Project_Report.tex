@@ -183,7 +183,7 @@ Finally, we thank our team members for the shared effort across the parts of the
 \phantomsection
 \addcontentsline{toc}{chapter}{Abstract}
 {\centering \Large\bfseries ABSTRACT\par}
-A smart space is an indoor environment equipped with sensors, IoT devices and intelligent infrastructure that collect indoor location data. Multi-building smart spaces, such as university campuses, hospitals and military bases, must identify and follow occupants as they move between buildings, without asking anyone to stop or tap. The usual design keeps every reference template in one central store, which is simple and accurate but concentrates sensitive biometric data. Keeping each building's templates local avoids this, but the capturing building then cannot tell which building holds a visitor's identity, and the base DSTS work resolves visitors through a central master list; among the works reviewed, none treats access control and explanation of answers together with identification. This work does not claim that a decentralised design is better. It asks whether a decentralised alternative can do the same job, and how much recognition accuracy it gives up. Building on the Distributed State Transition System (DSTS) framework, each building keeps its own gallery and publishes only a Bloom filter of locality-sensitive-hash codes of its occupants' face embeddings; a capture that is not recognised locally is routed to a short list of likely buildings, which verify it by angular-distance voting. Because the same tracking data would let any user who can query it follow anyone else, access is governed by two-layer role-based access control: what a requester sees about a person is filtered by the requester's role, from no information, through presence only, up to the exact zone and full trajectory. Every answer comes with an explanation of the rule applied, the evidence behind it, any uncertainty and what was withheld, redacted to the same level so that it never reveals more than the answer itself. A dynamic visitor database, probabilistic zone-level tracking and sealed inter-building transfers complete the system. It is evaluated on 500 simulated occupants (CASIA-WebFace) in 10 buildings, with 10,000 events per simulated day, using a central search as the reference and averaging over 50 random populations. The decentralised pipeline identifies 95.0\% of events, against 95.2\% for the central search (0.16 percentage points lower), while consulting 11.0\% of the galleries; the building-level state F1 is 0.961. Each answer carries a warning when it may be wrong. The warning appears on 74\% of the wrong identifications and, as a false alarm, on 2.3\% of the correct ones. Building the warnings adds about 13\% to the processing time of a query, measured on a single machine, so network delay is not included. These results describe the accuracy that decentralisation retains, not an advantage over a central design. The network, cameras and certificate authority are simulated, so the work demonstrates the design and its accuracy, not a hardened deployment.
+A smart space is an indoor environment equipped with sensors, IoT devices and intelligent infrastructure that collect indoor location data. Multi-building smart spaces, such as university campuses, hospitals and military bases, must identify and follow occupants as they move between buildings, without asking anyone to stop or tap. The usual design keeps every reference template in one central store, which is simple and accurate but concentrates sensitive biometric data. Keeping each building's templates local avoids this, but the capturing building then cannot tell which building holds a visitor's identity, and the base DSTS work resolves visitors through a central master list; among the works reviewed, none treats access control and explanation of answers together with identification. This work does not claim that a decentralised design is better. It asks whether a decentralised alternative can do the same job, and how much recognition accuracy it gives up. Building on the Distributed State Transition System (DSTS) framework, each building keeps its own gallery and publishes only a Bloom filter of locality-sensitive-hash codes of its occupants' face embeddings; a capture that is not recognised locally is routed to a short list of likely buildings, which verify it by angular-distance voting. Because the same tracking data would let any user who can query it follow anyone else, access is governed by two-layer role-based access control: what a requester sees about a person is filtered by the requester's role, from no information, through presence only, up to the exact zone and full trajectory. Every answer comes with an explanation of the rule applied, the evidence behind it, any uncertainty and what was withheld, redacted to the same level so that it never reveals more than the answer itself. A dynamic visitor database, probabilistic zone-level tracking and sealed inter-building transfers complete the system. It is evaluated on 500 simulated occupants (CASIA-WebFace) in 10 buildings, with 10,000 events per simulated day, using a central search as the reference and averaging over 50 random populations. The decentralised pipeline identifies 95.0\% of events, against 95.2\% for the central search (0.21 percentage points lower), while asking about 17 times fewer buildings (2 instead of 9 for a visitor that has to be routed). Each answer carries a warning when it may be wrong. The warning appears on 74\% of the wrong identifications and, as a false alarm, on 2.3\% of the correct ones. Building the warnings adds about 13\% to the processing time of a query, measured on a single machine, so network delay is not included. These results describe the accuracy that decentralisation retains, not an advantage over a central design. The network, cameras and certificate authority are simulated, so the work demonstrates the design and its accuracy, not a hardened deployment.
 
 Keywords: Occupant identification and tracking; Distributed state transition system; Locality-sensitive hashing; Bloom filter; Role-based access control; Explainable queries
 
@@ -225,10 +225,10 @@ The objectives, each linked to how it is evaluated and to its deliverable, are g
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
 \begin{tabular}{|p{0.6cm}|p{4.4cm}|p{5.2cm}|p{3.6cm}|}\hline
 \textbf{\#} & \textbf{Objective} & \textbf{Evaluation method} & \textbf{Deliverable}\\\hline
-1 & Extend the DSTS framework to distributed multi-building identification and tracking & Event identification precision and recall; state-level precision and recall over every state (Sections~\ref{sec:res-events}, \ref{sec:res-state}) & Pipeline, building nodes, building-level tracking databases (BSTS)\\\hline
+1 & Extend the DSTS framework to distributed multi-building identification and tracking & Event identification precision and recall, against a centralised search (Section~\ref{sec:res-events}) & Pipeline, building nodes, building-level tracking databases (BSTS)\\\hline
 2 & Provide an RBAC query interface in which each role sees only the people, and the level of detail, that its relationship allows & Every policy cell tested; access matrix checked against the expected decisions (Section~\ref{sec:res-security}) & Two-layer policy, FastAPI server, dashboard\\\hline
 3 & Return explainable responses that justify the access decision and the tracking evidence & Faithfulness and no-leakage tests; flag precision and recall against ground truth; latency overhead (Section~\ref{sec:res-expl}) & Explanation model, redaction, ``Why this answer'' card\\\hline
-4 & Design LSH + Bloom-filter routing for decentralised visitor lookup & Routing recall; gallery touched per lookup; accuracy against a centralised search; effective false-positive rate (Sections~\ref{sec:res-events}, \ref{sec:res-visitors}, \ref{sec:res-bloom}) & Enrolment, routing and verification modules\\\hline
+4 & Design LSH + Bloom-filter routing for decentralised visitor lookup & Routing recall; buildings contacted per lookup; accuracy against a centralised search; effective false-positive rate (Sections~\ref{sec:res-events}, \ref{sec:res-visitors}, \ref{sec:res-bloom}) & Enrolment, routing and verification modules\\\hline
 5 & Secure the system: sealed transfers, role-based filtering, audit logging & Tamper, replay, wrong-sender and fail-closed tests; login lockout tests (Section~\ref{sec:res-security}) & Sealed-transfer and access-control modules\\\hline
 6 & Evaluate tracking precision and recall, communication cost and explanation quality & TP/FP/FN/TN per cohort and level; 50 seeds; centralised baseline; explanation measurements (Chapter~\ref{ch:results}) & Evaluation scripts and result tables\\\hline
 \end{tabular}}
@@ -360,7 +360,7 @@ FR7 & Apply a two-layer policy before any answer & Query service & Caller, targe
 FR8 & Return an explanation with each answer, redacted to the caller's level & Query service & Answer $\rightarrow$ explanation & Explanation never shows more than the answer; faithful to it\\\hline
 FR9 & Seal every cross-building message & Building node & Message $\rightarrow$ sealed envelope & Tampered, replayed or mis-addressed messages are dropped\\\hline
 FR10 & Show the campus, zones, queries and security log on a dashboard & All roles & API data $\rightarrow$ web page & Content filtered by the caller's role\\\hline
-FR11 & Compare with a centralised search and report TP, FP, FN, TN & Evaluator & Run files $\rightarrow$ metrics & Metrics per cohort, state level and seed\\\hline
+FR11 & Compare with a centralised search and report TP, FP, FN, TN & Evaluator & Run files $\rightarrow$ metrics & Metrics per cohort and seed\\\hline
 FR12 & Record every authorisation decision in an audit log & Access layer & Decision $\rightarrow$ log entry & Entry has layer, code, principal and target\\\hline
 FR13 & Sign users in as a demo role or with a per-person credential & Users & Credential $\rightarrow$ signed token & Token expires in one hour; lockout after repeated failures\\\hline
 \end{longtable}}
@@ -376,7 +376,7 @@ Table~\ref{tab:nfr} states the quality requirements with the measure used. The r
 \begin{tabular}{|p{2.45cm}|p{5.29cm}|p{3.40cm}|p{2.83cm}|}\hline
 \textbf{Quality} & \textbf{Requirement} & \textbf{Measure} & \textbf{Where reported}\\\hline
 Accuracy & Decentralised identification close to a centralised search & Overall accuracy within 1 point; visitor F1 reported & Section~\ref{sec:res-events}\\\hline
-Communication cost & Touch a small part of the galleries per lookup & Gallery touched per lookup (central = 100\%) & Section~\ref{sec:res-events}\\\hline
+Communication cost & Contact few buildings per lookup & Buildings contacted per lookup (central search: all 9 others) & Section~\ref{sec:res-events}\\\hline
 Privacy & No gallery, id or embedding in a published filter; no plaintext biometric between buildings & Filter contents inspected; sealed-transfer tests; effective false-positive rate & Sections~\ref{sec:res-bloom}, \ref{sec:res-security}\\\hline
 Security & Fail closed; resist tampering, replay, impersonation and brute force & Attack tests; lockout after 5 failures in 60 s & Section~\ref{sec:res-security}\\\hline
 Explainability & Explanations faithful to the answer, free of leakage, and informative about uncertainty & Faithfulness cases; flag precision and recall; latency overhead & Section~\ref{sec:res-expl}\\\hline
@@ -530,7 +530,7 @@ Access control follows the role-based model of Sandhu et al. \cite{ref21}, exten
 \begin{tabular}{|p{1.17cm}|p{4.11cm}|p{9.00cm}|}\hline
 \textbf{Level} & \textbf{Name} & \textbf{What the caller sees}\\\hline
 L0 & None & Nothing; the request is refused with a reason code\\\hline
-L1 & Presence & Availability only (defined in the policy; no current rule grants it)\\\hline
+L1 & Presence & Counts and presence, no names or positions (granted for building and zone aggregates)\\\hline
 L2 & Precise current & Exact zone, zone label, confidence and exact time, for the present only\\\hline
 L3 & Historical track & Full trajectory and dwell times\\\hline
 \end{tabular}}
@@ -633,7 +633,7 @@ The evaluation uses 500 occupants in 10 buildings: the 500 CASIA-WebFace people 
 
 
 
-\textbf{Safeguards against bias.} Reference photos enrol people and are never events; test photos are events and are never enrolled. The mean face and the Bloom filters use reference photos only. The centralised baseline is the same pipeline: the same local check, the same visitor cache and the same vote rule. Only the lookup of a visitor's first sighting differs, a direct search of the other buildings' galleries instead of Bloom routing, so any difference is caused by routing and not by a stronger matcher. Ground truth is read only by the evaluation scripts; recognition, routing and tracking receive observable event fields only.
+\textbf{Safeguards against bias.} Reference photos enrol people and are never events; test photos are events and are never enrolled. The mean face and the Bloom filters use reference photos only. The centralised baseline is the same pipeline: the same local check and the same vote rule, but with no visitor cache. Every visitor is looked up by a direct search of the other buildings' galleries instead of Bloom routing, so any difference is caused by routing and by the decentralised pipeline's cache, and not by a stronger matcher; Section~\ref{sec:res-visitors} separates the two. Ground truth is read only by the evaluation scripts; recognition, routing and tracking receive observable event fields only.
 
 \section{Evaluation criteria}
 All identification metrics use the one-vs-rest convention. An item has one true label and at most one predicted label out of $N_L$ labels. \textbf{TP}: the predicted label is the true label. \textbf{FP}: a wrong label was predicted. \textbf{FN}: the true label was not predicted (a wrong prediction or an abstention). \textbf{TN}: every other (item, label) pair, that is items $\times N_L-$TP$-$FP$-$FN. A wrong identity is therefore both an FP and an FN, and an abstention only an FN.
@@ -642,7 +642,7 @@ All identification metrics use the one-vs-rest convention. An item has one true 
 \end{equation}
 Recall equals the share of events identified correctly, so it is also called identification accuracy. Because TN is in the millions, accuracy computed with TN is close to 1 and is not used to compare systems.
 
-\textbf{Event level.} The label is the occupant id (500 labels), reported for all, local and visitor events. \textbf{State level.} State $s_k$ is the campus after event $k$; the label is (building, zone) with 90 labels, plus building (10 labels) and zone (9 labels) alone, and every occupant the system places counts, including visitors updated by other people's events. \textbf{Cost.} Gallery touched per lookup is the number of buildings whose gallery is searched divided by the number of buildings (the centralised server is 100\%); routing recall is the share of routed visitors whose home building is in the shortlist.
+\textbf{Event level.} The label is the occupant id (500 labels), reported for all, local and visitor events. \textbf{Cost.} Buildings contacted per lookup is the number of other buildings that are asked to verify a capture, and the gallery touched is that number plus the capturing building, divided by the 10 buildings (the same measure is applied to the centralised search, which asks all 9 other buildings for every visitor it has to look up); routing recall is the share of routed visitors whose home building is in the shortlist.
 
 \textbf{Explanation criteria.} A flag is useful if it is carried by wrong answers and not by right ones. For identifications, \emph{share of wrong flagged} is the fraction of wrong identifications that carry at least one flag, and \emph{share of correct flagged} the false-alarm rate. For answers, an answer is wrong when it differs from the same query run over the identified events with their true occupants; flag \emph{precision} is the share of flagged answers that are wrong and \emph{recall} the share of wrong answers that are flagged. Overhead is the extra latency and response size of building the explanation. \textbf{Bloom criterion.} The effective false-positive rate is the share of the enrolled items of the other buildings that a building's filter reports as present.
 
@@ -654,11 +654,11 @@ Table~\ref{tab:central} compares the decentralised pipeline with the centralised
 \centering
 \caption{Identification accuracy and gallery touched (average of 50 seeds, 10,000 events per run)}\label{tab:central}
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{2.97cm}|p{1.67cm}|p{2.41cm}|p{2.60cm}|p{1.67cm}|p{2.04cm}|}\hline
-\textbf{Cohort} & \textbf{Events} & \textbf{Centralised accuracy} & \textbf{Decentralised accuracy} & \textbf{Gap (points)} & \textbf{Gallery touched}\\\hline
-All events & 10,000 & 95.17\% & 95.01\% & 0.16 & 11.0\%\\\hline
-Local & 8,000 & 95.94\% & 95.94\% & 0.00 & 10.0\%\\\hline
-Visitor & 2,000 & 92.11\% & 91.32\% & 0.79 & 15.2\%\\\hline
+\begin{tabular}{|p{2.5cm}|p{1.4cm}|p{2.1cm}|p{2.3cm}|p{1.3cm}|p{1.9cm}|p{1.9cm}|}\hline
+\textbf{Cohort} & \textbf{Events} & \textbf{Centralised accuracy} & \textbf{Decentralised accuracy} & \textbf{Gap (points)} & \textbf{Gallery touched, central} & \textbf{Gallery touched, ours}\\\hline
+All events & 10,000 & 95.23\% & 95.01\% & 0.21 & 27.4\% & 11.0\%\\\hline
+Local & 8,000 & 95.94\% & 95.94\% & 0.00 & 10.0\% & 10.0\%\\\hline
+Visitor & 2,000 & 92.39\% & 91.32\% & 1.07 & 97.1\% & 15.2\%\\\hline
 \end{tabular}}
 \end{table}
 
@@ -676,30 +676,65 @@ Visitor & 1,826 & 96 & 174 & 0.950 & 0.913 & 0.931\\\hline
 \end{tabular}}
 \end{table}
 
-Over all events the decentralised pipeline identifies 95.01\% against 95.17\% for the central search, a difference of 0.16 points that is positive in every one of the 50 seeds (0.03 to 0.34 points), while each lookup touches 11.0\% of the galleries. Local events are identical in the two systems (95.94\% in both): a registered person is recognised by the vote in their own building, with no lookup involved, so the two systems cannot differ there. The visitor events lose 0.8 points (91.32\% against 92.11\%), which is the cost of routing a capture with Bloom filters instead of searching the other buildings' galleries directly. The standard deviation over the 50 seeds is only 0.11 points (Section~\ref{sec:res-seeds}).
+\begin{table}[htbp]
+\centering
+\caption{Precision, recall and F1 of the centralised search and of the decentralised pipeline (average of 50 seeds), for the events}\label{tab:censcores}
+{\small\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.0cm}|p{1.2cm}|p{1.2cm}|p{1.2cm}|p{1.2cm}|p{1.2cm}|p{1.2cm}|p{1.2cm}|p{1.2cm}|}\hline
+ & \multicolumn{2}{c|}{\textbf{Precision}} & \multicolumn{2}{c|}{\textbf{Recall}} & \multicolumn{2}{c|}{\textbf{F1}} & \multicolumn{2}{c|}{\textbf{Other buildings asked}}\\\hline
+\textbf{Events} & Central & Ours & Central & Ours & Central & Ours & Central & Ours\\\hline
+All events & 0.983 & 0.984 & 0.952 & 0.950 & 0.967 & 0.967 & 1.74 & 0.10\\\hline
+Local & 0.990 & 0.992 & 0.959 & 0.959 & 0.975 & 0.976 & 0.00 & 0.00\\\hline
+Visitor & 0.953 & 0.950 & 0.924 & 0.913 & 0.938 & 0.931 & 8.71 & 0.52\\\hline
+\end{tabular}}
+\end{table}
+
+
+Over all events the decentralised pipeline identifies 95.01\% against 95.23\% for the central search, a difference of 0.21 points that is positive in every one of the 50 seeds (0.09 to 0.43 points), while asking far fewer buildings: 0.10 other buildings per event against 1.74 (11.0\% of the galleries touched against 27.4\%), and 2 against 9 for a visitor that has to be routed. The central search is the baseline without a visitor cache, so it looks every visitor up in all 9 other buildings, which is the 97.1\% above. Local events have the same accuracy in the two systems (95.94\% in both): a registered person is recognised by the vote in their own building, with no lookup involved, so the two systems cannot differ there. The central search does give about 14 more wrong identifications on local events (precision 0.990 against 0.992, Table~\ref{tab:censcores}): a local person who fails the local vote cannot be in another building, so every extra building searched is only another chance to accept a look-alike. The visitor events lose 1.1 points (91.32\% against 92.39\%), which is the cost of routing a capture with Bloom filters instead of searching the other buildings' galleries directly, partly won back by the visitor cache (Section~\ref{sec:res-visitors}). The standard deviation over the 50 seeds is only 0.11 points (Section~\ref{sec:res-seeds}).
 
 \subsection{Routing and the visitor database}\label{sec:res-visitors}
 Table~\ref{tab:visitors} summarises how visitors are identified and the text below breaks one run (seed 42) down by outcome. In that run, of the 2,000 visitor events, 1,335 (about two thirds) are served from the building's visitor database (the same visitor sighted again the same day), 585 are routed, and the remaining 80 are visitors that an occupant of the capturing building wrongly accepted as a local person (a false accept caused by a look-alike among the building's own occupants). The three groups add up to 2,000. Errors among the routed events are mostly routing misses that end in an abstention, and a smaller number of cases in which the right building is reached but the face still does not pass verification.
 
 \begin{table}[htbp]
 \centering
-\caption{Visitor identification and tracking (average of 50 seeds)}\label{tab:visitors}
+\caption{Visitor identification (average of 50 seeds)}\label{tab:visitors}
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
 \begin{tabular}{|p{8.4cm}|p{3.0cm}|}\hline
 \textbf{Metric} & \textbf{Value}\\\hline
 Visitor events per run & 2,000\\\hline
 Precision / recall / F1 of visitor identification & 0.950 / 0.913 / 0.931\\\hline
 Routing recall (home building in the top five) & 90.6\%\\\hline
-Buildings contacted per routed lookup & 2\\\hline
+Buildings contacted per routed lookup & 2 (central search: 9)\\\hline
 Visitor events served from the visitor database & 1,345 (67.2\%, about two thirds)\\\hline
 Visit-pointer precision & 98.3\%\\\hline
-Visitor recall in the tracked state: building / zone / building and zone & 0.950 / 0.937 / 0.903\\\hline
+\end{tabular}}
+\end{table}
+
+\textbf{Is the visitor database needed?} To find out, the same 50 populations were run three ways (Table~\ref{tab:vdb}): the centralised search, which has no cache and looks every visitor up in all 9 other buildings, and the decentralised pipeline with its visitor database switched off (still kept up to date but never allowed to answer) and on. Without the cache the decentralised pipeline loses 3.0 points of visitor recall to the centralised search (3.1 points on the routed lookups alone, that is the visitor sightings the cache does not answer), because it asks only a shortlist of five buildings and leaves the visitor unidentified when the right building is not on it: in this setting the wrong-person rate is 2.0\% against 1.4\% for the centralised search, but the share not identified is 5.7\% against 3.2\%. The cache wins back 2.0 points, because a repeat sighting is answered inside the building and never routed again, which leaves a gap of 1.1 points, and it cuts the buildings asked per day from 2,868 to 1,049 (the centralised search asks 17,420). The routed-lookup rates should be compared only within the same cache setting, because with the cache on the routed lookups are the harder sightings that the cache could not answer. The cache has a price: a wrong first identification is reused for the rest of the day (about 14 wrong identifications per day come from it, and only 4.3\% of them carry a warning flag, Section~\ref{sec:res-expl}). The runs last one simulated day, so every database answer comes from the day cache; the permanent pool for frequent visitors needs visits over several days and is not exercised here.
+
+\begin{table}[htbp]
+\centering
+\caption{Visitor events: the centralised search (no cache) and the decentralised pipeline without and with the visitor database (average number of events out of 2,000, mean of 50 seeds)}\label{tab:vdb}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{5.6cm}|p{2.7cm}|p{3.1cm}|p{3.1cm}|}\hline
+\textbf{Visitor events (2,000 per run)} & \textbf{Centralised, no cache} & \textbf{Decentralised, no cache} & \textbf{Decentralised, with cache}\\\hline
+Answered by the cache: correct & 0 & 0 & 1,331\\\hline
+Answered by the cache: wrong person & 0 & 0 & 14\\\hline
+Routed lookups: correct & 1,848 & 1,787 & 495\\\hline
+Routed lookups: wrong person & 27 & 38 & 17\\\hline
+Routed lookups: not identified & 61 & 110 & 78\\\hline
+Accepted as a local person (not routed) & 64 & 64 & 64\\\hline
+Buildings asked per lookup & 9.00 & 1.48 & 1.77\\\hline
+Buildings asked per day & 17,420 & 2,868 & 1,049\\\hline
+Visitor precision & 0.953 & 0.946 & 0.950\\\hline
+Visitor recall & 0.924 & 0.894 & 0.913\\\hline
+Visitor F1 score & 0.938 & 0.919 & 0.931\\\hline
 \end{tabular}}
 \end{table}
 
 
 
-The detailed run (seed 42) shows how the headline gap should be read. The centralised baseline identified 95.05\% of its 10,000 events and the pipeline 94.88\%. The exact difference is 17 events out of 10,000, that is 0.17 points. The 50-seed gap in Table~\ref{tab:central} is 0.16 points.
+The detailed run (seed 42) shows how the headline gap should be read. The centralised baseline identified 95.09\% of its 10,000 events and the pipeline 94.88\%. The exact difference is 21 events out of 10,000, that is 0.21 points. The 50-seed gap in Table~\ref{tab:central} is 0.21 points.
 
 \subsection{Shortlist verification policies compared}\label{sec:res-policies}
 The three policies of Section~\ref{sec:policies} were run on the same 50 populations, from the routing step onwards, with the adaptive threshold $g_0=5$; the sequential row is the run used everywhere else in this chapter. Table~\ref{tab:policies} counts the routed visitor lookups, that is the visitor events that were not served from the visitor database (about 590 per run), and the share of them identified correctly, identified as the wrong person, or left unidentified.
@@ -731,28 +766,9 @@ Accuracy, all events & 95.01\% & 0.11 & 94.67\% & 95.23\% & 0.03\\\hline
 Accuracy, local events & 95.94\% & 0.09 & 95.73\% & 96.16\% & 0.03\\\hline
 Accuracy, visitor events & 91.32\% & 0.66 & 89.70\% & 92.45\% & 0.19\\\hline
 Routing recall & 90.6\% & 1.0 & 88.3\% & 92.6\% & 0.3\\\hline
-Gap to the centralised search (points) & 0.16 & 0.06 & 0.03 & 0.34 & 0.02\\\hline
+Gap to the centralised search (points) & 0.21 & 0.08 & 0.09 & 0.43 & 0.02\\\hline
 \end{tabular}}
 \end{table}
-
-\subsection{Tracking state against the state ground truth}\label{sec:res-state}
-Table~\ref{tab:state} reports the state-level scores. After every one of the 10,000 events the whole campus state, that is who is in which building and zone, is compared with the true state recorded by the simulation, and the scores are averaged over the 10,000 states of a run and then over the 50 seeds.
-
-\begin{table}[htbp]
-\centering
-\caption{State-level scores against the state ground truth (average of 50 seeds)}\label{tab:state}
-{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{3.30cm}|p{1.74cm}|p{2.33cm}|p{1.94cm}|p{1.55cm}|p{2.52cm}|}\hline
-\textbf{Level} & \textbf{Labels} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Visitor recall}\\\hline
-Building & 10 & 0.962 & 0.960 & 0.961 & 0.950\\\hline
-Zone & 9 & 0.942 & 0.940 & 0.941 & 0.937\\\hline
-Building and zone & 90 & 0.926 & 0.924 & 0.925 & 0.903\\\hline
-\end{tabular}}
-\end{table}
-
-
-
-Building-level state, that is knowing which building each person is in after every event, reaches an F1 of 0.961; the zone within a building and the combination are harder because the nine-zone belief is updated from one event at a time. The standard deviation of the building-level F1 over the 50 seeds is 0.004.
 
 \subsection{Explanation quality}\label{sec:res-expl}
 Every answer comes with a ``Why this answer'' card and, where the system is unsure, a warning flag (Table~\ref{tab:flags}). Three questions were asked: do the explanations match the answers, do the flags appear when an answer is wrong, and what do the explanations cost. The results are averages over 50 seeds on the 10-building system, except the cost, which was timed on seeds 0 to 4.
@@ -870,18 +886,18 @@ Table~\ref{tab:comparison} compares the approaches. The fair comparison for this
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
 \begin{tabular}{|p{3.83cm}|p{3.06cm}|p{4.02cm}|p{3.06cm}|}\hline
 \textbf{Approach} & \textbf{Visitor lookup} & \textbf{Face data leaving a building} & \textbf{Result here}\\\hline
-Centralised search over all galleries (baseline) & Direct search of the other buildings' galleries & Galleries pooled in one store & 95.17\%; 100\% of the gallery searched\\\hline
-Decentralised LSH + Bloom routing (this work) & Rank by Bloom score, verify the shortlist & Only a 7.3~KB Bloom filter; references move only after a confirmed match & 95.01\%; 11.0\% of the gallery\\\hline
+Centralised search over all galleries (baseline) & Direct search of the other buildings' galleries & Galleries pooled in one store & 95.23\%; asks all 9 other buildings for every visitor (no cache)\\\hline
+Decentralised LSH + Bloom routing (this work) & Rank by Bloom score, verify the shortlist & Only a 7.3~KB Bloom filter; references move only after a confirmed match & 95.01\%; asks 2 buildings on average for a routed visitor\\\hline
 DSTS base paper \cite{ref6} & Central master list & Master list of visitor embeddings & Not re-run; replaced by the row above\\\hline
 Edge-camera tracking \cite{ref1,ref2,ref3,ref4,ref5} & Within one site & Not applicable & No cross-building identity, RBAC or explanations\\\hline
 \end{tabular}}
 \end{table}
 
-Routing costs 0.16 points overall and 0.8 points on visitors, in exchange for touching about a tenth of the gallery and never pooling it.
+Routing costs 0.21 points overall and 1.1 points on visitors, in exchange for asking 2 buildings instead of 9 for a routed visitor (0.10 against 1.74 other buildings per event) and never pooling the gallery.
 
 
 \section{Discussion and Interpretation}
-The results meet the objectives that can be measured. Decentralised identification is within 0.2 points of a central search overall while touching about 11\% of the galleries, so the privacy and locality gain costs little accuracy (objectives 1 and 4). Most visitor events need no routing because repeat sightings the same day are served from the day cache, so most visitor events contact no other building. Tracking reaches an F1 of 0.961 at building level and 0.941 at zone level (objective 1). The order in which shortlisted buildings are asked matters little for accuracy: verifying all five buildings, or only the uncertain cases, reduces wrong identifications of routed visitors by about 0.6 points compared with asking in rank order, at 3 to 5 contacts instead of 2.
+The results meet the objectives that can be measured. Decentralised identification is within 0.2 points of a central search overall while asking about 17 times fewer buildings (0.10 against 1.74 per event), so the privacy and locality gain costs little accuracy (objectives 1 and 4). Most visitor events need no routing because repeat sightings the same day are served from the day cache, so most visitor events contact no other building. The order in which shortlisted buildings are asked matters little for accuracy: verifying all five buildings, or only the uncertain cases, reduces wrong identifications of routed visitors by about 0.6 points compared with asking in rank order, at 3 to 5 contacts instead of 2.
 
 The access model and the explanations are verified by tests, flag scores and a persona matrix (objectives 2, 3 and 5). The flags catch about three quarters of the wrong identifications for about 13 per cent of extra latency, but the visitor database, whose errors are rarely flagged, is the main weakness.
 
@@ -903,7 +919,7 @@ One finding qualifies the design: the effective false-positive rate of the Bloom
 \clearpage
 \chapter{Conclusion}
 \section{Conclusion}
-This project built and evaluated a system that identifies and tracks occupants across buildings without pooling face data, answers queries according to the caller's role and relationship, and explains each answer. A visitor is found by routing a capture with LSH codes and per-building Bloom filters and verifying it only in the shortlisted buildings. On 10,000 events per day, averaged over 50 random populations, it identifies 95.0\% correctly against 95.2\% for a centralised search, touching 11.0\% of the galleries; the 95\% confidence interval of the accuracy is $\pm0.03$ points, and building-level state F1 is 0.961. A dynamic visitor database makes about two thirds of the visitor events free of routing. A two-layer class-teacher policy, sealed transfers and redacted explanations are implemented and covered by 574 automated tests. The uncertainty flags attached to answers catch about 74\% of the wrong identifications and 79\% of the wrong answers for about 13\% of extra latency, although they rarely flag errors that come from the visitor database. Measuring the Bloom filters showed that their effective false-positive rate is about 3.5\%, not the 1\% configured, so the privacy argument rests on the one-way encoding and on exact verification. All six objectives are achieved in simulation (Table~\ref{tab:status}); the security work is a tested design on a simulated network and not a hardened deployment.
+This project built and evaluated a system that identifies and tracks occupants across buildings without pooling face data, answers queries according to the caller's role and relationship, and explains each answer. A visitor is found by routing a capture with LSH codes and per-building Bloom filters and verifying it only in the shortlisted buildings. On 10,000 events per day, averaged over 50 random populations, it identifies 95.0\% correctly against 95.2\% for a centralised search, asking about 17 times fewer buildings (2 instead of 9 for a routed visitor); the 95\% confidence interval of the accuracy is $\pm0.03$ points. A dynamic visitor database makes about two thirds of the visitor events free of routing. A two-layer class-teacher policy, sealed transfers and redacted explanations are implemented and covered by 574 automated tests. The uncertainty flags attached to answers catch about 74\% of the wrong identifications and 79\% of the wrong answers for about 13\% of extra latency, although they rarely flag errors that come from the visitor database. Measuring the Bloom filters showed that their effective false-positive rate is about 3.5\%, not the 1\% configured, so the privacy argument rests on the one-way encoding and on exact verification. All six objectives are achieved in simulation (Table~\ref{tab:status}); the security work is a tested design on a simulated network and not a hardened deployment.
 
 \begin{table}[htbp]
 \centering
@@ -911,10 +927,10 @@ This project built and evaluated a system that identifies and tracks occupants a
 {\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
 \begin{tabular}{|p{4.6cm}|p{2.0cm}|p{2.6cm}|p{5.2cm}|}\hline
 \textbf{Objective} & \textbf{Planned} & \textbf{Status} & \textbf{Evidence}\\\hline
-1. Multi-building DSTS extension & Mid review & Achieved & BSTS over 10 buildings; building-level state F1 0.961\\\hline
+1. Multi-building DSTS extension & Mid review & Achieved & BSTS over 10 buildings; identification and routing evaluated on 10,000 events per run\\\hline
 2. RBAC query interface & 24/9/26 & Achieved & Two layers, class-teacher model, every policy cell tested, 64-request persona matrix\\\hline
 3. Explainable responses & 26/9/26 & Achieved & Faithfulness cases, flag recall 74\% on identifications, 13\% overhead\\\hline
-4. LSH + Bloom routing & Mid review & Achieved & 11.0\% of gallery touched, 0.2-point accuracy cost; effective false-positive rate 3.5\%\\\hline
+4. LSH + Bloom routing & Mid review & Achieved & 2 buildings asked instead of 9 per routed visitor, 0.2-point accuracy cost; effective false-positive rate 3.5\%\\\hline
 5. Security layer & 2/10/26 & Achieved (simulated network) & Sealed transfers, tokens, lockout, audit log\\\hline
 6. Evaluation & Final review & Achieved & Event and state TP/FP/FN/TN, 50 seeds, centralised baseline, explanation and Bloom measurements\\\hline
 \end{tabular}}

@@ -1,0 +1,1151 @@
+\documentclass[12pt,a4paper,oneside]{report}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage[left=30mm,right=25mm,top=25mm,bottom=25mm]{geometry}
+
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\setlength{\headheight}{30pt}
+\setlength{\headsep}{12pt}
+
+
+\usepackage{graphicx,array,longtable,setspace}
+\usepackage[hidelinks]{hyperref}
+\onehalfspacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\setcounter{tocdepth}{1}
+\emergencystretch=3em
+\renewcommand{\contentsname}{Table of Contents}
+\newcommand{\institutionlogo}[1]{\IfFileExists{amrita-logo.png}{\includegraphics[width=#1]{amrita-logo.png}}{\fbox{\parbox{#1}{\centering Amrita Vishwa Vidyapeetham\\Place amrita-logo.png beside this file}}}}
+\newcommand{\ProjectTitle}{Secure and Role-Aware Explainable Occupant Tracking in Multi-Building Indoor Smart Spaces}
+\fancypagestyle{project}{%
+  \fancyhf{}
+  \fancyhead[C]{\parbox{\textwidth}{\centering\small\nouppercase{\ProjectTitle}}}
+  \fancyfoot[C]{\thepage}
+  \renewcommand{\headrulewidth}{0.4pt}
+}
+% Preliminary pages show only a page number.
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyfoot[C]{\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+\newcommand{\EnableProjectHeaders}{%
+  \pagestyle{project}%
+  % report uses plain style on chapter-opening pages.
+  \fancypagestyle{plain}{%
+    \fancyhf{}
+    \fancyhead[C]{\parbox{\textwidth}{\centering\small\nouppercase{\ProjectTitle}}}
+    \fancyfoot[C]{\thepage}
+    \renewcommand{\headrulewidth}{0.4pt}
+  }%
+}
+\titlespacing*{\chapter}{0pt}{0pt}{16pt}
+\titlespacing*{\section}{0pt}{10pt}{4pt}
+\titlespacing*{\subsection}{0pt}{8pt}{3pt}
+\titlespacing*{\subsubsection}{0pt}{6pt}{3pt}
+\raggedbottom
+\begin{document}
+\pagestyle{empty}
+
+{\centering \Large\bfseries \ProjectTitle{}\par}
+{\centering Project report submitted in partial fulfilment of the requirements for the award of the degree of\par}
+{\centering \textbf{BACHELOR OF TECHNOLOGY}\par}
+{\centering in\par}
+{\centering \textbf{COMPUTER SCIENCE AND ENGINEERING}\par}
+{\centering Submitted by\par}
+{\centering \fontsize{14}{18}\selectfont
+Ajith Ashok \quad AM.U4.U4CSE23204\par}
+
+{\centering \fontsize{14}{18}\selectfont
+Arjun Rajesh \quad AM.U4.U4CSE23208\par}
+
+{\centering \fontsize{14}{18}\selectfont
+D Aditya Kiran \quad AM.U4.U4CSE23215\par}
+
+{\centering \fontsize{14}{18}\selectfont
+Yadhu Vipin Madhilakath Madathil \quad AM.U4.U4CSE23270\par}
+
+{\centering \fontsize{14}{18}\selectfont
+Under the guidance of\par
+Dr. Lakshmi Mohan\par
+Assistant Professor\par}
+
+{\centering \institutionlogo{4.5in}\par}
+
+{\centering \textbf{AMRITA SCHOOL OF COMPUTING}\par}
+{\centering \textbf{AMRITA VISHWA VIDYAPEETHAM}\par}
+{\centering \textbf{AMRITAPURI CAMPUS}\par}
+{\centering \textbf{KOLLAM 690525}\par}
+{\centering \textbf{NOVEMBER 2026}\par}
+
+
+\clearpage
+{\centering \institutionlogo{3.7in}\par}
+{\centering \textbf{DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING}\par}
+{\centering Amrita School of Computing, Amritapuri Campus\par}
+{\centering \Large\bfseries BONAFIDE CERTIFICATE\par}
+This is to certify that the project report entitled ``\ProjectTitle{}'', submitted by Ajith Ashok (AM.U4.U4CSE23204), Arjun Rajesh (AM.U4.U4CSE23208), D Aditya Kiran (AM.U4.U4CSE23215) and Yadhu Vipin Madhilakath Madathil (AM.U4.U4CSE23270), in partial fulfilment of the requirements for the award of the degree of Bachelor of Technology in Computer Science and Engineering at Amrita Vishwa Vidyapeetham, is a bonafide record of the work carried out by them under my guidance and supervision at Amrita School of Computing, Amritapuri, during Semester 7 of the academic year 2026 - 2027.
+
+\begin{tabular}{p{.46\textwidth}p{.46\textwidth}} Dr. Lakshmi Mohan & \phantom{X} \\ Project Guide & Project Coordinator \\ Signature \hrulefill & Signature \hrulefill \\[20pt] \phantom{X} &  \\ Chairperson, CSE & Reviewers \\ Signature \hrulefill & Signature \hrulefill \end{tabular}
+\\
+\\ 
+\\ Place: Amritapuri\\
+Date: 4 November 2026 
+\clearpage
+\thispagestyle{empty}
+
+{\centering
+\institutionlogo{3.7in}\par
+\vspace{0.4cm}
+\textbf{DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING}\par
+Amrita School of Computing, Amritapuri Campus\par
+\vspace{0.6cm}
+{\Large\bfseries DECLARATION\par}
+}
+
+\vspace{0.5cm}
+
+\noindent
+We, Ajith Ashok (AM.U4.U4CSE23204),
+Arjun Rajesh (AM.U4.U4CSE23208),
+D Aditya Kiran (AM.U4.U4CSE23215) and
+Yadhu Vipin Madhilakath Madathil (AM.U4.U4CSE23270),
+hereby declare that the project entitled
+``\ProjectTitle{}'' is a record of our original work
+carried out under the guidance of Dr. Lakshmi Mohan, Assistant Professor,
+Department of Computer Science and Engineering,
+Amrita Vishwa Vidyapeetham, Amritapuri.
+To the best of our knowledge, this work has not formed the
+basis for the award of any degree, diploma, fellowship or
+similar qualification to any candidate at any university.
+All sources and contributions of others have been
+appropriately acknowledged.
+
+\vspace{0.5cm}
+
+\noindent
+Place: Amritapuri\\
+Date: 4 November 2026
+
+\vspace{0.7cm}
+
+\noindent
+\begin{tabular}{@{}p{0.60\textwidth}p{0.34\textwidth}@{}}
+\textbf{Student details} & \textbf{Signature of the student} \\[14pt]
+
+Ajith Ashok\newline
+AM.U4.U4CSE23204
+& \rule{0.30\textwidth}{0.4pt} \\[18pt]
+
+Arjun Rajesh\newline
+AM.U4.U4CSE23208
+& \rule{0.30\textwidth}{0.4pt} \\[18pt]
+
+D Aditya Kiran\newline
+AM.U4.U4CSE23215
+& \rule{0.30\textwidth}{0.4pt} \\[18pt]
+
+Yadhu Vipin Madhilakath Madathil\newline
+AM.U4.U4CSE23270
+& \rule{0.30\textwidth}{0.4pt}
+\end{tabular}
+
+\vspace{0.8cm}
+
+\noindent
+\textbf{Project Guide:} Dr. Lakshmi Mohan
+
+\vspace{0.5cm}
+
+\noindent
+\textbf{Signature of the Project Guide:}
+\rule{4cm}{0.4pt}
+
+\clearpage
+% Arabic numbering continues through the preliminary pages and chapters.
+\pagenumbering{roman}
+\pagestyle{plain}
+
+\phantomsection
+\addcontentsline{toc}{chapter}{Acknowledgement}
+{\centering \Large\bfseries ACKNOWLEDGEMENT\par}
+We thank our guide, Dr. Lakshmi Mohan, for the Distributed State Transition System framework on which this work builds and for guiding every review, from the first literature survey to the final evaluation. Her comments at the mid-review shaped the role-based access control, the explainability and the security work reported here.
+
+We are grateful to the Department of Computer Science and Engineering and the Amrita School of Computing, Amritapuri Campus, for the computing facilities and the review process that kept the project on schedule. We also thank the authors of the open datasets and models we used, CASIA-WebFace and the InsightFace models, whose public release made this evaluation possible.
+
+Finally, we thank our team members for the shared effort across the parts of the project: the routing and pipeline, the query, access-control and security layers, the explanation layer and the dashboard.
+
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Abstract}
+{\centering \Large\bfseries ABSTRACT\par}
+A smart space is an indoor environment equipped with sensors, IoT devices and intelligent infrastructure that collect indoor location data. Multi-building smart spaces, such as university campuses, hospitals and military bases, must identify and follow occupants as they move between buildings, without asking anyone to stop or tap. The usual design keeps every reference template in one central store, which is simple and accurate but concentrates sensitive biometric data. Keeping each building's templates local avoids this, but the capturing building then cannot tell which building holds a visitor's identity, and the base DSTS work resolves visitors through a central master list; among the works reviewed, none treats access control and explanation of answers together with identification. This work does not claim that a decentralised design is better. It asks whether a decentralised alternative can do the same job, and how much recognition accuracy it gives up. Building on the Distributed State Transition System (DSTS) framework, each building keeps its own gallery and publishes only a Bloom filter of Locality-Sensitive Hashing (LSH) codes of its occupants' face embeddings; a capture that is not recognised locally is routed to a short list of likely buildings, which verify it by angular-distance voting. Because the same tracking data would let any user who can query it follow anyone else, access is governed by two-layer Role-Based Access Control (RBAC): what a requester sees about a person is filtered by the requester's role, from no information, through presence only, up to the exact zone and full trajectory. Every answer comes with an explanation of the rule applied, the evidence behind it, any uncertainty and what was withheld, redacted to the same level so that it never reveals more than the answer itself. A dynamic visitor database, probabilistic zone-level tracking and sealed inter-building transfers complete the system. It is evaluated on 500 simulated occupants (CASIA-WebFace) in 10 buildings, with 10,000 events per simulated day, using a central search as the reference and averaging over 50 random populations. The decentralised pipeline identifies 95.0\% of events, against 95.2\% for the central search (0.16 percentage points lower), while consulting 11.0\% of the galleries; the building-level state F1 score is 0.961. Each answer carries a warning when it may be wrong. The warning appears on 74\% of the wrong identifications and, as a false alarm, on 2.3\% of the correct ones. Building the warnings adds about 13\% to the processing time of a query, measured on a single machine, so network delay is not included. These results describe the accuracy that decentralisation retains, not an advantage over a central design. The network, cameras and certificate authority are simulated, so the work demonstrates the design and its accuracy, not a hardened deployment. The work maps to SDG 9, SDG 11 and SDG 16 of the 2030 Agenda.
+
+
+\clearpage
+
+\tableofcontents
+\clearpage
+
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoffigures
+\clearpage
+
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Tables}
+\begingroup\singlespacing
+\listoftables
+\endgroup
+\clearpage
+\pagenumbering{arabic}
+\pagestyle{plain}
+\EnableProjectHeaders
+\graphicspath{{figures/}{./}{latex/figures/}{latex/}{final_review/latex/figures/}{final_review/latex/}}
+\chapter{Introduction}
+\section{Background and motivation}
+A smart space is an indoor environment equipped with sensors, IoT devices and intelligent infrastructure that collect indoor location data about its occupants, in order to support occupant-specific services such as access, scheduling and safety \cite{ref6,ref7,ref26}. Campuses, hospitals, corporate estates and military bases are typical examples. In each of them the space spans many buildings, so the system must keep identifying and following a person as they move from one building to the next, without asking anyone to stop or tap. Indoor tracking with camera networks is well studied \cite{ref1,ref2,ref3,ref4,ref5}, but the identity question changes when the space has several buildings: a person registered in one building is a visitor in every other, and the building that senses the visitor does not hold that person's reference data.
+
+This project extends the Distributed State Transition System (DSTS) of Mohan and Menon \cite{ref6}, which models a multi-building smart space as states, events and transition functions. DSTS identifies visitors with a centralised database: a master list holds every person's reference embeddings, and every unrecognised capture is searched against it. This is simple and accurate, and we do not argue that it is a poor design. Its cost is that it concentrates biometric data, which, unlike a password, cannot be revoked and reissued if it leaks, and that it makes one server a single point of failure and an attractive target. The recognition part of this project therefore treats the centralised search as the reference and asks how well a distributed design holds up against it. In the distributed design each building keeps its own reference data, but a visitor's home building is then unknown, so the capturing building must either contact every other building for every unrecognised face or share reference embeddings between buildings. We measure how much recognition accuracy is given up, and how much of the stored data has to be consulted, when this is avoided.
+
+A second concern is the people who query the tracking data. The same data that helps find a lost visitor would let any user who can query it follow any other person. The information returned about a person must therefore be filtered according to the role of the requester, from no information at all, through whether the person is present, to their exact zone and full movement history, following the principles of Role-Based Access Control (RBAC) \cite{ref21}. The system must also be able to show why an answer was given. Among the works reviewed in Chapter~3, access control over tracking queries and explanation of the answers are not treated together with distributed identification.
+
+This project therefore combines three things in one system: (i) decentralised identification and tracking, in which a building shares only a Bloom filter of hashed LSH codes until a likely match is found, then sends the capture embedding over a sealed channel to a short list of buildings for verification, and releases a person's reference embeddings only after a match is confirmed; (ii) privacy-aware querying under RBAC with a two-layer policy; and (iii) explanations that justify both the access decision and the tracking evidence behind each answer. This report covers the complete system, including state tracking, access control, security, and explanations.
+
+\subsubsection{Relevant Sustainable Development Goals}
+The work maps to three goals of the 2030 Agenda \cite{ref27}: SDG~9 (target 9.1, resilient infrastructure), because there is no central biometric store to lose; SDG~11 (target 11.7, safe and inclusive spaces), because occupants can be located for safety while their data is protected from misuse such as stalking; and SDG~16 (target 16.6, accountable and transparent institutions), because every access decision is audited and every answer is explained.
+
+\section{Objectives}
+The objectives, each linked to how it is evaluated and to its deliverable, are given in Table~\ref{tab:objectives}.
+
+\begin{table}[htbp]
+\centering
+\caption{Objectives, evaluation methods and deliverables}\label{tab:objectives}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{0.6cm}|p{4.4cm}|p{5.2cm}|p{3.6cm}|}\hline
+\textbf{\#} & \textbf{Objective} & \textbf{Evaluation method} & \textbf{Deliverable}\\\hline
+1 & Extend the DSTS framework to distributed multi-building identification and tracking & Event identification precision and recall; state-level precision and recall over every state (Sections~\ref{sec:res-events}, \ref{sec:res-state}) & Pipeline, building nodes, building-level tracking databases (BSTS)\\\hline
+2 & Provide an RBAC query interface in which each role sees only the people, and the level of detail, that its relationship allows & Every policy cell tested; access matrix checked against the expected decisions (Section~\ref{sec:res-security}) & Two-layer policy, FastAPI server, dashboard\\\hline
+3 & Return explainable responses that justify the access decision and the tracking evidence & Faithfulness and no-leakage tests; flag precision and recall against ground truth; latency overhead (Section~\ref{sec:res-expl}) & Explanation model, redaction, ``Why this answer'' card\\\hline
+4 & Design LSH + Bloom-filter routing for decentralised visitor lookup & Routing recall; gallery touched per lookup; accuracy against a centralised search; effective false-positive rate (Sections~\ref{sec:res-events}, \ref{sec:res-visitors}, \ref{sec:res-bloom}) & Enrolment, routing and verification modules\\\hline
+5 & Secure the system: sealed transfers, role-based filtering, audit logging & Tamper, replay, wrong-sender and fail-closed tests; login lockout tests (Section~\ref{sec:res-security}) & Sealed-transfer and access-control modules\\\hline
+6 & Evaluate tracking precision and recall, communication cost and explanation quality & TP/FP/FN/TN per cohort and level; 50 seeds; centralised baseline; explanation measurements (Chapter~\ref{ch:results}) & Evaluation scripts and result tables\\\hline
+\end{tabular}}
+\end{table}
+
+\section{Scope and constraints}
+\subsubsection{Intended users}
+The administrators, staff and ordinary occupants of a multi-building space; each sees tracking data only as their role and relationship allow. The roles used in the implementation are defined in Chapter~5.
+
+\subsubsection{Included functions}
+Face-embedding-based identification of registered occupants and of visitors across buildings; probabilistic zone-level tracking; fourteen query templates (Q1--Q13 and TRACK, the full-trajectory query); role-based disclosure; explanations; secure inter-building exchange; a web dashboard; and a centralised baseline for comparison.
+
+\subsubsection{Exclusions and assumptions}
+The system works on face embeddings produced by a pretrained model; it does not train a face model or process live video. Cameras, the network between buildings and the certificate authority are simulated in one process, and the test photos are replayed as camera events. Zones are a fixed nine-zone layout per building. Every visitor is registered in some other building; people registered nowhere (unknown visitors) are future work.
+
+\subsubsection{Constraints}
+All experiments run on a laptop CPU and are reproducible from a population seed.
+
+\section{Project report organization}
+Chapter~2 states the problem, Chapter~3 reviews fourteen related works, and Chapter~4 lists the requirements. Chapter~5 presents the design and its parameters, Chapter~6 the evaluation, results, comparison and limitations, and Chapter~7 the conclusion and future work. References and an appendix on reproducibility follow.
+
+\clearpage
+\chapter{Problem Definition}
+\section{Problem statement}
+\subsubsection{Problem}
+Identify and track occupants across a wide-area, multi-building indoor environment while giving secure, role-based and explainable access to where they are and have been, and justify both the access decisions and the tracking evidence behind each answer.
+
+\subsubsection{Stakeholders and consequences}
+The stakeholders are the occupants who are tracked, the users who query the system under different roles, and the auditors. A central biometric store exposes every occupant in a single breach; distribution without routing costs a request to every other building per unrecognised face; uncontrolled access enables stalking; unexplained answers cannot be audited.
+
+\section{Existing system and limitations}
+Existing indoor tracking systems use cameras, radio signals or both \cite{ref1,ref2,ref9}. Edge-camera frameworks localise and track people inside one site \cite{ref1,ref2,ref5}, and distributed trackers associate targets across cameras with consensus filtering or shared target tables \cite{ref3,ref4}; none says how a person registered elsewhere is identified or who may query the locations.
+
+The DSTS framework \cite{ref6} models a multi-building environment as states, events and transition functions and resolves visitors through a centralised master list. Bloom filters have been used to protect biometric templates \cite{ref10}, to count people across locations without revealing their faces \cite{ref11} and to locate the web proxy that holds a cached object \cite{ref13}, but none of the reviewed work combines approximate, similarity-based routing of a face to a building with role-based access control and explanations.
+
+\subsubsection{Gap}
+The project addresses four gaps: (i) identity discovery across separate buildings without sharing galleries; (ii) evidence that LSH with Bloom filters routes biometric visitors accurately; (iii) role-based control over tracking queries; and (iv) explanations for access decisions and tracking answers.
+
+\clearpage
+\chapter{Literature Review}
+\section{Review scope and selection}
+Fourteen works (references 1--6, 8 and 10--16) were reviewed in twelve groups (Section~\ref{sec:lit-desc}); they are cited by their reference number throughout the report. The search covered indoor occupant tracking with camera and RF sensing, multi-camera association, state-transition models of smart spaces, privacy-preserving biometrics and Bloom-filter indexing, and similarity search with Locality-Sensitive Hashing. Search keywords were: ``indoor localization camera network edge'', ``distributed multi-camera multi-target tracking'', ``smart space state transition'', ``Bloom filter biometric'' and ``Locality-Sensitive Hashing''.
+
+The publication period is 1970 to 2026: recent works (2020--2026) on tracking and privacy-preserving biometrics were chosen for the problem context, and foundational works on Bloom filters and hashing were included because the routing mechanism is built on them. A work was selected if it is a primary source (a journal article, conference paper or preprint), is directly relevant to tracking, identity discovery, hashing-based routing, or the models used in this project, and gives enough detail to describe its approach and evaluation. Works [1]--[5] are the mid-review set; [6] is the base paper that this project extends. The remaining references (the datasets, face models, access-control model and cryptographic standards used in Chapters 4 and 5) are cited where they are used and are not reviewed here.
+
+\section{Descriptive review of literature works}\label{sec:lit-desc}
+Each group below gives one connected paragraph covering the problem or objective, the proposed contribution and approach, the study context, the evaluation criteria, the key findings and the limitations that leave a gap for this project. Table~\ref{tab:literature} compares all of them.
+
+\subsection{Group identification and localisation with privacy-preserving edge cameras}
+Hegde et al. (2024) in ``Indoor group identification and localization using privacy-preserving edge computing distributed camera network'' \cite{ref1} investigate how to find when and where groups form in an indoor therapeutic space of about 1,700~m$^2$. The work proposes a pipeline that takes noisy positions and orientations of people, estimated from sparsely placed multi-view edge cameras running a lightweight two-dimensional pose detector, and groups them. The study is situated in a therapeutic built environment with seven participants over 35-minute sessions in groups of two to seven. The authors assess it with precision, recall and F1 score for group identification and mean absolute error for group localisation. They report an F1 score of up to about 90\% and a localisation error of 1.25~m, with raw images kept off the network because the edge devices extract the features. The limitations are that the unit of identification is a group and not an individual, and that the study covers one space; it says nothing about identifying a person who is registered elsewhere.
+
+\subsection{Indoor localisation and multi-person tracking with sparse edge cameras}
+Kwon et al. (2023) in ``A feasibility study on indoor localization and multiperson tracking using sparsely distributed camera network with edge computing'' \cite{ref2} ask whether people can be localised and tracked over a large indoor site with few, low-cost cameras. They deploy 39 edge camera units, each running pose estimation on a Google Coral accelerator, in a therapeutic space of roughly 1,700~m$^2$, and track people from the pose output. The evaluation reports localisation error, multiple-object tracking accuracy, tracking precision, identity switches and body-orientation error, with an average localisation error of about 1.4~m and a tracking accuracy of about 88.6\%. The framework tracks anonymous people inside one site and does not attempt cross-building identity discovery, access control or explanations.
+
+\subsection{Distributed multi-camera multi-target association}
+Yang et al. (2022) in ``Distributed multi-camera multi-target association for real-time tracking'' \cite{ref3} address real-time association of targets across cameras without a central server. They propose a target-management module in which cameras share a data structure of target labels and appearance information so that detections in different views can be matched, without camera calibration. The evaluation uses several multi-camera benchmarks and an own mobile-camera dataset and reports multi-camera tracking accuracy, IDF1, false positives, false negatives and identity switches. The work improves association, but it keeps no probabilistic state of who is in which building and does not identify where a visitor comes from.
+
+\subsection{Distributed multi-target tracking in camera networks}
+Casao et al. (2021) in ``Distributed multi-target tracking in camera networks'' \cite{ref4} study tracking of several people with a network of cameras that exchange information only with neighbours. Their approach combines a distributed-consensus Kalman filter with a re-identification network and a distributed tracker manager that handles cross-camera association. They compare against centralised trackers on public multi-camera datasets using tracking accuracy, IDF1-type scores and bandwidth, and report better accuracy and lower bandwidth than the centralised methods they compare with. The gap is that the system tracks within one camera network and has no model of buildings, registered occupants and visitors.
+
+\subsection{Real-time multi-person multi-camera tracking at the edge}
+Gaikwad and Karmakar (2021) in ``Smart surveillance system for real-time multi-person multi-camera tracking at the edge'' \cite{ref5} build an end-to-end pipeline of person detection, tracking and re-identification that runs in real time on edge devices and follows people across multiple cameras. The pipeline shows that edge tracking and re-identification are practical, but it has no formal multi-building state or query model and no decentralised handling of visitors.
+
+\subsection{Modelling large-scale camera networks: the DSTS framework}
+Mohan and Menon (2020) in ``Modelling large scale camera networks for identification and tracking: an abstract framework'' \cite{ref6} model identification and tracking in a wide-area camera network as a distributed state transition system. A state records the probability that each occupant is in each zone, an event is a recognition at a zone, and a transition function updates the state when an event occurs; each building has a building-level state transition system (BSTS). Registered occupants are recognised against their own building's database, and visitors are resolved through a centralised master list. The framework is evaluated on a two-building campus with 35 registered occupants, using state-based precision and recall. The visitor step is the part this project replaces: the central list concentrates biometric data and every visitor lookup depends on it. The model of states, events and transitions builds on earlier work on the three Rs of cyber-physical spaces \cite{ref7}.
+
+\subsection{Face recognition and tracking for security surveillance}
+Nair et al. (2021) in ``Face recognition and tracking for security surveillance'' \cite{ref8} investigate identifying and following faces across surveillance cameras, including cameras with non-overlapping views. The work combines face detection and recognition with tracking so that a person recognised in one camera can be followed into the next. It shows that face recognition is a practical identity cue for tracking, which is the assumption this project relies on. As a surveillance system it is not designed around separate per-building galleries, cross-building identity discovery or role-based querying.
+
+\subsection{Bloom filters for iris biometrics}
+Rathgeb et al. (2014) in ``On application of Bloom filters to iris biometrics'' \cite{ref10} investigate how Bloom filters can hold iris templates. Representing the template as a Bloom filter makes comparison alignment-free and one-way, so that the stored template protects the biometric while still allowing identification, and the structure supports faster searches than a linear scan of templates. The work establishes that Bloom filters are a usable representation for biometric data. It targets iris codes, not face embeddings, and it protects a single database rather than routing a query among many databases.
+
+\subsection{Privacy-preserving face-based crowd monitoring}
+Marzani et al. (2026) in ``Head count: privacy-preserving face-based crowd monitoring'' \cite{ref11} address counting individuals across locations without revealing their faces. They combine face features, fuzzy extractors and homomorphically encrypted Bloom filters so that the same person seen in different places is counted once while the underlying biometric stays hidden. This is the closest related work to using Bloom filters for cross-location face matching. Its purpose is counting, not identification and tracking of named occupants, and it has no role-based query layer; this project uses LSH codes and per-building Bloom filters to route a capture towards the building that holds the reference.
+
+\subsection{Space/time trade-offs in hash coding}
+Bloom (1970) in ``Space/time trade-offs in hash coding with allowable errors'' \cite{ref12} introduces the Bloom filter: a bit array and several hash functions that answer ``probably in the set'' or ``definitely not in the set'', with a controllable false-positive rate and no false negatives. The analysis trades a small error probability for a large saving in space. This is the property the project depends on: each building can publish a compact, one-way summary of its occupants. The filter answers exact membership only, which is why Locality-Sensitive Hashing is needed to make nearby embeddings collide; and, as Section~\ref{sec:res-bloom} shows, the false-positive estimate assumes queries unrelated to the stored set, which LSH codes of similar faces are not.
+
+\subsection{Summary Cache: Bloom filters for wide-area cache sharing}
+Fan et al. (2000) in ``Summary Cache: a scalable wide-area web cache sharing protocol'' \cite{ref13} study how web proxies can share cache contents without flooding each other with queries. Each proxy keeps a Bloom-filter summary of the objects held by its peers and contacts only the peers whose summaries match, which sharply reduces inter-proxy messages at a small cost in false hits. The evaluation is on trace-driven simulations of proxy traffic. The same idea of summaries that tell where an item probably lives is applied here to faces, but a face capture never matches exactly, so the summaries must be built from similarity-preserving codes.
+
+\subsection{Similarity-preserving hashing: SimHash and multi-probe LSH}
+Charikar (2002) in ``Similarity estimation techniques from rounding algorithms'' \cite{ref14} shows that random-hyperplane hashing maps vectors to bits so that the probability of two vectors agreeing on a bit decreases as the angle between them grows, which makes binary codes preserve angular similarity. Lv et al. (2007) in ``Multi-probe LSH: efficient indexing for high-dimensional similarity search'' \cite{ref15} improve recall without adding hash tables by also probing nearby buckets chosen from the query, reaching the same recall with far fewer tables; this project applies the idea to binary codes by flipping the least-confident bits. Kirsch and Mitzenmacher (2006) show that Bloom-filter positions can be derived by double hashing with no loss in asymptotic false-positive rate \cite{ref16}. These three works supply the encoding, multi-probe lookup and hashing used in this project. They are generic indexing techniques and say nothing about biometric privacy or access control.
+
+\section{Comparison of reviewed literature}
+Table~\ref{tab:literature} compares the reviewed works on the attributes used above. The gap that follows from the comparison is stated here, and the table gives the evidence.
+
+\subsubsection{Gap}
+None of the surveyed works routes a face from a building that does not know it to the building that does, using compact similarity-preserving summaries, and none combines this with role-based access to the tracking data and with explanations of the answers. That combination is the contribution of this project.
+
+{\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{|p{2.0cm}|p{3.8cm}|p{3.2cm}|p{5.1cm}|}
+\caption{Comparison of reviewed literature}\label{tab:literature}\\\hline
+\textbf{Work and citation} & \textbf{Problem, approach and contribution} & \textbf{Study context and evaluation criteria} & \textbf{Key findings and limitations (gap)}\\\hline\endfirsthead
+\hline\textbf{Work and citation} & \textbf{Problem, approach and contribution} & \textbf{Study context and evaluation criteria} & \textbf{Key findings and limitations (gap)}\\\hline\endhead
+Work 01 \cite{ref1} Hegde et al., 2024 & Find when and where groups form indoors; pose estimation and clustering on edge cameras & One therapeutic space, 7 people, 35 min; precision, recall, F1 score, MAE & F1 score up to about 90\%, MAE 1.25~m. Groups, not individuals; one site\\\hline
+Work 02 \cite{ref2} Kwon et al., 2023 & Localise and track people with few cameras; 39 edge units with pose estimation & About 1,700~m$^2$ therapeutic space; localisation error, MOTA, MOTP, ID switches & About 1.4~m error, MOTA about 88.6\%. Anonymous tracking in one site\\\hline
+Work 03 \cite{ref3} Yang et al., 2022 & Distributed multi-target association; shared label and appearance table, no calibration & Benchmarks and an own mobile-camera set; MOTA, IDF1, FP/FN, ID switches & Real-time association without a server. No building-level state or visitor origin\\\hline
+Work 04 \cite{ref4} Casao et al., 2021 & Distributed multi-target tracking; consensus Kalman filter, re-ID and tracker manager & Public multi-camera datasets; MOTA/IDF1-type, bandwidth & Better than centralised in accuracy and bandwidth. One camera network; no occupants or visitors\\\hline
+Work 05 \cite{ref5} Gaikwad and Karmakar, 2021 & Edge multi-person multi-camera tracking; detection, tracking and re-ID on edge devices & Multi-camera surveillance video; tracking accuracy, real-time speed & Real-time edge tracking and re-ID is practical. No multi-building state or query model\\\hline
+Work 06 \cite{ref6} Mohan and Menon, 2020 & Model camera-network identification and tracking; abstract DSTS with states, events, transitions & Two-building campus, 35 registered occupants; state-based precision and recall & Formal model with building-level BSTS. Visitors via a central master list\\\hline
+Work 07 \cite{ref8} Nair et al., 2021 & Face recognition and tracking; recognition and tracking across cameras & Surveillance cameras; recognition and tracking quality & Face is a workable identity cue. Not built around per-building galleries or access control\\\hline
+Work 08 \cite{ref10} Rathgeb et al., 2014 & Protect iris templates; Bloom-filter templates & Iris databases; comparison and speed & Alignment-free, one-way templates. Iris, not face; one database, no routing\\\hline
+Work 09 \cite{ref11} Marzani et al., 2026 & Privacy-preserving crowd counting; face features, fuzzy extractor, encrypted Bloom filters & Multi-location counting; counting accuracy, privacy & Counts people without revealing faces. Counts, does not identify; no roles\\\hline
+Work 10 \cite{ref12} Bloom, 1970 & Compact set membership; bit array and hash functions & Theory; false-positive rate, space & No false negatives; tunable error. Exact membership only; assumes queries unrelated to the stored set\\\hline
+Work 11 \cite{ref13} Fan et al., 2000 & Share web caches cheaply; Bloom-filter summaries of peers & Proxy traces; messages, hit ratio & Far fewer inter-proxy messages. Exact keys, not similar faces\\\hline
+Work 12 \cite{ref14,ref15,ref16} Charikar, 2002; Lv et al., 2007; Kirsch and Mitzenmacher, 2006 & Similarity-preserving hashing; random hyperplanes, multi-probe lookup, double hashing & Theory, similarity search; recall, tables needed. Angle-preserving codes, fewer tables. Generic; no privacy or access control\\\hline
+\end{longtable}}
+
+\clearpage
+\chapter{Requirements}
+\section{Functional requirements}
+Table~\ref{tab:fr} lists the functional requirements with their actors, inputs and outputs, and the acceptance criterion used to check each one.
+
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|p{0.93cm}|p{3.75cm}|p{1.87cm}|p{3.19cm}|p{3.94cm}|}
+\caption{Functional requirements}\label{tab:fr}\\\hline
+\textbf{ID} & \textbf{Requirement} & \textbf{Actor} & \textbf{Input $\rightarrow$ output} & \textbf{Acceptance criterion}\\\hline\endfirsthead
+\hline\textbf{ID} & \textbf{Requirement} & \textbf{Actor} & \textbf{Input $\rightarrow$ output} & \textbf{Acceptance criterion}\\\hline\endhead
+FR1 & Recognise a registered occupant against the building's own gallery & Camera event & Embedding $\rightarrow$ identity or abstain & Accepted when at least 12 of 20 references agree within 80.43$^{\circ}$\\\hline
+FR2 & Route an unrecognised capture to likely buildings with Bloom filters, then verify there & Building node & Embedding $\rightarrow$ shortlist, then identity & Shortlist of at most 5 buildings; only they receive the capture\\\hline
+FR3 & Update the person's zone probabilities after each identified event & System & Identified event $\rightarrow$ nine zone probabilities & Nine rows per event summing to 1\\\hline
+FR4 & Remember visitors for a day and promote frequent visitors & System & Arrivals $\rightarrow$ day cache, permanent pool & Repeat sightings need no routing; promotion after 3 entries in 7 days or 8 in 30\\\hline
+FR5 & Open and close a visit pointer at the home building & System & Entry and exit events $\rightarrow$ pointer record & Pointer minted at arrival, closed at departure; no biometrics stored\\\hline
+FR6 & Answer the fourteen query templates (Q1--Q13 and TRACK, Table~\ref{tab:queries}) & Every role & Query $\rightarrow$ answer & Answer consistent with the stored events\\\hline
+FR7 & Apply a two-layer policy before any answer & Query service & Caller, target, purpose $\rightarrow$ permit or deny & Every denied request returns a reason code and no data\\\hline
+FR8 & Return an explanation with each answer, redacted to the caller's level & Query service & Answer $\rightarrow$ explanation & Explanation never shows more than the answer; faithful to it\\\hline
+FR9 & Seal every cross-building message & Building node & Message $\rightarrow$ sealed envelope & Tampered, replayed or mis-addressed messages are dropped\\\hline
+FR10 & Show the campus, zones, queries and security log on a dashboard & All roles & API data $\rightarrow$ web page & Content filtered by the caller's role\\\hline
+FR11 & Compare with a centralised search and report TP, FP, FN, TN & Evaluator & Run files $\rightarrow$ metrics & Metrics per cohort, state level and seed\\\hline
+FR12 & Record every authorisation decision in an audit log & Access layer & Decision $\rightarrow$ log entry & Entry has layer, code, principal and target\\\hline
+FR13 & Sign users in as a demo role or with a per-person credential & Users & Credential $\rightarrow$ signed token & Token expires in one hour; lockout after repeated failures\\\hline
+\end{longtable}}
+
+
+\section{Non-functional requirements}
+Table~\ref{tab:nfr} states the quality requirements with the measure used. The result that satisfies each one is given in Chapter~\ref{ch:results}.
+
+\begin{table}[htbp]
+\centering
+\caption{Non-functional requirements}\label{tab:nfr}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{2.55cm}|p{5.19cm}|p{3.40cm}|p{2.83cm}|}\hline
+\textbf{Quality} & \textbf{Requirement} & \textbf{Measure} & \textbf{Where reported}\\\hline
+Accuracy & Decentralised identification close to a centralised search & Overall accuracy within 1 point; visitor F1 score reported & Section~\ref{sec:res-events}\\\hline
+Communication cost & Touch a small part of the galleries per lookup & Gallery touched per lookup (central = 100\%) & Section~\ref{sec:res-events}\\\hline
+Privacy & No gallery, id or embedding in a published filter; no plaintext biometric between buildings & Filter contents inspected; sealed-transfer tests; effective false-positive rate & Sections~\ref{sec:res-bloom}, \ref{sec:res-security}\\\hline
+Security & Fail closed; resist tampering, replay, impersonation and brute force & Attack tests; lockout after 5 failures in 60 s & Section~\ref{sec:res-security}\\\hline
+Explainability & Explanations faithful to the answer, free of leakage, and informative about uncertainty & Faithfulness cases; flag precision and recall; latency overhead & Section~\ref{sec:res-expl}\\\hline
+Reproducibility & Every result regenerable from a seed & Seeded populations; 50 seeds & Section~\ref{sec:res-seeds}\\\hline
+Performance & Run on a laptop CPU & 10,000 events in about 8 minutes & Appendix~\ref{app:setup}\\\hline
+Usability & One web page for all roles & Dashboard with role-filtered views & Section~\ref{sec:res-ui}\\\hline
+\end{tabular}}
+\end{table}
+
+\section{Hardware requirements}
+A laptop-class machine is sufficient: an Intel CPU, 16~GB of memory recommended, and no GPU. All face-model inference is done once, offline, on the CPU; the experiments then work on stored 512-dimensional embeddings. No cameras or dedicated edge devices are required because camera events are replayed from the datasets. A full one-day run of 10,000 events, including enrolment, routing, tracking and evaluation, takes about eight minutes on such a machine.
+
+\section{Software and data requirements}
+Table~\ref{tab:software} lists the software, models and datasets, with their sources.
+
+\begin{table}[htbp]
+\centering
+\caption{Software, tools and data}\label{tab:software}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.59cm}|p{10.99cm}|}\hline
+\textbf{Item} & \textbf{Details}\\\hline
+Operating system, language & Windows 11; Python 3.12 in a virtual environment\\\hline
+Numerical and data & NumPy, pandas, matplotlib; ONNX Runtime and OpenCV for the one-off embedding extraction\\\hline
+Face models & InsightFace models: SCRFD detector \cite{ref18} and ArcFace recogniser \cite{ref17}, 512-dimensional output\\\hline
+Routing and state & Random-hyperplane LSH \cite{ref14}, Bloom filter \cite{ref12}, vote-based verifier, SQLite tracking databases (written from scratch)\\\hline
+Security and API & cryptography library (X25519, HKDF, AES-GCM, Ed25519), HMAC tokens, FastAPI and uvicorn, Prometheus client\\\hline
+Front end & Static HTML and JavaScript dashboard served by the API (no build step)\\\hline
+Testing & pytest with 574 automated tests\\\hline
+Main dataset & CASIA-WebFace \cite{ref19}: 500 identities, 20 reference and 20 test photos each (20,000 embeddings), in 10 buildings of 50 people\\\hline
+Access conditions & CASIA-WebFace is a public research dataset\\\hline
+\end{tabular}}
+\end{table}
+
+\subsubsection{Dataset partitioning}
+For each person, the 20 reference photos enrol them in their building and are never used as events; the 20 test photos are the camera events, so no photo is used for both. Buildings are formed by a seeded random permutation of the 500 people into 10 buildings of 50. The Bloom filters and the mean face used for centring come only from reference photos. No model is trained or tuned on the test photos.
+
+\clearpage
+\chapter{Proposed Methodology}
+\section{Architecture}
+The environment is a set of buildings. Each \textit{building node} owns its registered occupants' gallery, a registered database and a visitor database (SQLite) holding the zone probabilities and events of its own occupants and of its visitors, and a visitor lifecycle manager. A secure communication layer connects the nodes; an access control layer sits between the users and the data; and a query service applies the policy and builds the response with its explanation. Figure~\ref{fig:arch} shows the architecture and Figure~\ref{fig:flow} the two main workflows: the inter-building tracking workflow (recognise locally, route, verify, update the state) and the querying workflow (authenticate, authorise, retrieve, apply the response policy, explain).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{arch.png}
+\caption{System architecture: building nodes, secure communication layer, access control layer and user interface}\label{fig:arch}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{flow.png}
+\caption{Inter-building tracking workflow and querying and access workflow}\label{fig:flow}
+\end{figure}
+
+Table~\ref{tab:stores} lists what each building keeps and what leaves it.
+
+\begin{table}[htbp]
+\centering
+\caption{What a building keeps and what it shares}\label{tab:stores}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.52cm}|p{6.06cm}|p{4.69cm}|}\hline
+\textbf{Item} & \textbf{Content} & \textbf{Leaves the building?}\\\hline
+Gallery & 20 reference embeddings per registered occupant & Only the matched occupant's 20 references, sealed, after a confirmed match\\\hline
+Bloom filter & Bit array of LSH items, 58,469 bits (7.3~KB), 7 hash positions, no ids or embeddings & Yes, published to all peers; one-way\\\hline
+Registered and visitor databases & Per-occupant zone probabilities and events, for own occupants and for visitors & No\\\hline
+Visit-pointer database & Visit pointers of own occupants who are away: occupant id, current building, entry and exit times & Read by location queries; contains no biometrics\\\hline
+Visitor entry history and permanent store & Entry history and the embeddings of promoted frequent visitors & No\\\hline
+Day cache & A visitor's 20 references, in memory for one simulated day & No; zeroed at day rollover\\\hline
+\end{tabular}}
+\end{table}
+
+
+\section{Proposed approach and procedure}
+\subsection{Embedding preprocessing and enrolment}
+Faces are detected and aligned with SCRFD \cite{ref18} and embedded with an ArcFace model \cite{ref17} (512 dimensions). A raw embedding $e$ is normalised, centred with the mean $\bar{x}$ of the reference embeddings, and normalised again:
+\begin{equation}\label{eq:norm}
+\hat{e}=\frac{e/\|e\|-\bar{x}}{\left\|\,e/\|e\|-\bar{x}\,\right\|}
+\end{equation}
+The $R=20$ preprocessed references of an occupant $u$ are averaged into a unit-norm centroid:
+\begin{equation}\label{eq:centroid}
+z_u=\frac{\sum_{r=1}^{R}\hat{e}_{u,r}}{\left\|\sum_{r=1}^{R}\hat{e}_{u,r}\right\|}
+\end{equation}
+The centroid is used only to build the Bloom filter. The 20 individual references are kept in the building for voting, because a single centroid discards the variation between photos of the same person, which the vote relies on.
+
+\subsection{LSH codes and the Bloom filter}
+Random hyperplanes (one Gaussian vector $w$ for each slot $l$ and bit $k$, drawn once and shared by all buildings) define $L=122$ slots of $K=11$ bits \cite{ref14}. The bit $h$ is the side of the hyperplane on which the embedding lies, and the $K$ bits of slot $l$ form an integer code $c_l$:
+\begin{equation}\label{eq:hash}
+h_{l,k}(\hat{e})=\mathbf{1}\!\left[w_{l,k}^{\mathsf{T}}\hat{e}\geq 0\right],\qquad c_l=\sum_{k=0}^{K-1}h_{l,k}\,2^{k}
+\end{equation}
+Each occupant's centroid yields $L$ items, the item for slot $l$ being $l\cdot 2^{K}+c_l$, so a code counts as a match only in the same slot. The items of all occupants of a building are inserted into a Bloom filter \cite{ref12} with positions derived by double hashing \cite{ref16}. The filter is sized for 50 occupants at a target false-positive rate of 1\%, which gives 58,469 bits and 7 hash positions; with $50\times 122=6{,}100$ items the fill ratio is about 51\%. Only the packed bits and a few scalars are published (7.3~KB, or about 10~KB as a file): no ids, embeddings or centroids. Section~\ref{sec:res-bloom} measures how close the real false-positive rate is to the 1\% target.
+
+\subsection{Local recognition, routing and verification}
+A capture is first compared with the capturing building's own gallery. For every candidate occupant the angle between the capture and each of the 20 references is computed, and a reference votes if its angle is at most $80.43^{\circ}$. The winner is the occupant with most votes (ties broken by the smallest single angle); it is accepted only with at least $12$ votes. Figure~\ref{fig:flow} gives the flow and the listing below the steps.
+
+If the local check does not accept, the capture is hashed in all $L$ slots. As well as the exact code, the $3$ least confident bits of each slot are flipped to give extra probes \cite{ref15}. Each peer's filter is tested, and a building's score is the number of distinct slots that matched, on a 0 to $L$ scale. The highest-scoring buildings form a shortlist. Its members verify the capture over the sealed channel with the same vote rule against their own occupants, following a verification policy (Section~\ref{sec:policies}). If no shortlisted building confirms the capture, it is not identified (abstain).
+
+{\footnotesize
+\begin{verbatim}
+identify(capture q, building b):
+  r = preprocess(q)
+  (who, votes) = vote(own_gallery(b), r)          # >=12 of 20 votes
+  if votes >= 12: return who                      # local occupant
+  codes, margins = lsh_encode(r)                  # 122 slots of 11 bits
+  score[c] = distinct slots of c's Bloom filter that match any probe
+  for c in shortlist(score):                      # sequential: best first
+      reply = sealed_request(c, r)                # only c sees the capture
+      if reply.matched: return reply.occupant     # refs come back sealed
+  return None                                     # abstain
+\end{verbatim}}
+
+\subsection{Shortlist verification policies}\label{sec:policies}
+The shortlist has a fixed size $S$ (here $S=5$), and the shortlisted buildings can be asked in more than one way. Three verification policies were considered, which trade the number of buildings contacted against the risk of confirming the wrong person.
+
+\subsubsection{Verify all}
+All $S$ buildings verify the capture and the building whose occupant gathers the most votes wins. It never depends on the ranking, but every lookup contacts $S$ buildings.
+
+\subsubsection{Sequential}
+The buildings are contacted in rank order and the first confirmation ends the search. It contacts the fewest buildings, but a wrongly ranked building that confirms first is accepted without the others being asked.
+
+\subsubsection{Adaptive}
+The gap $g$ between the best and the second-best Bloom score decides: if $g\le g_0=5$ (the top buildings are hard to tell apart) all $S$ buildings verify, otherwise the buildings are asked sequentially. It spends extra contacts only where the ranking is uncertain.
+
+The pipeline can run any of the three. The headline results of Chapter~\ref{ch:results} use the sequential policy, so their accuracy includes the occasional wrong confirmation by a lower-ranked building, which the ``lower-ranked building verified'' uncertainty flag marks (Table~\ref{tab:flags}). Section~\ref{sec:res-policies} compares the three policies.
+
+\subsection{Tracking: probabilities and state}
+For an identified event with candidate distances $d_i$ to each candidate occupant $i$, the occupant probabilities follow Definition 3.3 of the DSTS framework \cite{ref6}: with $\sigma$ the population standard deviation of the distances,
+\begin{equation}\label{eq:prob}
+p_i=\frac{\exp\!\left(-d_i^{2}/2\sigma^{2}\right)}{\sum_{l}\exp\!\left(-d_l^{2}/2\sigma^{2}\right)}
+\end{equation}
+The result is uniform over ties when $\sigma=0$. The Bloom score, vote counts and ground truth never enter this probability. The building's registered and visitor databases keep, for each occupant, a probability over the nine zones and updates it from each event. The zones are z1 Entrance, z2 Mail room, z3 Office, z4 Lounge, z5 Conference, z6 Classroom, z7 Cafeteria (reached only from the classroom), z8 Exit, and zT, the transition zone to the outdoors; movement between buildings must pass through zT. The event is stored in the building that observed it: registered occupants in the registered database and visitors in the visitor database. The state is reset at the start of every simulated day.
+
+\subsection{Dynamic visitor database and visit pointers}
+A visitor is remembered in three layers (Table~\ref{tab:visitor}). A transition-zone rule keeps a visitor who is waiting in zT out of other people's probability updates until they are seen outside zT. A visit pointer (occupant id, current building, entry and exit times, no biometrics) is minted at the home building when the visitor arrives and closed at departure, so a location query follows the pointer instead of asking all buildings.
+
+\begin{table}[htbp]
+\centering
+\caption{The three layers of the visitor database}\label{tab:visitor}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{2.68cm}|p{3.83cm}|p{3.64cm}|p{3.83cm}|}\hline
+\textbf{Layer} & \textbf{Lifetime} & \textbf{Content} & \textbf{Used for}\\\hline
+Presence & Memory, until the visitor leaves or the day ends & Who is inside and in which zone & Which rows the probability update covers\\\hline
+Day cache & Memory, one simulated day; survives departure; zeroed at rollover & The visitor's 20 reference embeddings & Matching later captures the same day with no routing\\\hline
+Entry history and permanent pool & Disk: entry history and permanent-visitor store & Every arrival; embeddings of frequent visitors & Recognising frequent visitors on any later day without routing\\\hline
+\end{tabular}}
+\end{table}
+
+An arrival is the zT event of a visitor who is not inside. When a visitor's earlier entries into a building already satisfy a rule from the configuration (default: three entries in seven days, or eight in thirty), the next entry stores their embeddings permanently. From then on the visitor is matched from the permanent pool, on every day, without contacting any other building. A wrong identity stored in the cache persists for the rest of the day; Section~\ref{sec:res-expl} reports how rarely such errors are flagged.
+
+\subsection{Role-based access control}
+Access control follows the Role-Based Access Control model of Sandhu et al. \cite{ref21}, extended with the relationship between the caller and the target. Every query passes two layers before execution. Layer~1 authenticates the principal and applies the building scope. Layer~2 is the persona policy, which returns a disclosure level for the pair (caller, target) and the purpose and time of the query. The levels are shown in Table~\ref{tab:levels} and the access model in Table~\ref{tab:access}. There are 1~Dean, 10~Teachers and 39~Students per building, and each Teacher has a class roster of about four students.
+
+\begin{table}[htbp]
+\centering
+\caption{Disclosure levels}\label{tab:levels}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{1.17cm}|p{4.11cm}|p{9.00cm}|}\hline
+\textbf{Level} & \textbf{Name} & \textbf{What the caller sees}\\\hline
+L0 & None & Nothing; the request is refused with a reason code\\\hline
+L1 & Presence & Availability only (defined in the policy; no current rule grants it)\\\hline
+L2 & Precise current & Exact zone, zone label, confidence and exact time, for the present only\\\hline
+L3 & Historical track & Full trajectory and dwell times\\\hline
+\end{tabular}}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Access model (class-teacher RBAC)}\label{tab:access}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{2.49cm}|p{5.36cm}|p{2.87cm}|p{3.25cm}|}\hline
+\textbf{Role} & \textbf{May follow} & \textbf{Disclosure} & \textbf{Cannot see}\\\hline
+Dean (1 per building) & Teachers and students of their own campus (wherever they are), and the Deans of other buildings & L3 for both & Teachers and students of other campuses, including while they visit the Dean's building\\\hline
+Teacher (10 per building) & Only the students on their class roster, in any building & L3 for roster students & Unassigned students, peer teachers, the Dean\\\hline
+Student (39 per building) & Themselves in full; the teachers assigned to them & L3 for self, L2 for assigned teachers & Peer students, other teachers, the Dean\\\hline
+\end{tabular}}
+\end{table}
+
+Building-level queries (Q1, Q2) return aggregates to everyone in their own building and the list of people only to a Dean; zone queries (Q10, Q12, Q13) filter each listed occupant through the same policy; students cannot run zone queries. There are fourteen query templates, Q1--Q13 and TRACK (the full trajectory), listed in Table~\ref{tab:queries}. Q6 is a point-in-time location query whose answer is redacted to the caller's level; Q3, Q4, Q5, Q7, Q8, Q9, Q11 and TRACK need the full-history level and are refused below it.
+
+\begin{table}[htbp]
+\centering
+\caption{The fourteen query templates supported by the system}\label{tab:queries}
+{\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{|p{1.4cm}|p{9.3cm}|p{3.5cm}|}\hline
+\textbf{Query} & \textbf{Question} & \textbf{Kind}\\\hline
+Q1 & Did any occupant stay in building B after time T? & Building aggregate\\\hline
+Q2 & Were there more visitors than registered occupants in building B at time T? & Building aggregate\\\hline
+Q3 & Did occupant O leave building B before time T? & History of one person\\\hline
+Q4 & Did occupant O enter the building between times T1 and T2? & History of one person\\\hline
+Q5 & Did occupant O visit all the zones of building B? & History of one person\\\hline
+Q6 & Where was occupant O at time T? & Location at a time\\\hline
+Q7 & How many zones did occupant O visit between T1 and T2? & History of one person\\\hline
+Q8 & At what time did occupant O first visit zone Z? & History of one person\\\hline
+Q9 & How long did occupant O spend in zone Z during the first visit? & History of one person\\\hline
+Q10 & Who was in zone Z at time T? & Zone occupancy\\\hline
+Q11 & Where was occupant O between T1 and T2? & History of one person\\\hline
+Q12 & Who was in zone Z between T1 and T2? & Zone occupancy\\\hline
+Q13 & Who ever visited zone Z? & Zone occupancy\\\hline
+TRACK & The full historical trajectory of occupant O & History of one person\\\hline
+\end{tabular}}
+\end{table}
+
+\subsection{Explainable responses}
+Each query builds an explanation from the same filtered event list that it used to compute the answer, never by recomputing afterwards. The explanation holds the decision rule in one sentence, the evidence events with their roles (decisive, last before $t$, carry-in state, zone visit), what was looked for and not found, uncertainty flags, what redaction withheld, and the visit pointer if one answered the query. Flags come from the identification provenance stored with every identified event (votes, routing rank, Bloom margin, whether the vote winner was also the nearest candidate) and are listed in Table~\ref{tab:flags}. A flag is a plain warning that an answer rests on weaker evidence; it does not say that the answer is wrong. The first four flags concern the identification of a person and the last two concern the answer to a query. The identity probability of Equation~\ref{eq:prob} is not used as a confidence signal, because it is computed from the candidate distances alone and ignores the votes and the routing evidence on which an identification is accepted. Before leaving the service the explanation is redacted to the caller's disclosure level, so it never shows more than the answer does.
+
+\begin{table}[htbp]
+\centering
+\caption{Uncertainty flags}\label{tab:flags}
+{\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.6cm}|p{10.98cm}|}\hline
+\textbf{Flag} & \textbf{What it means}\\\hline
+Winner not nearest & The person accepted is not the one whose single photo is closest to the captured face. Acceptance counts matching photos, so a different person with a closer photo means the evidence contradicts itself: the strongest warning of a wrong identification.\\\hline
+Few votes & A bare pass. A person is accepted when at least 12 of their 20 reference photos match; below 16 matches the identification is marginal.\\\hline
+Lower-ranked building verified & A visitor's possible home buildings are ranked and asked in order, and the first to confirm is accepted. Here the confirming building was not the first choice, so the ranking was off and a look-alike elsewhere may have been accepted.\\\hline
+Narrow routing margin & Which building to ask first was a close call: the two best buildings scored within 5 points of each other (out of 122).\\\hline
+Stale observation & The answer to a time question (for example, where a person was at 4 pm) rests on a sighting more than 60 minutes earlier, so the person may have moved.\\\hline
+Pointer-based value & The answer comes from the visitor's home-building record, which says only which building the person entered and when. No sighting supports it, so there is no exact zone.\\\hline
+\end{tabular}}
+\end{table}
+
+\subsection{Secure inter-building exchange}
+Every message between buildings is sealed. The sender generates an ephemeral X25519 key \cite{ref23}, derives a symmetric key with HKDF-SHA256 \cite{ref22}, encrypts with AES-GCM \cite{ref25} using the whole header as associated data, and signs the header, nonce and ciphertext with Ed25519 \cite{ref24}. Replies are bound to their request. A campus certificate authority issues node certificates that bind both the signing key and the key-agreement key; expiry, revocation, subject and pinning are checked. A replay guard accepts a message only within a 300-second window and once per nonce, and runs after the signature check so the timestamp is authenticated. Any failed step yields no reply and nothing is admitted (fail closed).
+
+\subsection{Parameters}
+Table~\ref{tab:params} lists the parameters used. The Bloom filter was configured for a 1\% false-positive rate, but Section~\ref{sec:res-bloom} shows that the effective rate that routing sees is about 3.5\% because LSH codes of different people collide.
+
+\begin{table}[htbp]
+\centering
+\caption{Parameters used}\label{tab:params}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{7.39cm}|p{7.19cm}|}\hline
+\textbf{Parameter} & \textbf{Value}\\\hline
+LSH bits per slot $K$ / slots $L$ & 11 / 122\\\hline
+Bloom target false-positive rate (configured) & 0.01\\\hline
+Bloom effective false-positive rate (measured, Section~\ref{sec:res-bloom}) & about 3.5\%\\\hline
+References per occupant $R$ & 20\\\hline
+Accept angle / minimum votes & 80.43$^{\circ}$ / 12\\\hline
+Shortlist size / extra probes & 5 / 3\\\hline
+Verification policy evaluated & sequential, in rank order\\\hline
+Visitor promotion rule & 3 entries in 7 days or 8 entries in 30 days\\\hline
+Uncertainty-flag thresholds & few votes below 16; narrow margin below 5; stale after 60 min\\\hline
+\end{tabular}}
+\end{table}
+
+\subsection{API and dashboard}
+The FastAPI server exposes login, query, tracking, occupancy and explanation endpoints; every data endpoint runs the same authentication, building scope and two-layer policy before it returns anything, and the dashboard is a static page that calls them. A simulation endpoint, open to Deans only, replays the run's recognised events against a simulated clock; a track endpoint returns one person's day, and a photo endpoint serves the captured or reference photo, both under the same policy.
+
+
+\clearpage
+\chapter{Results and Analysis}
+\label{ch:results}
+\section{Evaluation setup}
+The evaluation uses 500 occupants in 10 buildings: the 500 CASIA-WebFace people dealt into 10 buildings of 50 by a seeded permutation. One simulated day has 10,000 events, one for each of the 10,000 test photos; 8,000 are local (the person is in their home building) and 2,000 are visitor events. Every headline number in this chapter is the average over 50 random populations (seeds 0 to 49); each seed places the same people in different buildings and draws a different event day. Where a single run is needed to show detail (the visitor outcome buckets and the screenshots), seed 42 is used and is named as such.
+
+\subsubsection{Safeguards against bias}
+Reference photos enrol people and are never events; test photos are events and are never enrolled. The mean face and the Bloom filters use reference photos only. The centralised baseline is the same pipeline: the same local check, the same visitor cache and the same vote rule. Only the lookup of a visitor's first sighting differs, a direct search of the other buildings' galleries instead of Bloom routing, so any difference is caused by routing and not by a stronger matcher. Ground truth is read only by the evaluation scripts; recognition, routing and tracking receive observable event fields only.
+
+\section{Evaluation criteria}
+All identification metrics use the one-vs-rest convention. An item has one true label and at most one predicted label out of $N_L$ labels. TP: the predicted label is the true label. FP: a wrong label was predicted. FN: the true label was not predicted (a wrong prediction or an abstention). TN: every other (item, label) pair, that is items $\times N_L-$TP$-$FP$-$FN. A wrong identity is therefore both an FP and an FN, and an abstention only an FN.
+\begin{equation}\label{eq:metrics}
+\mathrm{Precision}=\frac{TP}{TP+FP},\qquad \mathrm{Recall}=\frac{TP}{TP+FN},\qquad F_1=\frac{2PR}{P+R}
+\end{equation}
+Recall equals the share of events identified correctly, so it is also called identification accuracy. Because TN is in the millions, accuracy computed with TN is close to 1 and is not used to compare systems.
+
+\subsubsection{Event level}
+The label is the occupant id (500 labels), reported for all, local and visitor events.
+
+\subsubsection{State level}
+State $s_k$ is the campus after event $k$; the label is (building, zone) with 90 labels, plus building (10 labels) and zone (9 labels) alone, and every occupant the system places counts, including visitors updated by other people's events.
+
+\subsubsection{Cost}
+Gallery touched per lookup is the number of buildings whose gallery is searched divided by the number of buildings (the centralised server is 100\%); routing recall is the share of routed visitors whose home building is in the shortlist.
+
+\subsubsection{Explanation criteria}
+A flag is useful if it is carried by wrong answers and not by right ones. For identifications, share of wrong flagged is the fraction of wrong identifications that carry at least one flag, and share of correct flagged the false-alarm rate. For answers, an answer is wrong when it differs from the same query run over the identified events with their true occupants; flag precision is the share of flagged answers that are wrong and recall the share of wrong answers that are flagged. Overhead is the extra latency and response size of building the explanation.
+
+\subsubsection{Bloom criterion}
+The effective false-positive rate is the share of the enrolled items of the other buildings that a building's filter reports as present.
+
+\section{Result}
+\subsection{Identification: decentralised against centralised}\label{sec:res-events}
+Table~\ref{tab:central} compares the decentralised pipeline with the centralised search, and Table~\ref{tab:events} gives the confusion counts and scores, all averaged over the 50 seeds.
+
+\begin{table}[htbp]
+\centering
+\caption{Identification accuracy and gallery touched (average of 50 seeds, 10,000 events per run)}\label{tab:central}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{2.97cm}|p{1.67cm}|p{2.41cm}|p{2.60cm}|p{1.67cm}|p{2.04cm}|}\hline
+\textbf{Cohort} & \textbf{Events} & \textbf{Centralised accuracy} & \textbf{Decentralised accuracy} & \textbf{Gap (points)} & \textbf{Gallery touched}\\\hline
+All events & 10,000 & 95.17\% & 95.01\% & 0.16 & 11.0\%\\\hline
+Local & 8,000 & 95.94\% & 95.94\% & 0.00 & 10.0\%\\\hline
+Visitor & 2,000 & 92.11\% & 91.32\% & 0.79 & 15.2\%\\\hline
+\end{tabular}}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Event-level confusion counts and scores (average of 50 seeds; TN, in the millions, omitted)}\label{tab:events}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{2.97cm}|p{1.78cm}|p{1.48cm}|p{1.48cm}|p{1.98cm}|p{1.78cm}|p{1.58cm}|}\hline
+\textbf{Cohort} & \textbf{TP} & \textbf{FP} & \textbf{FN} & \textbf{Precision} & \textbf{Recall} & \textbf{F1 score}\\\hline
+All events & 9,501 & 155 & 499 & 0.984 & 0.950 & 0.967\\\hline
+Local & 7,675 & 60 & 325 & 0.992 & 0.959 & 0.976\\\hline
+Visitor & 1,826 & 96 & 174 & 0.950 & 0.913 & 0.931\\\hline
+\end{tabular}}
+\end{table}
+
+Over all events the decentralised pipeline identifies 95.01\% against 95.17\% for the central search, a difference of 0.16 points that is positive in every one of the 50 seeds (0.03 to 0.34 points), while each lookup touches 11.0\% of the galleries. Local events are identical in the two systems (95.94\% in both): a registered person is recognised by the vote in their own building, with no lookup involved, so the two systems cannot differ there. The visitor events lose 0.8 points (91.32\% against 92.11\%), which is the cost of routing a capture with Bloom filters instead of searching the other buildings' galleries directly. The standard deviation over the 50 seeds is only 0.11 points (Section~\ref{sec:res-seeds}).
+
+\subsection{Routing and the visitor database}\label{sec:res-visitors}
+Table~\ref{tab:visitors} summarises how visitors are identified and the text below breaks one run (seed 42) down by outcome. In that run, of the 2,000 visitor events, 1,335 (about two thirds) are served from the building's visitor database (the same visitor sighted again the same day), 585 are routed, and the remaining 80 are visitors that an occupant of the capturing building wrongly accepted as a local person (a false accept caused by a look-alike among the building's own occupants). The three groups add up to 2,000. Errors among the routed events are mostly routing misses that end in an abstention, and a smaller number of cases in which the right building is reached but the face still does not pass verification.
+
+\begin{table}[htbp]
+\centering
+\caption{Visitor identification and tracking (average of 50 seeds)}\label{tab:visitors}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{8.4cm}|p{3.0cm}|}\hline
+\textbf{Metric} & \textbf{Value}\\\hline
+Visitor events per run & 2,000\\\hline
+Precision / recall / F1 score of visitor identification & 0.950 / 0.913 / 0.931\\\hline
+Routing recall (home building in the top five) & 90.6\%\\\hline
+Buildings contacted per routed lookup & 2\\\hline
+Visitor events served from the visitor database & 1,345 (67.2\%, about two thirds)\\\hline
+Visit-pointer precision & 98.3\%\\\hline
+Visitor recall in the tracked state: building / zone / building and zone & 0.950 / 0.937 / 0.903\\\hline
+\end{tabular}}
+\end{table}
+
+The detailed run (seed 42) shows how the headline gap should be read. The centralised baseline identified 95.05\% of its 10,000 events and the pipeline 94.88\%. The exact difference is 17 events out of 10,000, that is 0.17 points. The 50-seed gap in Table~\ref{tab:central} is 0.16 points.
+
+\subsection{Shortlist verification policies compared}\label{sec:res-policies}
+The three policies of Section~\ref{sec:policies} were run on the same 50 populations, from the routing step onwards, with the adaptive threshold $g_0=5$; the sequential row is the run used everywhere else in this chapter. Table~\ref{tab:policies} counts the routed visitor lookups, that is the visitor events that were not served from the visitor database (about 590 per run), and the share of them identified correctly, identified as the wrong person, or left unidentified.
+
+\begin{table}[htbp]
+\centering
+\caption{Verification policies on routed visitor lookups (average of 50 seeds)}\label{tab:policies}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.0cm}|p{1.9cm}|p{2.2cm}|p{2.0cm}|p{2.3cm}|p{2.2cm}|}\hline
+\textbf{Policy} & \textbf{Correct} & \textbf{Wrong person} & \textbf{Abstained} & \textbf{Buildings contacted} & \textbf{Accuracy, all events}\\\hline
+Sequential & 83.89\% & 2.95\% & 13.16\% & 2 & 95.01\%\\\hline
+Adaptive ($g_0=5$) & 84.49\% & 2.29\% & 13.22\% & 3 & 95.06\%\\\hline
+Verify all & 84.42\% & 2.36\% & 13.22\% & 5 & 95.04\%\\\hline
+\end{tabular}}
+\end{table}
+
+All three leave about 13\% of the routed lookups unidentified, because an abstention means that no shortlisted building confirms the capture, which does not depend on the order of asking. They differ in the wrong-person rate: the sequential policy accepts a lower-ranked building that happens to confirm first, and it misidentifies about 0.6 points more of the routed lookups than the other two (2.95\% against 2.29\% and 2.36\%) and identifies about 0.5 to 0.6 points fewer correctly (better in 50 of the 50 populations for the adaptive policy and in 48 for verify-all). The adaptive policy matches verify-all (the paired difference is 0.07 points, with a 95\% interval of $\pm0.05$) while contacting about 3 buildings per lookup instead of 5 (45\% fewer); it costs about one more contact than the sequential policy. Over all 10,000 events the policies differ by at most 0.05 points (95.01\% to 95.06\%), because routed lookups are about 6\% of the events, so the choice of policy is a small effect on the headline accuracy. The sequential policy is kept for the other results because it contacts the fewest buildings and its errors are the ones the uncertainty flags are designed to expose.
+
+\subsection{Stability across 50 random populations}\label{sec:res-seeds}
+Each of the 50 seeds places the same people in different buildings and draws a different event day. Table~\ref{tab:seeds} gives the spread of the main results over the seeds. The averages in this chapter are the means in the table; the spread is small, so the result does not depend on a favourable assignment of people to buildings. The visitor result varies most because it rests on fewer events.
+
+\begin{table}[htbp]
+\centering
+\caption{Spread of the results over 50 random populations (10,000 events each)}\label{tab:seeds}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.6cm}|p{1.9cm}|p{1.9cm}|p{1.9cm}|p{1.9cm}|p{2.4cm}|}\hline
+\textbf{Measure} & \textbf{Mean} & \textbf{SD} & \textbf{Min} & \textbf{Max} & \textbf{95\% CI ($\pm$)}\\\hline
+Accuracy, all events & 95.01\% & 0.11 & 94.67\% & 95.23\% & 0.03\\\hline
+Accuracy, local events & 95.94\% & 0.09 & 95.73\% & 96.16\% & 0.03\\\hline
+Accuracy, visitor events & 91.32\% & 0.66 & 89.70\% & 92.45\% & 0.19\\\hline
+Routing recall & 90.6\% & 1.0 & 88.3\% & 92.6\% & 0.3\\\hline
+Gap to the centralised search (points) & 0.16 & 0.06 & 0.03 & 0.34 & 0.02\\\hline
+\end{tabular}}
+\end{table}
+
+\subsection{Tracking state against the state ground truth}\label{sec:res-state}
+Table~\ref{tab:state} reports the state-level scores. After every one of the 10,000 events the whole campus state, that is who is in which building and zone, is compared with the true state recorded by the simulation, and the scores are averaged over the 10,000 states of a run and then over the 50 seeds.
+
+\begin{table}[htbp]
+\centering
+\caption{State-level scores against the state ground truth (average of 50 seeds)}\label{tab:state}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.30cm}|p{1.74cm}|p{2.33cm}|p{1.94cm}|p{1.55cm}|p{2.52cm}|}\hline
+\textbf{Level} & \textbf{Labels} & \textbf{Precision} & \textbf{Recall} & \textbf{F1 score} & \textbf{Visitor recall}\\\hline
+Building & 10 & 0.962 & 0.960 & 0.961 & 0.950\\\hline
+Zone & 9 & 0.942 & 0.940 & 0.941 & 0.937\\\hline
+Building and zone & 90 & 0.926 & 0.924 & 0.925 & 0.903\\\hline
+\end{tabular}}
+\end{table}
+
+Building-level state, that is knowing which building each person is in after every event, reaches an F1 score of 0.961; the zone within a building and the combination are harder because the nine-zone belief is updated from one event at a time. The standard deviation of the building-level F1 score over the 50 seeds is 0.004.
+
+\subsection{Explanation quality}\label{sec:res-expl}
+Every answer comes with a ``Why this answer'' card and, where the system is unsure, a warning flag (Table~\ref{tab:flags}). Three questions were asked: do the explanations match the answers, do the flags appear when an answer is wrong, and what do the explanations cost. The results are averages over 50 seeds on the 10-building system, except the cost, which was timed on seeds 0 to 4.
+
+\subsubsection{Do the explanations match the answers?}
+Yes. An explanation is built from the same events that produced the answer, and never recomputed. For every query type, tests with a yes, a no and an empty answer (40 cases) check that each piece of evidence is one of the system's own events and that redoing the answer from the evidence gives the same answer. Further tests check that an explanation never shows more than the answer itself may show to that role, and that explanations are never shared between roles. All of them pass (Section~\ref{sec:res-security}).
+
+\subsubsection{Do the flags appear when an identification is wrong?}
+A flag is raised when an explanation is built, from facts saved at the moment the person was identified, such as a low vote count or a close call between two buildings. It never uses the true identity. For each group of identifications, Table~\ref{tab:expl-id} shows how many wrong identifications carry a flag (more is better) and how many correct ones carry one by mistake (fewer is better).
+
+\begin{table}[htbp]
+\centering
+\caption{Warning flags on identifications (average of 50 seeds)}\label{tab:expl-id}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{5.2cm}|p{4.6cm}|p{4.6cm}|}\hline
+\textbf{Identified} & \textbf{Wrong ones with a flag} & \textbf{Correct ones with a flag}\\\hline
+All identifications & 73.9\% & 2.3\%\\\hline
+In the person's own building & 74.2\% & 0.9\%\\\hline
+Visitors found by routing & 85.3\% & 30.0\%\\\hline
+Visitors from the visitor database & 4.3\% & 0.0\%\\\hline
+\end{tabular}}
+\end{table}
+
+\begin{itemize}
+\item Overall, about 3 in 4 wrong identifications carry a flag and only 2 in 100 correct ones do. A flag therefore means ``check this one'': 34\% of flagged identifications are wrong, against about 0.4\% of unflagged ones.
+\item The weak spot is the visitor database. A visitor recognised from the day's cache leaves almost no trail for the flags to use, so only 4\% of its few wrong identifications (about 11 per day) are flagged, and such an error stays until the end of the day. Routed visitors are flagged reliably but also noisily (30\% of their correct identifications carry a flag).
+\item The strongest flag is ``winner not nearest'' (Table~\ref{tab:flags}): 714 of the 730 identifications that carry it, over the 50 seeds, were wrong.
+\end{itemize}
+
+\subsubsection{Do the flags carry over to answers?}
+The same check was made on query answers (where a person was at a given time, how many zones they visited, and their full track), on about 6,900 answers per run. 21\% of them carry a flag. Of the wrong answers 79\% are flagged, and 39\% of the flagged answers are wrong, so a flag again means that an answer deserves a second look rather than that it is wrong.
+
+\subsubsection{What do explanations cost?}
+Building the explanation makes a query about 13\% slower (5.9~ms to 6.6~ms, summed over the fourteen query types and timed on seeds 0 to 4, one at a time) and the response about seven times larger (16~KB to 119~KB with the full explanation), because the evidence is listed.
+
+\subsection{The Bloom filters' real false-positive rate}\label{sec:res-bloom}
+Each filter is sized for a 1\% false-positive rate on the assumption that its items behave like independent random keys. LSH codes of different people are not independent: two occupants whose embeddings fall on the same side of the same hyperplanes receive the same code in that slot. The effective rate was therefore measured directly, by testing the enrolled items of the nine other buildings against each building's filter and averaging over the buildings and the 50 seeds.
+
+The effective rate is about 3.5 times the configured one. The Bloom array itself is not at fault: random integers that were never inserted are reported at 0.95\%, essentially the 1\% target. The excess comes from the codes: 2.64\% of the items of other buildings already equal an enrolled item in the same slot, close to the 2.44\% expected if the codes of 50 occupants were spread evenly over 2048 values. The 50-seed value, measured on 10 buildings, is 3.56\%.
+
+\subsubsection{Privacy consequence}
+The filter is one-way, but membership in it can be tested, and a positive does not prove that a particular face is enrolled in the building: with an effective rate of about 3.5\% on top of genuine matches, a positive is ambiguous. That ambiguity limits what a single positive reveals, and routing therefore only ranks buildings and never identifies anyone; identification needs the exact vote on the real references in the shortlisted buildings. The same finding also means that the configured 1\% must not be quoted as the system's false-positive rate, and that the privacy argument should rest on the one-way encoding and on the verification step, not on a small false-positive rate. No formal privacy guarantee is claimed.
+
+\subsection{Verification of the security and policy layers}\label{sec:res-security}
+The security, policy and explanation layers are verified by 574 automated tests (Table~\ref{tab:tests}). They include attack cases written for this project: tampering with every header field of a sealed message, replay, wrong sender or recipient, a revoked certificate, brute-force login, a token used as another person, and cache sharing across roles.
+
+\begin{table}[htbp]
+\centering
+\caption{Automated tests by area}\label{tab:tests}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{4.50cm}|p{1.37cm}|p{8.41cm}|}\hline
+\textbf{Area} & \textbf{Tests} & \textbf{What is checked}\\\hline
+access\_\allowbreak control & 112 & Every policy cell, structured Layer-1 decisions, building scope, lockout, credentials, tickets, API-level RBAC attacks\\\hline
+secure\_\allowbreak transfer & 61 & Sealed payloads: tampering, replay, wrong sender or recipient, revoked certificate, fail closed, strict decoding\\\hline
+api & 98 & Login and demo sign-in, queries per role, caching, zone and time-frame views, simulation control, person track and photos, dashboard adapter\\\hline
+queries & 181 & Query engine, multi-day normalisation, explanation faithfulness, leakage and uncertainty, CLI access rules\\\hline
+pipeline, population, events, evaluation & 98 & Local recognition, routing and tracking stages, visitor database, seeded populations, event generation, ground truth, confusion metrics\\\hline
+standalone, centralised, state library & 19 & Standalone demo, centralised baseline, state library\\\hline
+shared utilities & 5 & Dated timestamps, time-window arithmetic\\\hline
+\textbf{Total} & \textbf{574} & All passing on the final commit\\\hline
+\end{tabular}}
+\end{table}
+
+A persona matrix tool replays 64 requests (Dean, Teacher, Student and an outsider against each query type and target type) and checks the decision, the rule code and the disclosure level of each. A request for a person in another building is denied unless a relationship allows it: a Teacher may follow a rostered student wherever the student is, and a Dean may follow the Deans of other buildings; every other cross-building request is refused, with a rule code that records the reason.
+
+\subsection{The dashboard}\label{sec:res-ui}
+The dashboard demonstrates the access model as much as the tracking. A Dean starts a simulation of one day, one week or one month: the recognised events of the run are replayed against a simulated clock, and the campus map, the occupancy, the live feed and every query follow it (Figure~\ref{fig:ui-overview}). The person at the keyboard is chosen by role, building and name (any Dean, Teacher or Student of any building), and what the page shows is then decided only by the two policy layers: the same feed shows a Dean of building 8 every event of that campus, a Teacher only the assigned students, and a Student only themselves.
+
+Choosing a building shows its nine zones; choosing a zone lists who was there in the time frame, named only where the role may see the exact location. Choosing a person opens their day as a track across buildings and zones (Figure~\ref{fig:ui-track}): each photo is the one the camera captured at that moment, a blue dashed line joins sightings inside a building and a red one a move to another building. The track is shown only where the role may see the full history (disclosure L3): a Dean for the people of their own campus and for the other Deans, a Teacher for the students on their roster, and a Student for themselves. A Student sees the exact current position of an assigned Teacher but no track: a location query from a Student is always answered for the present, whatever time is asked, so repeated queries cannot rebuild a history. A Student gets nothing at all about a Dean, a peer or an unassigned Teacher. Photos follow the exact-location level (L2 or higher). A query returns its answer with the ``Why this answer'' card, and the same query from a Student, who may not follow that person, is refused with a rule code and no explanation (Figures~\ref{fig:ui-dean} and \ref{fig:ui-student}).
+
+Table~\ref{tab:ui-pages} lists every page of the dashboard and the results it can produce. The ``confidence'' shown on the overview and in the answers is the identity probability of Equation~\ref{eq:prob}; it is not a calibrated confidence, and the uncertainty flags are the warning signal (Section~\ref{sec:res-expl}).
+
+\begin{table}[htbp]
+\centering
+\caption{What each dashboard page shows}\label{tab:ui-pages}
+{\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{|p{2.5cm}|p{8.1cm}|p{3.9cm}|}\hline
+\textbf{Page} & \textbf{What it shows} & \textbf{What the role changes}\\\hline
+Overview & The simulation controls and clock, the counts of buildings, zones, tracked occupants and recognised events, the average identity probability, a campus map with the number of people in each building, and a live feed of recognised events with photos & The feed lists only the people the role may see; only a Dean controls the simulation\\\hline
+Occupancy & The latest position (building, zone, identity probability, last time seen) of each person & Only the people the role may see\\\hline
+Building and zones & The zones of each building with their counts and, for a time frame, who was in each zone (visitors marked) & Counts for everyone, names only where the role may see the exact location\\\hline
+Research queries & The fourteen query templates with the answer, the ``Why this answer'' card, the rule, the evidence, the uncertainty flags and what was withheld & Answer and card redacted to the caller's level\\\hline
+Person track & A person's day across buildings and zones, with the photo at each sighting & Full-history level only\\\hline
+Security & Counts of users, sessions, requests and blocked requests, the access log of every decision, and the roles, policies and certificate mechanisms & A Dean sees all decisions, other roles only their own\\\hline
+Metrics and settings & The raw Prometheus counters of the queries executed, and the fixed recognition and routing parameters of Table~\ref{tab:params} (read-only) & Same for every role\\\hline
+\end{tabular}}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{ui_overview.png}
+\caption{Overview with a simulation running: clock, progress, counts and a live feed with photos; the sign-in (role, building, person) is at the top right}\label{fig:ui-overview}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{ui_track.png}
+\caption{The track of one person across two buildings, with the photo captured at each sighting}\label{fig:ui-track}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{ui_query_dean.png}
+\caption{A query from a Dean, answered with its ``Why this answer'' card (rule, evidence, uncertainty, withheld)}\label{fig:ui-dean}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{ui_query_student.png}
+\caption{The same query from a Student, refused with a rule code and no explanation}\label{fig:ui-student}
+\end{figure}
+
+\section{Comparative Analysis}
+Table~\ref{tab:comparison} compares the approaches. The fair comparison for this project is the same pipeline with a central search; other published systems \cite{ref1,ref2,ref3,ref4,ref5} use different data and tasks and cannot be compared number for number.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison with the baseline and the approaches in the literature}\label{tab:comparison}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{3.83cm}|p{3.06cm}|p{4.02cm}|p{3.06cm}|}\hline
+\textbf{Approach} & \textbf{Visitor lookup} & \textbf{Face data leaving a building} & \textbf{Result here}\\\hline
+Centralised search over all galleries (baseline) & Direct search of the other buildings' galleries & Galleries pooled in one store & 95.17\%; 100\% of the gallery searched\\\hline
+Decentralised LSH + Bloom routing (this work) & Rank by Bloom score, verify the shortlist & Only a 7.3~KB Bloom filter; references move only after a confirmed match & 95.01\%; 11.0\% of the gallery\\\hline
+DSTS base paper \cite{ref6} & Central master list & Master list of visitor embeddings & Not re-run; replaced by the row above\\\hline
+Edge-camera tracking \cite{ref1,ref2,ref3,ref4,ref5} & Within one site & Not applicable & No cross-building identity, RBAC or explanations\\\hline
+\end{tabular}}
+\end{table}
+
+Routing costs 0.16 points overall and 0.8 points on visitors, in exchange for touching about a tenth of the gallery and never pooling it.
+
+\section{Discussion and Interpretation}
+The results meet the objectives that can be measured. Decentralised identification is within 0.2 points of a central search overall while touching about 11\% of the galleries, so the privacy and locality gain costs little accuracy (objectives 1 and 4). Most visitor events need no routing because repeat sightings the same day are served from the day cache, so most visitor events contact no other building. Tracking reaches an F1 score of 0.961 at building level and 0.941 at zone level (objective 1). The order in which shortlisted buildings are asked matters little for accuracy: verifying all five buildings, or only the uncertain cases, reduces wrong identifications of routed visitors by about 0.6 points compared with asking in rank order, at 3 to 5 contacts instead of 2.
+
+The access model and the explanations are verified by tests, flag scores and a persona matrix (objectives 2, 3 and 5). The flags catch about three quarters of the wrong identifications for about 13 per cent of extra latency, but the visitor database, whose errors are rarely flagged, is the main weakness.
+
+One finding qualifies the design: the effective false-positive rate of the Bloom filters is about 3.5\%, not the configured 1\%, so the privacy argument must not rely on a small false-positive rate.
+
+\section{Limitations}
+\begin{itemize}
+\item The network, cameras and the face detector are simulated. Arrays are plaintext in memory before sealing and after opening, and the certificate authority is a simulated substitute whose signature is a message authentication code, not a real public-key infrastructure.
+\item The API has no TLS unless a reverse proxy adds it, the stored embeddings and tracking databases are not encrypted, and token secrets, caches and lockout counters are per process. The dashboard's demo mode lets any viewer act as any role, by design. No outside penetration test was done; the attack tests are those written by the authors.
+\item Recognition of people wearing face masks is not implemented: the system assumes unmasked faces, and masked or otherwise occluded faces were not evaluated.
+\item A wrong identity stored in the visitor cache persists for the rest of the day and is rarely flagged; a visitor whose departure is not identified stays ``present'' until the day ends.
+\item The ArcFace model was trained on large web-collected face data that may overlap the identities of CASIA-WebFace, so recognition of people unseen by the model could be harder.
+\item No other routing mechanism, such as a distributed hash table or an approximate-nearest-neighbour index shared between buildings, was evaluated; such alternatives were excluded on privacy and cost grounds, not by measurement.
+\item No formal privacy guarantee is claimed, and the effective Bloom false-positive rate (about 3.5\%) exceeds the configured rate.
+\item The one-week and one-month simulations in the dashboard replay the recognised events of a single day with shifted times and weekend attendance; they demonstrate the interface and the access rules and are not a longitudinal evaluation.
+\item Every visitor is registered in some building, so unregistered people cannot be identified. Only 500 people in 10 buildings were measured, and the results come from simulated movement on replayed photographs, not from live video.
+\end{itemize}
+
+\clearpage
+\chapter{Conclusion}
+\section{Conclusion}
+This project built and evaluated a system that identifies and tracks occupants across buildings without pooling face data, answers queries according to the caller's role and relationship, and explains each answer. A visitor is found by routing a capture with LSH codes and per-building Bloom filters and verifying it only in the shortlisted buildings. On 10,000 events per day, averaged over 50 random populations, it identifies 95.0\% correctly against 95.2\% for a centralised search, touching 11.0\% of the galleries; the 95\% confidence interval of the accuracy is $\pm0.03$ points, and building-level state F1 score is 0.961. A dynamic visitor database makes about two thirds of the visitor events free of routing. A two-layer class-teacher policy, sealed transfers and redacted explanations are implemented and covered by 574 automated tests. The uncertainty flags attached to answers catch about 74\% of the wrong identifications and 79\% of the wrong answers for about 13\% of extra latency, although they rarely flag errors that come from the visitor database. Measuring the Bloom filters showed that their effective false-positive rate is about 3.5\%, not the 1\% configured, so the privacy argument rests on the one-way encoding and on exact verification. All six objectives are achieved in simulation (Table~\ref{tab:status}); the security work is a tested design on a simulated network and not a hardened deployment.
+
+\begin{table}[htbp]
+\centering
+\caption{Objective-wise status}\label{tab:status}
+{\small\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|p{4.3cm}|p{2.0cm}|p{2.6cm}|p{5.0cm}|}\hline
+\textbf{Objective} & \textbf{Planned} & \textbf{Status} & \textbf{Evidence}\\\hline
+1. Multi-building DSTS extension & Mid review & Achieved & BSTS over 10 buildings; building-level state F1 score 0.961\\\hline
+2. RBAC query interface & 24/9/26 & Achieved & Two layers, class-teacher model, every policy cell tested, 64-request persona matrix\\\hline
+3. Explainable responses & 26/9/26 & Achieved & Faithfulness cases, flag recall 74\% on identifications, 13\% overhead\\\hline
+4. LSH + Bloom routing & Mid review & Achieved & 11.0\% of gallery touched, 0.2-point accuracy cost; effective false-positive rate 3.5\%\\\hline
+5. Security layer & 2/10/26 & Achieved (simulated network) & Sealed transfers, tokens, lockout, audit log\\\hline
+6. Evaluation & Final review & Achieved & Event and state TP/FP/FN/TN, 50 seeds, centralised baseline, explanation and Bloom measurements\\\hline
+\end{tabular}}
+\end{table}
+
+\section{Future work}
+Three directions follow directly from the results.
+
+\subsubsection{Masked face recognition}
+The system assumes unmasked faces. Recognising people who wear masks needs a face model trained with masks instead of one trained on unmasked faces, a real mask detector, a few real masked photos per person, and tracking context, such as who is already inside the building. Each can be validated on the same seeds once a masked group of people is added to the simulated population.
+
+\subsubsection{Unknown visitor re-identification}
+Today a visitor must be registered in some building, and a face that is registered in no building is left unidentified. A future version should re-identify unknown visitors across buildings and days: keep one-way codes of the unknown faces (LSH with Bloom filters) under a temporary identifier, link their sightings into a track, and let an administrator later name or purge them. This needs retention and privacy rules, and a check that two different strangers are not merged, which can be measured with the same precision and recall used here once unregistered people are added to the simulated population.
+
+\subsubsection{Other types of sensor recognition}
+The pipeline needs only an identity estimate together with a zone and a time. Badge or RFID readers, beacons or other sensors can therefore replace the camera or complement it. Each new sensor needs its own error measurement, and the access rules and the explanations must be checked for it.
+
+\clearpage
+\renewcommand{\bibname}{References}
+
+\begin{thebibliography}{99}
+\phantomsection
+\addcontentsline{toc}{chapter}{References}
+
+\setlength{\itemsep}{6pt}
+\setlength{\parskip}{0pt}
+
+% Journal paper format
+\bibitem{ref1}
+C. Hegde \textit{et al.},
+``Indoor group identification and localization using privacy-preserving edge computing distributed camera network,''
+\textit{IEEE J. Indoor Seamless Position. Navig.},
+vol. 2, pp. 51--60,
+2024, doi: 10.1109/JISPIN.2024.3354248.
+
+\bibitem{ref2}
+H. Kwon \textit{et al.},
+``A feasibility study on indoor localization and multiperson tracking using sparsely distributed camera network with edge computing,''
+\textit{IEEE J. Indoor Seamless Position. Navig.},
+2023, doi: 10.1109/JISPIN.2023.3337189.
+
+% Journal paper with an article number instead of page numbers
+\bibitem{ref3}
+S. Yang, F. Ding, P. Li, and S. Hu,
+``Distributed multi-camera multi-target association for real-time tracking,''
+\textit{Sci. Rep.},
+vol. 12,
+Art. no. 11052, 2022,
+doi: 10.1038/s41598-022-15000-4.
+
+\bibitem{ref4}
+S. Casao, A. Naya, A. C. Murillo, and E. Montijano,
+``Distributed multi-target tracking in camera networks,''
+arXiv:2010.13701, 2021.
+
+\bibitem{ref5}
+B. Gaikwad and A. Karmakar,
+``Smart surveillance system for real-time multi-person multi-camera tracking at the edge,''
+\textit{J. Real-Time Image Process.},
+2021, doi: 10.1007/s11554-020-01066-8.
+
+\bibitem{ref6}
+L. Mohan and V. Menon,
+``Modelling large scale camera networks for identification and tracking: an abstract framework,''
+\textit{IET Comput. Vis.},
+vol. 14, no. 7, pp. 426--433,
+2020.
+
+\bibitem{ref7}
+V. Menon, B. Jayaraman, and V. Govindaraju,
+``The three Rs of cyberphysical spaces,''
+\textit{Computer},
+vol. 44, no. 9, pp. 73--79,
+2011.
+
+\bibitem{ref8}
+S. P. Nair, K. A. Reddy, P. K. Alluri, and S. Lalitha,
+``Face recognition and tracking for security surveillance,''
+\textit{J. Intell. Fuzzy Syst.},
+vol. 41, no. 5, pp. 5337--5345,
+2021, doi: 10.3233/JIFS-189856.
+
+\bibitem{ref9}
+Z. Wu \textit{et al.},
+``Learning-based tracking-before-detect for unconstrained indoor human tracking using RF signal,''
+\textit{IEEE Trans. Mobile Comput.},
+vol. 24, no. 6, pp. 4777--4793,
+2025, doi: 10.1109/TMC.2025.3529501.
+
+\bibitem{ref10}
+C. Rathgeb, F. Breitinger, C. Busch, and H. Baier,
+``On application of Bloom filters to iris biometrics,''
+\textit{IET Biometrics},
+vol. 3, no. 4, pp. 207--218,
+2014.
+
+\bibitem{ref11}
+F. Marzani, T. van Ede, G. Heijenk, and M. van Steen,
+``Head count: privacy-preserving face-based crowd monitoring,''
+arXiv:2604.14250, 2026.
+
+\bibitem{ref12}
+B. H. Bloom,
+``Space/time trade-offs in hash coding with allowable errors,''
+\textit{Commun. ACM},
+vol. 13, no. 7, pp. 422--426,
+1970.
+
+\bibitem{ref13}
+L. Fan, P. Cao, J. Almeida, and A. Z. Broder,
+``Summary cache: a scalable wide-area web cache sharing protocol,''
+\textit{IEEE/ACM Trans. Netw.},
+vol. 8, no. 3, pp. 281--293,
+2000.
+
+% Conference paper format
+\bibitem{ref14}
+M. S. Charikar,
+``Similarity estimation techniques from rounding algorithms,''
+in \textit{Proc. 34th Annu. ACM Symp. Theory Comput. (STOC)},
+Montr\'eal, Canada, 2002, pp. 380--388.
+
+\bibitem{ref15}
+Q. Lv, W. Josephson, Z. Wang, M. Charikar, and K. Li,
+``Multi-probe LSH: efficient indexing for high-dimensional similarity search,''
+in \textit{Proc. 33rd Int. Conf. Very Large Data Bases (VLDB)},
+Vienna, Austria, 2007, pp. 950--961.
+
+\bibitem{ref16}
+A. Kirsch and M. Mitzenmacher,
+``Less hashing, same performance: building a better Bloom filter,''
+in \textit{Algorithms -- ESA 2006}, ser. LNCS, vol. 4168,
+Z\"urich, Switzerland, 2006, pp. 456--467.
+
+\bibitem{ref17}
+J. Deng, J. Guo, N. Xue, and S. Zafeiriou,
+``ArcFace: additive angular margin loss for deep face recognition,''
+in \textit{Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR)},
+Long Beach, CA, USA, 2019, pp. 4690--4699.
+
+\bibitem{ref18}
+J. Guo, J. Deng, A. Lattas, and S. Zafeiriou,
+``Sample and computation redistribution for efficient face detection,''
+in \textit{Proc. Int. Conf. Learn. Represent. (ICLR)},
+virtual event, 2022.
+
+\bibitem{ref19}
+D. Yi, Z. Lei, S. Liao, and S. Z. Li,
+``Learning face representation from scratch,''
+arXiv:1411.7923, 2014.
+
+\bibitem{ref21}
+R. S. Sandhu, E. J. Coyne, H. L. Feinstein, and C. E. Youman,
+``Role-based access control models,''
+\textit{IEEE Computer},
+vol. 29, no. 2, pp. 38--47,
+1996.
+
+\bibitem{ref22}
+H. Krawczyk and P. Eronen,
+``HMAC-based extract-and-expand key derivation function (HKDF),''
+RFC 5869, IETF, 2010.
+
+\bibitem{ref23}
+A. Langley, M. Hamburg, and S. Turner,
+``Elliptic curves for security,''
+RFC 7748, IETF, 2016.
+
+\bibitem{ref24}
+S. Josefsson and I. Liusvaara,
+``Edwards-curve digital signature algorithm (EdDSA),''
+RFC 8032, IETF, 2017.
+
+\bibitem{ref25}
+M. Dworkin,
+``Recommendation for block cipher modes of operation: Galois/Counter Mode (GCM) and GMAC,''
+NIST Special Publication 800-38D, 2007.
+
+\bibitem{ref26}
+M. S. S. Suresh and V. Menon,
+``A generic and scalable approach to maximize coverage in diverse indoor and outdoor multicamera surveillance scenarios,''
+\textit{IEEE Trans. Syst., Man, Cybern., Syst.},
+vol. 53, no. 2, pp. 1172--1182,
+2022.
+
+\bibitem{ref27}
+United Nations General Assembly,
+``Transforming our world: the 2030 Agenda for Sustainable Development,''
+A/RES/70/1, 2015.
+
+\end{thebibliography}
+\clearpage
+\appendix\chapter{Source Code and Reproducibility}
+The complete source code, configuration and test suite of the project are in one Git repository: \texttt{github.com/yadhu-vipin/Occupant\_\allowbreak Tracking\_\allowbreak v2}, branch \texttt{test\_\allowbreak 7}. No passwords, tokens or personal data are stored in the repository; the datasets and model files are public and are downloaded separately (see below), and the login master secret is supplied through an environment variable.
+
+\section{Setup and execution}\label{app:setup}
+\subsubsection{Dependencies}
+Python 3.12; the packages in \texttt{requirements.txt} (NumPy, pandas, cryptography, FastAPI, uvicorn, pydantic, prometheus\_\allowbreak client, PyYAML, httpx, pytest). The face models were used once to extract the embeddings and are not needed to run the pipeline on the stored embeddings.
+
+\subsubsection{Steps}
+\begin{enumerate}
+\item Clone the repository, create a virtual environment and run \texttt{pip install -r requirements.txt}.
+\item Place the embedding corpus files \texttt{emb\_\allowbreak arcface.npy} (20,000 $\times$ 512) and \texttt{meta.csv} in \texttt{corpus/}. They are not in Git because of their size.
+\item Run the experiment with the commands below; every seed writes into its own folder \texttt{runs/seed\_\allowbreak XX/}.
+\end{enumerate}
+\begin{footnotesize}
+\begin{verbatim}
+python manage.py test                        # the automated tests
+python manage.py run --seeds 0-49 --days 1   # 50 populations, summary
+python -m centralized.compare_all            # central baseline
+python -m evaluation.evaluate_explanations   # flags and overhead
+python tools/measure_bloom_fpr.py            # Bloom false-positive rate
+DSTS_DEMO_MODE=1 python manage.py serve --seed 42   # API, port 8000
+\end{verbatim}
+\end{footnotesize}
+
+\subsubsection{Configuration}
+All settings of an experiment are in \texttt{config/experiment.yaml}: the population (10 buildings of 50, default seed 42), the event model (by default 14 simulated days with 8 events per occupant per day and a visitor share of 20\%; the results in this report use the one-day generator, \texttt{--days 1}, which replays every test photograph once and has the same visitor share) and the visitor promotion rule. The federation contract (hash functions, Bloom size, thresholds) is in \texttt{shared/params.json} and \texttt{shared/routing\_\allowbreak params.json}; every artifact carries a hash of it, and a mismatch is rejected.
+
+\subsubsection{Time and outputs}
+A one-day run of 10,000 events takes about eight minutes on a laptop CPU. Each run writes its own folder under runs/seed\_\allowbreak XX/ (population, node data, events, results).
+
+\section{Supporting material}
+\subsection{Repository layout and sources of the numbers}
+The repository is grouped by role: \texttt{population}, \texttt{events}, \texttt{buildinglib} and \texttt{recognition} (the building node and the pipeline), \texttt{access\_\allowbreak control} and \texttt{secure\_\allowbreak transfer} (the two security layers), \texttt{evaluation}, \texttt{centralized} and \texttt{tools} (metrics, baseline and measurements), \texttt{dsts/api} (the server and dashboard) and \texttt{tests}. Every number in this report is read from the files a run writes under \texttt{runs/seed\_\allowbreak XX/results/}, and the 50-seed averages from \texttt{runs/summary.json}; the commands in Section~\ref{app:setup} regenerate all of them.
+
+\subsection{Dataset documentation}
+\subsubsection{CASIA-WebFace subset}500 identities with 40 embeddings each, split into 20 reference and 20 test embeddings; embeddings were extracted once with the InsightFace buffalo\_\allowbreak l models and are stored as 512-dimensional unit vectors.
+
+\end{document}

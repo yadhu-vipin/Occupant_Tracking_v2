@@ -52,8 +52,17 @@ def test_disabled_gives_the_original_ten_building_corpus():
     assert not corpus.masked and len(corpus.meta) == 20000 and corpus.emb_path == BASE_EMB
 
 
+@pytest.fixture
+def masked_enabled(tmp_path, monkeypatch):
+    """The project default now runs the original ten buildings; this test needs the optional masked eleventh one switched on."""
+    import shared.experiment_config as experiment_config
+    config = tmp_path / "experiment.yaml"
+    config.write_text("masked_building:\n  enabled: true\n", encoding="utf-8")
+    monkeypatch.setattr(experiment_config, "CONFIG_FILE", config)
+
+
 @needs_masked
-def test_population_adds_building_11_without_reshuffling_the_other_ten():
+def test_population_adds_building_11_without_reshuffling_the_other_ten(masked_enabled):
     pop = build_population(5)
     assert pop.n_buildings == 11 and pop.masked_building == "building_11" and len(pop.person_building) == 550
     by_b = pop.by_building

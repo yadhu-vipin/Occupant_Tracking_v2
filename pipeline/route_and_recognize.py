@@ -235,7 +235,9 @@ class RetrievalRuntime:
         self.advance_clock(event["timestamp"])
         replies, verified, verified_refs, routing_source = [], None, None, "routed"
         db = getattr(self, "visitor_dbs", {}).get(current)
-        hit = db.match(query, self.contract.accept_angle_deg, self.contract.min_votes) if db is not None else None
+        # DSTS_VISITOR_DB=off is an ablation switch: the database is still kept up to date, but never answers a lookup.
+        use_db = os.environ.get("DSTS_VISITOR_DB", "on").lower() != "off"
+        hit = db.match(query, self.contract.accept_angle_deg, self.contract.min_votes) if db is not None and use_db else None
         if hit is not None:                              # a visitor this building already knows: no routing at all
             shortlist, scores, routing_source = [], {}, hit.source
             verified = {"building": hit.home_building, "matched": True, "occupant_id": hit.occupant_id,
